@@ -45,6 +45,7 @@ function isSingleInheritanceLandTransfer(item) {
 
 function inheritanceRowText(item) {
   return [
+    item.receiptNumber ? `第${item.receiptNumber}号` : '',
     item.receiptDate || '',
     item.propertyType || '土地',
     item.registryAddress || item.location || '',
@@ -621,8 +622,9 @@ export default function App() {
   function downloadInheritanceCsv() {
     if (!sortedInheritanceRows.length) return
     const rows = [
-      ['受付日', '土地', '住所', '外記載'],
+      ['受付番号', '受付日', '土地', '住所', '外記載'],
       ...sortedInheritanceRows.map((item) => [
+        item.receiptNumber ? `第${item.receiptNumber}号` : '',
         item.receiptDate,
         item.propertyType || '土地',
         item.registryAddress || item.location,
@@ -1647,7 +1649,7 @@ export default function App() {
             <div className="inheritance-disclosure__body">
               <div className="privacy-note">
                 <strong>個人情報保護のための注意</strong>
-                <span>PDFはブラウザ内で処理し、サーバー送信・自動保存はしません。受付日・土地所在地・外記載を抽出し、最終確認は必ず原本で行ってください。</span>
+                <span>PDFはブラウザ内で処理し、サーバー送信・自動保存はしません。受付番号・受付日・土地所在地・外記載を抽出し、最終確認は必ず原本で行ってください。</span>
               </div>
 
               <div className="inheritance-toolbar">
@@ -1737,12 +1739,13 @@ export default function App() {
                             <option value="address">住所順</option>
                           </select>
                         </label>
-                        <small>行の「コピー」は、受付日・土地・住所・外記載をタブ区切りでコピーします。</small>
+                        <small>行の「コピー」は、受付番号・受付日・土地・住所・外記載をタブ区切りでコピーします。</small>
                       </div>
                       <div className="inheritance-table-wrap">
                         <table className="inheritance-table">
                           <thead>
                             <tr>
+                              <th>受付番号</th>
                               <th>受付日</th>
                               <th>土地</th>
                               <th>住所</th>
@@ -1753,6 +1756,7 @@ export default function App() {
                           <tbody>
                             {sortedInheritanceRows.map((item, index) => (
                               <tr key={`${item.pageNumber}-${item.sequence}-${index}`} className="inheritance-row--single">
+                                <td>{item.receiptNumber ? `第${item.receiptNumber}号` : '番号未抽出'}</td>
                                 <td>{item.receiptDate || '受付日未抽出'}</td>
                                 <td>{item.propertyType || '土地'}</td>
                                 <td>
