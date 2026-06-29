@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { existsSync, readFileSync } from 'node:fs'
 
 import { parseCoordinateInput, toDegreeMinutes } from '../src/utils/coordinates.js'
 import { escapeCsv } from '../src/utils/csv.js'
@@ -113,13 +114,21 @@ test('snowRateLevel uses shared visual thresholds', () => {
 })
 
 test('horizon direction presets keep simple and detailed analysis modes stable', () => {
-  assert.deepEqual(HORIZON_DIRECTIONS.map((item) => item.bearing), [0, 45, 90, 135, 180, 225, 270])
+  assert.deepEqual(HORIZON_DIRECTIONS.map((item) => item.bearing), [0, 45, 90, 135, 180, 225, 270, 315])
   assert.equal(DETAILED_HORIZON_DIRECTIONS.length, 36)
   assert.equal(DETAILED_HORIZON_DIRECTIONS[0].bearing, 0)
   assert.equal(DETAILED_HORIZON_DIRECTIONS.at(-1).bearing, 350)
   assert.equal(DETAILED_HORIZON_DIRECTIONS.find((item) => item.bearing === 10)?.direction, '')
   assert.equal(DETAILED_HORIZON_DIRECTIONS.find((item) => item.bearing === 270)?.direction, '西')
   assert.deepEqual(createHorizonDirections(90).map((item) => item.bearing), [0, 90, 180, 270])
+})
+
+test('serve:dist script points to an existing local server file', () => {
+  const packageJson = JSON.parse(readFileSync('package.json', 'utf8'))
+  const script = packageJson.scripts?.['serve:dist'] || ''
+  const match = script.match(/node\s+(.+)$/)
+  assert.ok(match, 'serve:dist should run a node server file')
+  assert.ok(existsSync(match[1]), `${match[1]} should exist`)
 })
 
 test('solar window check compares winter peak sun height against horizon direction', () => {

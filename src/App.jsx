@@ -970,11 +970,11 @@ export default function App() {
                 <div className="terrain-box">
                   <div>
                     <strong>{formatHorizonSummary(terrain)}</strong>
-                    <span>{detailedHorizon ? '10°間隔・36方位を一括分析（詳細）' : '0° / 45° / 90° / 135° / 180° / 225° / 270°を一括分析'}</span>
+                    <span>{detailedHorizon ? '10°間隔・36方位を一括分析（詳細）' : '0° / 45° / 90° / 135° / 180° / 225° / 270° / 315°を一括分析'}</span>
                   </div>
                   <div className="terrain-actions">
                     <button type="button" className="action-button action-button--terrain" disabled={!position || !Number.isFinite(elevation.value) || terrainStatus === 'loading'} onClick={handleTerrainAnalysis}>
-                      <span>{terrainStatus === 'loading' ? '分析中…' : (detailedHorizon ? '詳細地平線36方位を分析' : '地平線7方位を分析')}</span>
+                      <span>{terrainStatus === 'loading' ? '分析中…' : (detailedHorizon ? '詳細地平線36方位を分析' : '地平線8方位を分析')}</span>
                       <small>{position ? '選択地点から周辺地形を取得' : '先に地図で地点を選択'}</small>
                     </button>
                     <label className="horizon-detail-toggle">
@@ -1371,7 +1371,7 @@ export default function App() {
               <ol>
                 <li>候補地点を地図・住所・座標で指定する。</li>
                 <li>緯度・経度・標高・3次メッシュを確認する。</li>
-                <li>地平線7方位を分析し、必要なら手動補正する。</li>
+                <li>地平線8方位を分析し、必要なら手動補正する。</li>
                 <li>NEDO Webから同一3次メッシュの積雪出現率を取得する。</li>
                 <li>Solar Pro転記用ミニ表を開き、入力値を確認する。</li>
               </ol>
@@ -1391,9 +1391,9 @@ export default function App() {
             <article className="manual-card">
               <span>STEP 2</span>
               <h3>地平線を入力</h3>
-              <p><strong>3DCAD → 地平線</strong> を開き、方位角と高度角を入力します。現在は一次検討用として7方位を使います。</p>
+              <p><strong>3DCAD → 地平線</strong> を開き、方位角と高度角を入力します。現在は一次検討用として8方位を使います。</p>
               <ul>
-                <li>0° / 45° / 90° / 135° / 180° / 225° / 270°を入力。</li>
+                <li>0° / 45° / 90° / 135° / 180° / 225° / 270° / 315°を入力。</li>
                 <li>樹高20mを加算した保守的な概算値として扱う。</li>
                 <li>冬の太陽高度警告が出た場合は現地影を重点確認。</li>
               </ul>
@@ -1426,7 +1426,7 @@ export default function App() {
               <h3>簡易シミュレーション前の確認</h3>
               <div className="manual-check-list">
                 <label><input type="checkbox" /> 設置場所の緯度・経度・標高を入力した</label>
-                <label><input type="checkbox" /> 地平線7方位を入力または確認した</label>
+                <label><input type="checkbox" /> 地平線8方位を入力または確認した</label>
                 <label><input type="checkbox" /> 積雪補正係数を月別に入力した</label>
                 <label><input type="checkbox" /> 図面・航空写真・現地影メモを確認した</label>
                 <label><input type="checkbox" /> 結果が極端な場合は原典データを再確認した</label>
@@ -1474,7 +1474,7 @@ export default function App() {
               <div className="check-note-list">
                 <label><input type="checkbox" /> 設置場所：緯度・経度・標高を確認</label>
                 <label><input type="checkbox" /> 日射データベース：MONSOLA-11の地域を確認</label>
-                <label><input type="checkbox" /> 地平線：7方位の仰角を入力または確認</label>
+                <label><input type="checkbox" /> 地平線：8方位の仰角を入力または確認</label>
                 <label><input type="checkbox" /> 積雪補正：月別係数を入力</label>
                 <label><input type="checkbox" /> 現地影：近接障害物は別途メモ・写真確認</label>
               </div>

@@ -230,6 +230,7 @@ const DIRECTIONS = [
   ['南', 180],
   ['南西', 225],
   ['西', 270],
+  ['北西', 315],
 ]
 
 export const HORIZON_DIRECTIONS = DIRECTIONS.map(([direction, bearing]) => ({

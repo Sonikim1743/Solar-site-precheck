@@ -1005,7 +1005,7 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
 
 .horizon-table {
   display: grid;
-  grid-template-columns: repeat(7, minmax(100px, 1fr));
+  grid-template-columns: repeat(8, minmax(92px, 1fr));
   gap: 9px;
 }
 .horizon-table--detail {
@@ -1827,7 +1827,7 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
 .report-data-block { margin-top: 20px; padding: 15px; border: 1px solid var(--line); border-radius: 9px; }
 .report-data-block h3 { margin: 0 0 12px; color: var(--green-dark); font-size: 14px; }
 .report-source-line { margin: -4px 0 12px; color: var(--muted); font-size: 12px; }
-.report-horizon-row { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.report-horizon-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); }
 .report-horizon-row > div { min-width: 0; padding: 8px; display: grid; gap: 3px; border-right: 1px solid var(--line); text-align: center; }
 .report-horizon-row > div:last-child { border-right: 0; }
 .report-horizon-row span { color: var(--muted); font-size: 11px; }
@@ -2181,7 +2181,7 @@ footer {
     background: #fbfdfc;
   }
   .report-section__heading { align-items: flex-start; flex-direction: column; }
-  .horizon-table { grid-template-columns: repeat(7, minmax(86px, 1fr)); overflow-x: auto; }
+  .horizon-table { grid-template-columns: repeat(4, minmax(86px, 1fr)); overflow-x: auto; }
   .horizon-table--detail {
     grid-template-columns: repeat(auto-fit, minmax(86px, 1fr));
     max-height: none;
