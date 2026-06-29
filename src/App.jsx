@@ -605,11 +605,10 @@ export default function App() {
   function downloadInheritanceCsv() {
     if (!inheritanceSingleTransferRows.length) return
     const rows = [
-      ['受付番号', '土地', '受付日', '住所', '外記載'],
+      ['受付日', '土地', '住所', '外記載'],
       ...inheritanceSingleTransferRows.map((item) => [
-        item.receiptNumber ? `第${item.receiptNumber}号` : '',
-        item.propertyType || '土地',
         item.receiptDate,
+        item.propertyType || '土地',
         item.registryAddress || item.location,
         item.extraCount ? `外${item.extraCount}件` : '',
       ]),
@@ -1604,7 +1603,7 @@ export default function App() {
             <div className="inheritance-disclosure__body">
               <div className="privacy-note">
                 <strong>個人情報保護のための注意</strong>
-                <span>PDFはブラウザ内で処理し、サーバー送信・自動保存はしません。受付番号・受付日・土地所在地・外記載を抽出し、最終確認は必ず原本で行ってください。</span>
+                <span>PDFはブラウザ内で処理し、サーバー送信・自動保存はしません。受付日・土地所在地・外記載を抽出し、最終確認は必ず原本で行ってください。</span>
               </div>
 
               <div className="inheritance-toolbar">
@@ -1638,9 +1637,8 @@ export default function App() {
                       <table className="inheritance-table">
                         <thead>
                           <tr>
-                            <th>受付番号</th>
-                            <th>土地</th>
                             <th>受付日</th>
+                            <th>土地</th>
                             <th>住所</th>
                             <th>外記載</th>
                           </tr>
@@ -1648,11 +1646,8 @@ export default function App() {
                         <tbody>
                           {inheritanceSingleTransferRows.map((item, index) => (
                             <tr key={`${item.pageNumber}-${index}`} className="inheritance-row--single">
-                              <td>
-                                <span>{item.receiptNumber ? `第${item.receiptNumber}号` : '番号未抽出'}</span>
-                              </td>
-                              <td>{item.propertyType || '土地'}</td>
                               <td>{item.receiptDate || '受付日未抽出'}</td>
+                              <td>{item.propertyType || '土地'}</td>
                               <td>
                                 <span>{item.registryAddress || item.location || '所在未抽出'}</span>
                               </td>

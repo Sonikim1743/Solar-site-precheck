@@ -147,6 +147,7 @@ test('inheritance text analyzer flags land single-inheritance candidates conserv
       '相続人：山田太郎',
       '所有権全部を相続により取得',
       '',
+      '第１４３０号 】 ３月 ３日受付（共有） 所有権移転・相続',
       '土地',
       '所在：広島県三次市乙',
       '地番：555番',
@@ -162,6 +163,25 @@ test('inheritance text analyzer flags land single-inheritance candidates conserv
   assert.equal(results[0].registryAddress, '庄原市西本町１丁目１７５－３')
   assert.equal(results[0].extraCount, 21)
   assert.ok(results.some((item) => item.status.includes('共有')))
+})
+
+test('inheritance text analyzer keeps receipt order and reads compact extra-count notation', () => {
+  const results = analyzeInheritanceText([{
+    pageNumber: 1,
+    text: [
+      '第１００１号 】 １月 ５日受付（単独） 所有権移転・相続',
+      '既）土地 庄原市A町１００ 外２',
+      '第１００２号 】 １月 ６日受付（単独） 所有権移転・相続',
+      '既）土地 庄原市B町２００ 外 ３件',
+    ].join('\n'),
+  }])
+  assert.equal(results.length, 2)
+  assert.equal(results[0].receiptDate, '1月5日')
+  assert.equal(results[0].registryAddress, '庄原市A町１００')
+  assert.equal(results[0].extraCount, 2)
+  assert.equal(results[1].receiptDate, '1月6日')
+  assert.equal(results[1].registryAddress, '庄原市B町２００')
+  assert.equal(results[1].extraCount, 3)
 })
 
 test('solar window check compares winter peak sun height against horizon direction', () => {

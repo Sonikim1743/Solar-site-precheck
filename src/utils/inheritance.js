@@ -37,9 +37,13 @@ function parseRegistrySummary(excerpt) {
   const ownershipMode = flat.match(/[（(]\s*(単独|共有|共同)\s*[）)]/)?.[1] || ''
   const registrationCause = flat.match(/(所有権移転[・･・\s]*相続|所有権移転|相続)/)?.[1]?.replace(/\s+/g, '') || ''
   const propertyType = flat.match(/(?:既[）)]\s*)?(土地|建物)/)?.[1] || ''
-  const landMatch = flat.match(/(?:既[）)]\s*)?土地\s+(.+?)(?:\s+外\s*([0-9０-９]+)|$)/)
-  const registryAddress = landMatch?.[1]?.trim() || ''
-  const extraCount = landMatch?.[2] ? Number(toHalfWidthDigits(landMatch[2])) : 0
+  const landText = flat.match(/(?:既[）)]\s*)?土地\s+(.+)/)?.[1] || ''
+  const extraMatch = landText.match(/\s*外\s*([0-9０-９]+)\s*(?:件|筆)?/)
+  const addressSource = extraMatch ? landText.slice(0, extraMatch.index) : landText
+  const registryAddress = addressSource
+    .split(/\s+(?:所在|地番|地目|地積|相続人|所有者|取得者|承継人|第\s*[0-9０-９]+\s*号|土地\s)/)[0]
+    .trim()
+  const extraCount = extraMatch?.[1] ? Number(toHalfWidthDigits(extraMatch[1])) : 0
 
   return {
     receiptNumber,
@@ -55,14 +59,29 @@ function parseRegistrySummary(excerpt) {
 export function analyzeInheritanceText(pages) {
   const results = []
   const seen = new Set()
+  let sequence = 0
 
   pages.forEach((page) => {
     const lines = normalizeText(page.text).split('\n').map((line) => line.trim()).filter(Boolean)
-    lines.forEach((line, index) => {
-      if (!/(第\s*[0-9０-９]+\s*号|受付|土地|所在|地番|地目|地積)/.test(line)) return
-      const excerpt = compactExcerpt(lines, Math.max(0, index - 1), 8)
+    const receiptIndexes = lines
+      .map((line, index) => ({ line, index }))
+      .filter(({ line }) => /第\s*[0-9０-９]+\s*号/.test(line) && /受付/.test(line))
+      .map(({ index }) => index)
+    const scanIndexes = receiptIndexes.length
+      ? receiptIndexes
+      : lines
+        .map((line, index) => ({ line, index }))
+        .filter(({ line }) => /(受付|土地|所在|地番|地目|地積)/.test(line))
+        .map(({ index }) => index)
+
+    scanIndexes.forEach((index, scanOrder) => {
+      const nextReceiptIndex = receiptIndexes.find((nextIndex) => nextIndex > index)
+      const end = nextReceiptIndex || Math.min(lines.length, index + 10)
+      const excerpt = receiptIndexes.length
+        ? normalizeText(lines.slice(index, end).join('\n'))
+        : compactExcerpt(lines, Math.max(0, index - 1), 8)
       if (!/(土地|地番|地目|地積)/.test(excerpt)) return
-      const key = `${page.pageNumber}:${excerpt.slice(0, 120)}`
+      const key = `${page.pageNumber}:${index}:${excerpt.slice(0, 120)}`
       if (seen.has(key)) return
       seen.add(key)
 
@@ -102,7 +121,10 @@ export function analyzeInheritanceText(pages) {
       ].filter(Boolean)
 
       results.push({
+        sequence: sequence++,
         pageNumber: page.pageNumber,
+        lineNumber: index + 1,
+        scanOrder,
         status,
         score,
         location: pickField(excerpt, '所在'),
@@ -124,10 +146,7 @@ export function analyzeInheritanceText(pages) {
   })
 
   return results
-    .sort((a, b) => {
-      if (a.status !== b.status) return a.status === '単独相続候補' ? -1 : 1
-      return b.score - a.score
-    })
+    .sort((a, b) => a.sequence - b.sequence)
     .slice(0, 80)
 }
 
