@@ -43,6 +43,15 @@ function isSingleInheritanceLandTransfer(item) {
     (item?.registrationCause || '').includes('相続')
 }
 
+function inheritanceRowText(item) {
+  return [
+    item.receiptDate || '',
+    item.propertyType || '土地',
+    item.registryAddress || item.location || '',
+    item.extraCount ? `外${item.extraCount}件` : '',
+  ].join('\t')
+}
+
 function loadDraft() {
   try {
     return JSON.parse(window.localStorage.getItem(DRAFT_KEY)) || {}
@@ -202,6 +211,8 @@ export default function App() {
   const [drawingSelectedPages, setDrawingSelectedPages] = useState([])
   const [inheritanceStatus, setInheritanceStatus] = useState({ status: 'idle', message: '' })
   const [inheritanceJob, setInheritanceJob] = useState(null)
+  const [inheritanceSort, setInheritanceSort] = useState('receipt')
+  const [inheritanceCopyStatus, setInheritanceCopyStatus] = useState('')
   const draftSaveTimer = useRef(null)
 
   useEffect(() => {
@@ -604,13 +615,14 @@ export default function App() {
   function clearInheritanceJob() {
     setInheritanceJob(null)
     setInheritanceStatus({ status: 'idle', message: '' })
+    setInheritanceCopyStatus('')
   }
 
   function downloadInheritanceCsv() {
-    if (!inheritanceSingleTransferRows.length) return
+    if (!sortedInheritanceRows.length) return
     const rows = [
       ['受付日', '土地', '住所', '外記載'],
-      ...inheritanceSingleTransferRows.map((item) => [
+      ...sortedInheritanceRows.map((item) => [
         item.receiptDate,
         item.propertyType || '土地',
         item.registryAddress || item.location,
@@ -624,6 +636,19 @@ export default function App() {
     link.download = `${inheritanceJob.fileName.replace(/\.pdf$/i, '') || '相続資料'}_単独所有権移転相続リスト.csv`
     link.click()
     URL.revokeObjectURL(link.href)
+  }
+
+  async function copyInheritanceRow(item, index) {
+    const text = inheritanceRowText(item)
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard API unavailable')
+      await navigator.clipboard.writeText(text)
+      setInheritanceCopyStatus(`row-${index}`)
+    } catch {
+      setInheritanceCopyStatus('failed')
+      window.prompt('コピーできない場合は、この内容を選択してコピーしてください。', text)
+    }
+    window.setTimeout(() => setInheritanceCopyStatus(''), 1600)
   }
 
   function updateSnowRate(index, rawValue) {
@@ -665,6 +690,21 @@ export default function App() {
     () => inheritanceJob?.results?.filter(isSingleInheritanceLandTransfer) || [],
     [inheritanceJob]
   )
+  const sortedInheritanceRows = useMemo(() => {
+    const rows = [...inheritanceSingleTransferRows]
+    if (inheritanceSort === 'extra-desc') {
+      rows.sort((a, b) => (b.extraCount || 0) - (a.extraCount || 0) || a.sequence - b.sequence)
+    } else if (inheritanceSort === 'address') {
+      rows.sort((a, b) => {
+        const addressA = a.registryAddress || a.location || ''
+        const addressB = b.registryAddress || b.location || ''
+        return addressA.localeCompare(addressB, 'ja') || a.sequence - b.sequence
+      })
+    } else {
+      rows.sort((a, b) => a.sequence - b.sequence)
+    }
+    return rows
+  }, [inheritanceSingleTransferRows, inheritanceSort])
 
   const report = useMemo(() => ({
     position,
@@ -1687,31 +1727,50 @@ export default function App() {
                   )}
 
                   {inheritanceSingleTransferRows.length ? (
-                    <div className="inheritance-table-wrap">
-                      <table className="inheritance-table">
-                        <thead>
-                          <tr>
-                            <th>受付日</th>
-                            <th>土地</th>
-                            <th>住所</th>
-                            <th>外記載</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {inheritanceSingleTransferRows.map((item, index) => (
-                            <tr key={`${item.pageNumber}-${index}`} className="inheritance-row--single">
-                              <td>{item.receiptDate || '受付日未抽出'}</td>
-                              <td>{item.propertyType || '土地'}</td>
-                              <td>
-                                <span>{item.registryAddress || item.location || '所在未抽出'}</span>
-                              </td>
-                              <td>
-                                {item.extraCount ? `外${item.extraCount}件` : ''}
-                              </td>
+                    <div className="inheritance-list-panel">
+                      <div className="inheritance-list-tools">
+                        <label>
+                          <span>並び替え</span>
+                          <select value={inheritanceSort} onChange={(event) => setInheritanceSort(event.target.value)}>
+                            <option value="receipt">受付順</option>
+                            <option value="extra-desc">外記載が多い順</option>
+                            <option value="address">住所順</option>
+                          </select>
+                        </label>
+                        <small>行の「コピー」は、受付日・土地・住所・外記載をタブ区切りでコピーします。</small>
+                      </div>
+                      <div className="inheritance-table-wrap">
+                        <table className="inheritance-table">
+                          <thead>
+                            <tr>
+                              <th>受付日</th>
+                              <th>土地</th>
+                              <th>住所</th>
+                              <th>外記載</th>
+                              <th>操作</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody>
+                            {sortedInheritanceRows.map((item, index) => (
+                              <tr key={`${item.pageNumber}-${item.sequence}-${index}`} className="inheritance-row--single">
+                                <td>{item.receiptDate || '受付日未抽出'}</td>
+                                <td>{item.propertyType || '土地'}</td>
+                                <td>
+                                  <span>{item.registryAddress || item.location || '所在未抽出'}</span>
+                                </td>
+                                <td>
+                                  {item.extraCount ? `外${item.extraCount}件` : ''}
+                                </td>
+                                <td>
+                                  <button type="button" className="tiny-action-button" onClick={() => copyInheritanceRow(item, index)}>
+                                    {inheritanceCopyStatus === `row-${index}` ? 'コピー済み' : 'コピー'}
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   ) : (
                     <p className="inline-message">単独 / 所有権移転・相続（土地）を検出できませんでした。PDFの文字認識状態または原本を確認してください。</p>
