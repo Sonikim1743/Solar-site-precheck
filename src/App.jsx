@@ -37,6 +37,12 @@ const DRAFT_KEY = 'solar-site-precheck-draft-v1'
 const TERRAIN_ANALYSIS_VERSION = 2
 const APP_VERSION = '1.01'
 
+function isSingleInheritanceLandTransfer(item) {
+  return item?.ownershipMode === '単独' &&
+    item?.propertyType === '土地' &&
+    /所有権移転|相続/.test(item?.registrationCause || '')
+}
+
 function loadDraft() {
   try {
     return JSON.parse(window.localStorage.getItem(DRAFT_KEY)) || {}
@@ -581,9 +587,10 @@ export default function App() {
         setInheritanceStatus({ status: 'loading', message })
       })
       setInheritanceJob(job)
+      const singleTransferCount = job.results.filter(isSingleInheritanceLandTransfer).length
       setInheritanceStatus({
         status: 'success',
-        message: `${job.pageCount}ページを確認しました。単独相続候補 ${job.results.filter((item) => item.status === '単独相続候補').length}件 / 要確認 ${job.results.filter((item) => item.status !== '単独相続候補').length}件`,
+        message: `${job.pageCount}ページを確認しました。単独 / 所有権移転・相続（土地） ${singleTransferCount}件を抽出しました。`,
       })
     } catch (error) {
       setInheritanceStatus({ status: 'error', message: error.message || '相続資料PDFを読み取れませんでした。' })
@@ -596,32 +603,22 @@ export default function App() {
   }
 
   function downloadInheritanceCsv() {
-    if (!inheritanceJob?.results?.length) return
+    if (!inheritanceSingleTransferRows.length) return
     const rows = [
-      ['判定', 'ページ', '受付番号', '受付日', '区分', '登記内容', '種別', '所在・住所', '外件数', '地番', '地目', '地積', '相続人・取得者候補', '根拠', '抜粋'],
-      ...inheritanceJob.results.map((item) => [
-        item.status,
-        item.pageNumber,
-        item.receiptNumber,
+      ['受付番号', '土地', '受付日', '住所', '外記載'],
+      ...inheritanceSingleTransferRows.map((item) => [
+        item.receiptNumber ? `第${item.receiptNumber}号` : '',
+        item.propertyType || '土地',
         item.receiptDate,
-        item.ownershipMode,
-        item.registrationCause,
-        item.propertyType,
         item.registryAddress || item.location,
-        item.extraCount || '',
-        item.lotNumber,
-        item.landCategory,
-        item.area,
-        item.heirs.join(' / '),
-        item.reasons.join(' / '),
-        item.excerpt,
+        item.extraCount ? `外${item.extraCount}件` : '',
       ]),
     ]
     const csv = `\uFEFF${rows.map((row) => row.map(escapeCsv).join(',')).join('\r\n')}`
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob)
-    link.download = `${inheritanceJob.fileName.replace(/\.pdf$/i, '') || '相続資料'}_単独相続候補.csv`
+    link.download = `${inheritanceJob.fileName.replace(/\.pdf$/i, '') || '相続資料'}_単独所有権移転相続リスト.csv`
     link.click()
     URL.revokeObjectURL(link.href)
   }
@@ -661,6 +658,10 @@ export default function App() {
   const confirmedMeshPlaceName = confirmedSnowStation?.placeName || ''
   const selectedPlaceLabel = placeInfo.status === 'success' ? placeInfo.data.label : ''
   const solarReference = useMemo(() => solarAltitudeReference(position, terrain), [position, terrain])
+  const inheritanceSingleTransferRows = useMemo(
+    () => inheritanceJob?.results?.filter(isSingleInheritanceLandTransfer) || [],
+    [inheritanceJob]
+  )
 
   const report = useMemo(() => ({
     position,
@@ -1603,7 +1604,7 @@ export default function App() {
             <div className="inheritance-disclosure__body">
               <div className="privacy-note">
                 <strong>個人情報保護のための注意</strong>
-                <span>PDFはブラウザ内で処理し、サーバー送信・自動保存はしません。判定は候補抽出であり、最終判断は必ず原本を目視確認してください。</span>
+                <span>PDFはブラウザ内で処理し、サーバー送信・自動保存はしません。受付番号・受付日・土地所在地・外記載を抽出し、最終確認は必ず原本で行ってください。</span>
               </div>
 
               <div className="inheritance-toolbar">
@@ -1616,7 +1617,7 @@ export default function App() {
                   <input type="file" accept="application/pdf,.pdf" onChange={handleInheritancePdf} />
                 </label>
                 <button type="button" className="secondary-button" disabled={!inheritanceJob} onClick={clearInheritanceJob}>結果クリア</button>
-                <button type="button" className="primary-button" disabled={!inheritanceJob?.results?.length} onClick={downloadInheritanceCsv}>Excel用CSV出力</button>
+                <button type="button" className="primary-button" disabled={!inheritanceSingleTransferRows.length} onClick={downloadInheritanceCsv}>Excel用CSV出力</button>
               </div>
 
               {inheritanceStatus.message && (
@@ -1628,48 +1629,35 @@ export default function App() {
                   <div className="inheritance-summary">
                     <div><span>ファイル</span><strong>{inheritanceJob.fileName}</strong></div>
                     <div><span>ページ数</span><strong>{inheritanceJob.pageCount}</strong></div>
-                    <div><span>抽出文字数</span><strong>{inheritanceJob.textLength.toLocaleString()}</strong></div>
-                    <div><span>候補件数</span><strong>{inheritanceJob.results.length}</strong></div>
+                    <div><span>単独 / 所有権移転・相続</span><strong>{inheritanceSingleTransferRows.length}件</strong></div>
+                    <div><span>確認した候補</span><strong>{inheritanceJob.results.length}件</strong></div>
                   </div>
 
-                  {inheritanceJob.results.length ? (
+                  {inheritanceSingleTransferRows.length ? (
                     <div className="inheritance-table-wrap">
                       <table className="inheritance-table">
                         <thead>
                           <tr>
-                            <th>判定</th>
-                            <th>頁</th>
-                            <th>受付</th>
-                            <th>登記内容</th>
-                            <th>土地・件数</th>
-                            <th>相続人候補</th>
-                            <th>根拠</th>
+                            <th>受付番号</th>
+                            <th>土地</th>
+                            <th>受付日</th>
+                            <th>住所</th>
+                            <th>外記載</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {inheritanceJob.results.map((item, index) => (
-                            <tr key={`${item.pageNumber}-${index}`} className={item.status === '単独相続候補' ? 'inheritance-row--single' : 'inheritance-row--check'}>
-                              <td><strong>{item.status}</strong><small>score {item.score}</small></td>
-                              <td>{item.pageNumber}</td>
+                          {inheritanceSingleTransferRows.map((item, index) => (
+                            <tr key={`${item.pageNumber}-${index}`} className="inheritance-row--single">
                               <td>
                                 <span>{item.receiptNumber ? `第${item.receiptNumber}号` : '番号未抽出'}</span>
-                                <small>{item.receiptDate || '受付日未抽出'}</small>
                               </td>
-                              <td>
-                                <span>{[item.ownershipMode, item.registrationCause].filter(Boolean).join(' / ') || '内容未抽出'}</span>
-                                <small>{item.propertyType || '種別未抽出'}</small>
-                              </td>
+                              <td>{item.propertyType || '土地'}</td>
+                              <td>{item.receiptDate || '受付日未抽出'}</td>
                               <td>
                                 <span>{item.registryAddress || item.location || '所在未抽出'}</span>
-                                <small>{item.extraCount ? `外${item.extraCount}件` : (item.lotNumber || item.landCategory || item.area || '追加件数なし')}</small>
                               </td>
-                              <td>{item.heirs.length ? item.heirs.join(' / ') : '未抽出'}</td>
                               <td>
-                                <span>{item.reasons.join(' / ') || '根拠不足'}</span>
-                                <details>
-                                  <summary>抜粋</summary>
-                                  <pre>{item.excerpt}</pre>
-                                </details>
+                                {item.extraCount ? `外${item.extraCount}件` : ''}
                               </td>
                             </tr>
                           ))}
@@ -1677,7 +1665,7 @@ export default function App() {
                       </table>
                     </div>
                   ) : (
-                    <p className="inline-message">土地・単独相続候補を検出できませんでした。PDFの文字認識状態または原本を確認してください。</p>
+                    <p className="inline-message">単独 / 所有権移転・相続（土地）を検出できませんでした。PDFの文字認識状態または原本を確認してください。</p>
                   )}
                 </div>
               )}
