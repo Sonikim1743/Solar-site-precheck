@@ -4,6 +4,31 @@ import { analyzeInheritanceText, normalizeInheritanceText } from '../utils/inher
 
 GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 
+function textLinesFromPdfItems(items) {
+  const rows = []
+
+  items.forEach((item, index) => {
+    const text = item.str || ''
+    if (!text.trim()) return
+    const x = item.transform?.[4] ?? 0
+    const y = item.transform?.[5] ?? -index
+    let row = rows.find((candidate) => Math.abs(candidate.y - y) < 2)
+    if (!row) {
+      row = { y, parts: [] }
+      rows.push(row)
+    }
+    row.parts.push({ x, text })
+  })
+
+  return rows
+    .sort((a, b) => b.y - a.y)
+    .map((row) => row.parts
+      .sort((a, b) => a.x - b.x)
+      .map((part) => part.text)
+      .join(''))
+    .join('\n')
+}
+
 export async function readInheritancePdf(file, onProgress = () => {}) {
   const data = await file.arrayBuffer()
   const pdf = await getDocument({ data }).promise
@@ -13,7 +38,7 @@ export async function readInheritancePdf(file, onProgress = () => {}) {
     onProgress(`${pageNumber}/${pdf.numPages}ページのテキストを確認中…`)
     const page = await pdf.getPage(pageNumber)
     const content = await page.getTextContent()
-    const text = normalizeInheritanceText(content.items.map((item) => item.str || '').join('\n'))
+    const text = normalizeInheritanceText(textLinesFromPdfItems(content.items))
     pages.push({ pageNumber, text, charCount: text.length })
   }
 

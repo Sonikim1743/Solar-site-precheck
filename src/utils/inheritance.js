@@ -24,6 +24,13 @@ function uniqueValues(values) {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))]
 }
 
+function cleanRegistryAddress(value) {
+  return String(value || '')
+    .split(/[│┃┠┗┏┯┼┨┓]/)[0]
+    .replace(/\s+(?:の変更・更正|無償名義).*$/, '')
+    .trim()
+}
+
 function parseRegistrySummary(excerpt) {
   const flat = normalizeText(excerpt)
     .replace(/[┃│｜]/g, ' ')
@@ -37,12 +44,12 @@ function parseRegistrySummary(excerpt) {
   const ownershipMode = flat.match(/[（(]\s*(単独|共有|共同)\s*[）)]/)?.[1] || ''
   const registrationCause = flat.match(/(所有権移転[・･・\s]*相続|所有権移転|相続)/)?.[1]?.replace(/\s+/g, '') || ''
   const propertyType = flat.match(/(?:既[）)]\s*)?(土地|建物)/)?.[1] || ''
-  const landText = flat.match(/(?:既[）)]\s*)?土地\s+(.+)/)?.[1] || ''
+  const landText = flat.match(/(?:既[）)]\s*)?土地\s*(.+)/)?.[1] || ''
   const extraMatch = landText.match(/\s*外\s*([0-9０-９]+)\s*(?:件|筆)?/)
   const addressSource = extraMatch ? landText.slice(0, extraMatch.index) : landText
-  const registryAddress = addressSource
+  const registryAddress = cleanRegistryAddress(addressSource
     .split(/\s+(?:所在|地番|地目|地積|相続人|所有者|取得者|承継人|第\s*[0-9０-９]+\s*号|土地\s)/)[0]
-    .trim()
+    .trim())
   const extraCount = extraMatch?.[1] ? Number(toHalfWidthDigits(extraMatch[1])) : 0
 
   return {

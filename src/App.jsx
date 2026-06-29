@@ -40,7 +40,7 @@ const APP_VERSION = '1.01'
 function isSingleInheritanceLandTransfer(item) {
   return item?.ownershipMode === '単独' &&
     item?.propertyType === '土地' &&
-    /所有権移転|相続/.test(item?.registrationCause || '')
+    (item?.registrationCause || '').includes('相続')
 }
 
 function loadDraft() {

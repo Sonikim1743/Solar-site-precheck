@@ -184,6 +184,24 @@ test('inheritance text analyzer keeps receipt order and reads compact extra-coun
   assert.equal(results[1].extraCount, 3)
 })
 
+test('inheritance text analyzer reads PDF.js reconstructed rows without spaces', () => {
+  const results = analyzeInheritanceText([{
+    pageNumber: 1,
+    text: [
+      '┃【第１４２７号】３月２日受付（単独）所有権移転・相続│┃',
+      '┃既）土地安芸高田市美土里町本郷４０８８－４外８│┃',
+      '┃│┃',
+      '┠───────────────────────────────────────────┼────┨',
+      '┃【第１４２９号】３月２日受付（単独）所有権移転・相続│┃',
+      '┃既）土地庄原市西本町１丁目１７５－３外２１│┃',
+    ].join('\n'),
+  }])
+  assert.equal(results[0].registryAddress, '安芸高田市美土里町本郷４０８８－４')
+  assert.equal(results[0].extraCount, 8)
+  assert.equal(results[1].registryAddress, '庄原市西本町１丁目１７５－３')
+  assert.equal(results[1].extraCount, 21)
+})
+
 test('solar window check compares winter peak sun height against horizon direction', () => {
   const noon = solarPositionAtHour(35, 12)
   assert.ok(noon.altitude > 30)
