@@ -202,6 +202,18 @@ test('inheritance text analyzer reads PDF.js reconstructed rows without spaces',
   assert.equal(results[1].extraCount, 21)
 })
 
+test('inheritance text analyzer does not drop later receipt blocks', () => {
+  const rows = []
+  for (let index = 1; index <= 120; index += 1) {
+    rows.push(`┃【第${String(1000 + index)}号】３月１８日受付（単独）所有権移転・相続│┃`)
+    rows.push(`┃既）土地庄原市テスト町${index}外${index}│┃`)
+  }
+  const results = analyzeInheritanceText([{ pageNumber: 1, text: rows.join('\n') }])
+  assert.equal(results.length, 120)
+  assert.equal(results[119].registryAddress, '庄原市テスト町120')
+  assert.equal(results[119].extraCount, 120)
+})
+
 test('solar window check compares winter peak sun height against horizon direction', () => {
   const noon = solarPositionAtHour(35, 12)
   assert.ok(noon.altitude > 30)

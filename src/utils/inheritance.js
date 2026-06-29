@@ -154,7 +154,6 @@ export function analyzeInheritanceText(pages) {
 
   return results
     .sort((a, b) => a.sequence - b.sequence)
-    .slice(0, 80)
 }
 
 export function normalizeInheritanceText(text) {
