@@ -24,6 +24,10 @@ function uniqueValues(values) {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))]
 }
 
+function lineReceiptNumber(line) {
+  return toHalfWidthDigits(String(line || '').match(/第\s*([0-9０-９]+)\s*号/)?.[1] || '')
+}
+
 function cleanRegistryAddress(value) {
   return String(value || '')
     .split(/[│┃┠┗┏┯┼┨┓]/)[0]
@@ -108,6 +112,51 @@ export function extractReceiptBlocks(pages) {
   return blocks.sort((a, b) => a.sequence - b.sequence)
 }
 
+function classifyUnmatchedReceiptLine(line) {
+  const hasBlackBox = /■{2,}|█{2,}|黒塗|墨塗/.test(line)
+  const hasWithdrawn = /取下|却下|取止|取扱中止/.test(line)
+  const hasReceiptText = /受付/.test(line)
+
+  if (hasBlackBox && hasWithdrawn) return { type: 'black-withdrawn', label: '黒塗り・取下' }
+  if (hasBlackBox) return { type: 'black-box', label: '黒塗り' }
+  if (hasWithdrawn) return { type: 'withdrawn', label: '取下等' }
+  if (!hasReceiptText) return { type: 'no-receipt-text', label: '受付文字なし' }
+  return { type: 'format-issue', label: '表示形式違い' }
+}
+
+export function classifyMissingReceiptNumbers(pages, missingNumbers) {
+  const missingSet = new Set(missingNumbers.map(Number))
+  const candidates = []
+
+  pages.forEach((page) => {
+    const lines = normalizeText(page.text).split('\n').map((line) => line.trim()).filter(Boolean)
+    lines.forEach((line, index) => {
+      const receiptNumber = Number(lineReceiptNumber(line))
+      if (!missingSet.has(receiptNumber)) return
+      const classification = classifyUnmatchedReceiptLine(line)
+      candidates.push({
+        receiptNumber,
+        pageNumber: page.pageNumber,
+        lineNumber: index + 1,
+        line,
+        ...classification,
+      })
+    })
+  })
+
+  const byNumber = new Map()
+  candidates.forEach((candidate) => {
+    if (!byNumber.has(candidate.receiptNumber)) byNumber.set(candidate.receiptNumber, candidate)
+  })
+
+  return missingNumbers.map((number) => byNumber.get(number) || {
+    receiptNumber: number,
+    type: 'not-found',
+    label: '原文行未検出',
+    line: '',
+  })
+}
+
 export function summarizeInheritanceReceipts(pages) {
   const blocks = extractReceiptBlocks(pages)
   const numbers = blocks
@@ -125,6 +174,12 @@ export function summarizeInheritanceReceipts(pages) {
       if (!numberSet.has(number)) missingNumbers.push(number)
     }
   }
+  const missingDetails = classifyMissingReceiptNumbers(pages, missingNumbers)
+  const explainedMissingCount = missingDetails.filter((item) => item.type !== 'not-found').length
+  const missingBreakdown = missingDetails.reduce((summary, item) => ({
+    ...summary,
+    [item.label]: (summary[item.label] || 0) + 1,
+  }), {})
 
   return {
     firstNumber,
@@ -134,6 +189,11 @@ export function summarizeInheritanceReceipts(pages) {
     blockCount: blocks.length,
     missingCount: missingNumbers.length,
     missingNumbers: missingNumbers.slice(0, 30),
+    missingDetails: missingDetails.slice(0, 30),
+    explainedMissingCount,
+    unexplainedMissingCount: missingNumbers.length - explainedMissingCount,
+    missingBreakdown,
+    missingExplanationMatches: missingNumbers.length === explainedMissingCount,
     isContinuous: expectedCount > 0 && missingNumbers.length === 0 && uniqueNumbers.length === expectedCount,
   }
 }

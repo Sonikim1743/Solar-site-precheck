@@ -1989,6 +1989,31 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
 .inheritance-toolbar span { display: block; color: var(--green-dark); font-size: 13px; font-weight: 900; }
 .inheritance-toolbar small { display: block; margin-top: 2px; color: var(--muted); font-size: 11px; line-height: 1.5; }
 .inheritance-result { display: grid; gap: 12px; }
+.mini-details {
+  border: 1px solid rgba(16, 128, 96, 0.18);
+  border-radius: 14px;
+  background: #fbfffd;
+  padding: 10px 12px;
+}
+.mini-details > summary {
+  cursor: pointer;
+  color: var(--green-dark);
+  font-size: 13px;
+  font-weight: 900;
+}
+.mini-details__body {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.mini-details__body p { margin: 0; color: var(--muted); }
+.mini-details__body ul {
+  margin: 0;
+  padding-left: 18px;
+}
 .inheritance-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

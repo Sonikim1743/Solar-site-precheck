@@ -1648,6 +1648,14 @@ export default function App() {
                           : '—'}
                       </strong>
                     </div>
+                    <div>
+                      <span>抜け番説明候補</span>
+                      <strong>
+                        {inheritanceJob.receiptSummary?.missingCount
+                          ? `${inheritanceJob.receiptSummary.explainedMissingCount} / ${inheritanceJob.receiptSummary.missingCount}件`
+                          : '0件'}
+                      </strong>
+                    </div>
                     <div><span>単独 / 所有権移転・相続</span><strong>{inheritanceSingleTransferRows.length}件</strong></div>
                     <div><span>確認した候補</span><strong>{inheritanceJob.results.length}件</strong></div>
                   </div>
@@ -1655,8 +1663,27 @@ export default function App() {
                     <p className={`inline-message ${inheritanceJob.receiptSummary.isContinuous ? '' : 'inline-message--error'}`}>
                       {inheritanceJob.receiptSummary.isContinuous
                         ? `受付番号は ${inheritanceJob.receiptSummary.firstNumber}〜${inheritanceJob.receiptSummary.lastNumber} まで連続して読取済みです。`
-                        : `受付番号の抜け候補があります：${inheritanceJob.receiptSummary.missingNumbers.join('、')}${inheritanceJob.receiptSummary.missingCount > inheritanceJob.receiptSummary.missingNumbers.length ? ' ほか' : ''}`}
+                        : `受付番号の抜け候補 ${inheritanceJob.receiptSummary.missingCount}件中、黒塗り・取下・受付文字なし等で説明できる候補は ${inheritanceJob.receiptSummary.explainedMissingCount}件です。${inheritanceJob.receiptSummary.missingExplanationMatches ? '件数は一致しています。' : `未説明候補が ${inheritanceJob.receiptSummary.unexplainedMissingCount}件あります。`}（抜け候補：${inheritanceJob.receiptSummary.missingNumbers.join('、')}${inheritanceJob.receiptSummary.missingCount > inheritanceJob.receiptSummary.missingNumbers.length ? ' ほか' : ''}）`}
                     </p>
+                  )}
+                  {inheritanceJob.receiptSummary?.missingCount > 0 && (
+                    <details className="mini-details">
+                      <summary>抜け番の分類を確認</summary>
+                      <div className="mini-details__body">
+                        <p>
+                          {Object.entries(inheritanceJob.receiptSummary.missingBreakdown || {})
+                            .map(([label, count]) => `${label}: ${count}件`)
+                            .join(' / ')}
+                        </p>
+                        <ul>
+                          {(inheritanceJob.receiptSummary.missingDetails || []).slice(0, 10).map((item) => (
+                            <li key={item.receiptNumber}>
+                              第{item.receiptNumber}号：{item.label}{item.pageNumber ? `（${item.pageNumber}ページ）` : ''}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </details>
                   )}
 
                   {inheritanceSingleTransferRows.length ? (

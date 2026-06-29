@@ -235,6 +235,25 @@ test('inheritance receipt summary checks first, last and missing numbers', () =>
   assert.equal(summary.isContinuous, false)
 })
 
+test('inheritance receipt summary explains missing numbers by black-box or withdrawn rows', () => {
+  const summary = summarizeInheritanceReceipts([{
+    pageNumber: 1,
+    text: [
+      '┃【第１７５５号】３月１２日受付（単独）所有権移転・相続│┃',
+      '┃既）土地庄原市東本町１丁目４外１１│┃',
+      '┃【第１７５６号】■■■■■■■■■■■■取下│┃',
+      '┃■■■■ ■■■■■■■■■■■■■■■■■■■■■■■│┃',
+      '┃【第１７５７号】３月１２日受付（連先）所有権の保存（申請）│┃',
+      '┃既）土地安芸高田市高宮町来女木１１４４２－４│┃',
+    ].join('\n'),
+  }])
+  assert.equal(summary.missingCount, 1)
+  assert.equal(summary.explainedMissingCount, 1)
+  assert.equal(summary.unexplainedMissingCount, 0)
+  assert.equal(summary.missingExplanationMatches, true)
+  assert.equal(summary.missingDetails[0].label, '黒塗り・取下')
+})
+
 test('solar window check compares winter peak sun height against horizon direction', () => {
   const noon = solarPositionAtHour(35, 12)
   assert.ok(noon.altitude > 30)
