@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from 'node:fs'
 
 import { parseCoordinateInput, toDegreeMinutes } from '../src/utils/coordinates.js'
 import { escapeCsv } from '../src/utils/csv.js'
+import { analyzeInheritanceText } from '../src/utils/inheritance.js'
 import { snowRateLevel } from '../src/utils/snowRates.js'
 import { interpolateHorizonAngle, peakSolarWindowReference, solarPositionAtHour } from '../src/utils/solarWindow.js'
 import { DETAILED_HORIZON_DIRECTIONS, HORIZON_DIRECTIONS, createHorizonDirections, recalculateTerrainObstruction } from '../src/services/gsi.js'
@@ -129,6 +130,38 @@ test('serve:dist script points to an existing local server file', () => {
   const match = script.match(/node\s+(.+)$/)
   assert.ok(match, 'serve:dist should run a node server file')
   assert.ok(existsSync(match[1]), `${match[1]} should exist`)
+})
+
+test('inheritance text analyzer flags land single-inheritance candidates conservatively', () => {
+  const results = analyzeInheritanceText([{
+    pageNumber: 1,
+    text: [
+      '第１４２９号 】 ３月 ２日受付（単独） 所有権移転・相続',
+      '既）土地 庄原市西本町１丁目１７５－３ 外２１',
+      '',
+      '土地',
+      '所在：広島県三次市甲田町',
+      '地番：123番4',
+      '地目：田',
+      '地積：1200平方メートル',
+      '相続人：山田太郎',
+      '所有権全部を相続により取得',
+      '',
+      '土地',
+      '所在：広島県三次市乙',
+      '地番：555番',
+      '共有 持分 ２分の１',
+    ].join('\n'),
+  }])
+  assert.equal(results[0].status, '単独相続候補')
+  assert.equal(results[0].receiptNumber, '1429')
+  assert.equal(results[0].receiptDate, '3月2日')
+  assert.equal(results[0].ownershipMode, '単独')
+  assert.equal(results[0].registrationCause, '所有権移転・相続')
+  assert.equal(results[0].propertyType, '土地')
+  assert.equal(results[0].registryAddress, '庄原市西本町１丁目１７５－３')
+  assert.equal(results[0].extraCount, 21)
+  assert.ok(results.some((item) => item.status.includes('共有')))
 })
 
 test('solar window check compares winter peak sun height against horizon direction', () => {

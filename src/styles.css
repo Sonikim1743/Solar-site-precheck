@@ -1947,6 +1947,110 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
   margin-top: 0;
   scroll-margin-top: 92px;
 }
+.inheritance-section {
+  margin-top: 18px;
+  padding: 22px;
+  scroll-margin-top: 92px;
+}
+.inheritance-disclosure__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  cursor: pointer;
+  list-style: none;
+}
+.inheritance-disclosure__summary::-webkit-details-marker { display: none; }
+.inheritance-disclosure__body {
+  margin-top: 16px;
+  display: grid;
+  gap: 14px;
+}
+.privacy-note {
+  padding: 13px 14px;
+  display: grid;
+  gap: 5px;
+  border: 1px solid #e2cf9b;
+  border-radius: 13px;
+  background: #fffaf0;
+}
+.privacy-note strong { color: #7b5c13; font-size: 14px; }
+.privacy-note span { color: #6f674f; font-size: 12px; line-height: 1.65; }
+.inheritance-toolbar {
+  padding: 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #d8e5df;
+  border-radius: 13px;
+  background: #f8fbf9;
+}
+.inheritance-toolbar span { display: block; color: var(--green-dark); font-size: 13px; font-weight: 900; }
+.inheritance-toolbar small { display: block; margin-top: 2px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.inheritance-result { display: grid; gap: 12px; }
+.inheritance-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+.inheritance-summary > div {
+  min-width: 0;
+  padding: 10px;
+  display: grid;
+  gap: 3px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fbfdfc;
+}
+.inheritance-summary span { color: var(--muted); font-size: 10px; font-weight: 900; }
+.inheritance-summary strong {
+  overflow: hidden;
+  color: var(--green-dark);
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.inheritance-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: white;
+}
+.inheritance-table {
+  width: 100%;
+  min-width: 920px;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.inheritance-table th,
+.inheritance-table td {
+  padding: 10px;
+  border-bottom: 1px solid #e7efeb;
+  text-align: left;
+  vertical-align: top;
+}
+.inheritance-table th { color: var(--green-dark); background: #edf7f2; font-size: 11px; font-weight: 900; }
+.inheritance-table td span,
+.inheritance-table td small { display: block; }
+.inheritance-table td small { margin-top: 3px; color: var(--muted); font-size: 10px; }
+.inheritance-row--single > td:first-child strong { color: var(--green); }
+.inheritance-row--check > td:first-child strong { color: #8a5d00; }
+.inheritance-table details { margin-top: 6px; }
+.inheritance-table summary { cursor: pointer; color: var(--green); font-size: 11px; font-weight: 900; }
+.inheritance-table pre {
+  max-height: 180px;
+  margin: 7px 0 0;
+  padding: 8px;
+  overflow: auto;
+  border-radius: 8px;
+  background: #f5f8f6;
+  color: #31453f;
+  font-family: "Yu Gothic UI", Meiryo, sans-serif;
+  font-size: 11px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
 .knowledge-grid {
   margin-top: 20px;
   display: grid;
@@ -2298,6 +2402,10 @@ footer {
   .manual-grid { grid-template-columns: 1fr; }
   .knowledge-grid,
   .external-link-grid { grid-template-columns: 1fr; }
+  .inheritance-toolbar { grid-template-columns: 1fr; }
+  .inheritance-toolbar .secondary-button,
+  .inheritance-toolbar .primary-button { width: 100%; }
+  .inheritance-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .knowledge-card--wide { grid-column: auto; }
   .transfer-grid { grid-template-columns: 1fr; }
   .transfer-card__heading { align-items: flex-start; flex-direction: column; }
@@ -2321,6 +2429,12 @@ footer {
   .utility-button,
   .utility-link-button { width: 100%; }
   .panel, .report-section { border-radius: 14px; padding: 16px; }
+  .inheritance-section { padding: 16px; }
+  .inheritance-disclosure__summary {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .inheritance-summary { grid-template-columns: 1fr; }
   .map-panel { padding: 14px; }
   .address-search {
     display: grid;

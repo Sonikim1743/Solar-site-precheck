@@ -194,6 +194,8 @@ export default function App() {
   const [drawingConvertStatus, setDrawingConvertStatus] = useState({ status: 'idle', message: '' })
   const [drawingJob, setDrawingJob] = useState(null)
   const [drawingSelectedPages, setDrawingSelectedPages] = useState([])
+  const [inheritanceStatus, setInheritanceStatus] = useState({ status: 'idle', message: '' })
+  const [inheritanceJob, setInheritanceJob] = useState(null)
   const draftSaveTimer = useRef(null)
 
   useEffect(() => {
@@ -565,6 +567,63 @@ export default function App() {
     } catch (error) {
       setDrawingConvertStatus({ status: 'error', message: error.message || 'JPG保存に失敗しました。' })
     }
+  }
+
+  async function handleInheritancePdf(event) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    setInheritanceStatus({ status: 'loading', message: '相続資料PDFをブラウザ内で読み込んでいます…' })
+    setInheritanceJob(null)
+    try {
+      const { readInheritancePdf } = await import('./services/inheritancePdf.js')
+      const job = await readInheritancePdf(file, (message) => {
+        setInheritanceStatus({ status: 'loading', message })
+      })
+      setInheritanceJob(job)
+      setInheritanceStatus({
+        status: 'success',
+        message: `${job.pageCount}ページを確認しました。単独相続候補 ${job.results.filter((item) => item.status === '単独相続候補').length}件 / 要確認 ${job.results.filter((item) => item.status !== '単独相続候補').length}件`,
+      })
+    } catch (error) {
+      setInheritanceStatus({ status: 'error', message: error.message || '相続資料PDFを読み取れませんでした。' })
+    }
+  }
+
+  function clearInheritanceJob() {
+    setInheritanceJob(null)
+    setInheritanceStatus({ status: 'idle', message: '' })
+  }
+
+  function downloadInheritanceCsv() {
+    if (!inheritanceJob?.results?.length) return
+    const rows = [
+      ['判定', 'ページ', '受付番号', '受付日', '区分', '登記内容', '種別', '所在・住所', '外件数', '地番', '地目', '地積', '相続人・取得者候補', '根拠', '抜粋'],
+      ...inheritanceJob.results.map((item) => [
+        item.status,
+        item.pageNumber,
+        item.receiptNumber,
+        item.receiptDate,
+        item.ownershipMode,
+        item.registrationCause,
+        item.propertyType,
+        item.registryAddress || item.location,
+        item.extraCount || '',
+        item.lotNumber,
+        item.landCategory,
+        item.area,
+        item.heirs.join(' / '),
+        item.reasons.join(' / '),
+        item.excerpt,
+      ]),
+    ]
+    const csv = `\uFEFF${rows.map((row) => row.map(escapeCsv).join(',')).join('\r\n')}`
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = `${inheritanceJob.fileName.replace(/\.pdf$/i, '') || '相続資料'}_単独相続候補.csv`
+    link.click()
+    URL.revokeObjectURL(link.href)
   }
 
   function updateSnowRate(index, rawValue) {
@@ -1527,6 +1586,104 @@ export default function App() {
           </div>
         </section>
         </div>
+
+        <section className="inheritance-section panel" id="inheritance-check">
+          <details className="inheritance-disclosure">
+            <summary className="inheritance-disclosure__summary">
+              <div className="section-heading">
+                <div className="step-number">相</div>
+                <div>
+                  <h2>相続資料PDFチェック（実験機能）</h2>
+                  <p>法務局資料PDFから土地の単独相続候補を拾い出す、オフライン確認補助です。</p>
+                </div>
+              </div>
+              <span className="manual-disclosure__toggle">クリックして開く</span>
+            </summary>
+
+            <div className="inheritance-disclosure__body">
+              <div className="privacy-note">
+                <strong>個人情報保護のための注意</strong>
+                <span>PDFはブラウザ内で処理し、サーバー送信・自動保存はしません。判定は候補抽出であり、最終判断は必ず原本を目視確認してください。</span>
+              </div>
+
+              <div className="inheritance-toolbar">
+                <div>
+                  <span>PDFを選択</span>
+                  <small>テキスト抽出できるPDFに対応。スキャンPDFは今後OCR対応予定です。</small>
+                </div>
+                <label className="secondary-button file-button">
+                  相続資料PDFを読み込む
+                  <input type="file" accept="application/pdf,.pdf" onChange={handleInheritancePdf} />
+                </label>
+                <button type="button" className="secondary-button" disabled={!inheritanceJob} onClick={clearInheritanceJob}>結果クリア</button>
+                <button type="button" className="primary-button" disabled={!inheritanceJob?.results?.length} onClick={downloadInheritanceCsv}>Excel用CSV出力</button>
+              </div>
+
+              {inheritanceStatus.message && (
+                <p className={`inline-message ${inheritanceStatus.status === 'error' ? 'inline-message--error' : ''}`}>{inheritanceStatus.message}</p>
+              )}
+
+              {inheritanceJob && (
+                <div className="inheritance-result">
+                  <div className="inheritance-summary">
+                    <div><span>ファイル</span><strong>{inheritanceJob.fileName}</strong></div>
+                    <div><span>ページ数</span><strong>{inheritanceJob.pageCount}</strong></div>
+                    <div><span>抽出文字数</span><strong>{inheritanceJob.textLength.toLocaleString()}</strong></div>
+                    <div><span>候補件数</span><strong>{inheritanceJob.results.length}</strong></div>
+                  </div>
+
+                  {inheritanceJob.results.length ? (
+                    <div className="inheritance-table-wrap">
+                      <table className="inheritance-table">
+                        <thead>
+                          <tr>
+                            <th>判定</th>
+                            <th>頁</th>
+                            <th>受付</th>
+                            <th>登記内容</th>
+                            <th>土地・件数</th>
+                            <th>相続人候補</th>
+                            <th>根拠</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {inheritanceJob.results.map((item, index) => (
+                            <tr key={`${item.pageNumber}-${index}`} className={item.status === '単独相続候補' ? 'inheritance-row--single' : 'inheritance-row--check'}>
+                              <td><strong>{item.status}</strong><small>score {item.score}</small></td>
+                              <td>{item.pageNumber}</td>
+                              <td>
+                                <span>{item.receiptNumber ? `第${item.receiptNumber}号` : '番号未抽出'}</span>
+                                <small>{item.receiptDate || '受付日未抽出'}</small>
+                              </td>
+                              <td>
+                                <span>{[item.ownershipMode, item.registrationCause].filter(Boolean).join(' / ') || '内容未抽出'}</span>
+                                <small>{item.propertyType || '種別未抽出'}</small>
+                              </td>
+                              <td>
+                                <span>{item.registryAddress || item.location || '所在未抽出'}</span>
+                                <small>{item.extraCount ? `外${item.extraCount}件` : (item.lotNumber || item.landCategory || item.area || '追加件数なし')}</small>
+                              </td>
+                              <td>{item.heirs.length ? item.heirs.join(' / ') : '未抽出'}</td>
+                              <td>
+                                <span>{item.reasons.join(' / ') || '根拠不足'}</span>
+                                <details>
+                                  <summary>抜粋</summary>
+                                  <pre>{item.excerpt}</pre>
+                                </details>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="inline-message">土地・単独相続候補を検出できませんでした。PDFの文字認識状態または原本を確認してください。</p>
+                  )}
+                </div>
+              )}
+            </div>
+          </details>
+        </section>
       </main>
 
       <footer>
