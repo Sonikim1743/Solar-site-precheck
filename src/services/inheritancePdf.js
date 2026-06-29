@@ -1,6 +1,6 @@
 import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist/build/pdf.mjs'
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
-import { analyzeInheritanceText, normalizeInheritanceText } from '../utils/inheritance.js'
+import { analyzeInheritanceText, normalizeInheritanceText, summarizeInheritanceReceipts } from '../utils/inheritance.js'
 
 GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 
@@ -52,6 +52,7 @@ export async function readInheritancePdf(file, onProgress = () => {}) {
     pageCount: pdf.numPages,
     textLength: fullTextLength,
     pages,
+    receiptSummary: summarizeInheritanceReceipts(pages),
     results: analyzeInheritanceText(pages),
   }
 }

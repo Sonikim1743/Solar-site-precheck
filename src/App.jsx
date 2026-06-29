@@ -588,9 +588,13 @@ export default function App() {
       })
       setInheritanceJob(job)
       const singleTransferCount = job.results.filter(isSingleInheritanceLandTransfer).length
+      const receiptSummary = job.receiptSummary
+      const receiptCheck = receiptSummary?.expectedCount
+        ? `受付番号 ${receiptSummary.firstNumber}〜${receiptSummary.lastNumber} / ${receiptSummary.readCount}件読取`
+        : '受付番号範囲を確認できませんでした'
       setInheritanceStatus({
         status: 'success',
-        message: `${job.pageCount}ページを確認しました。単独 / 所有権移転・相続（土地） ${singleTransferCount}件を抽出しました。`,
+        message: `${job.pageCount}ページを確認しました。${receiptCheck}。単独 / 所有権移転・相続（土地） ${singleTransferCount}件を抽出しました。`,
       })
     } catch (error) {
       setInheritanceStatus({ status: 'error', message: error.message || '相続資料PDFを読み取れませんでした。' })
@@ -1628,9 +1632,32 @@ export default function App() {
                   <div className="inheritance-summary">
                     <div><span>ファイル</span><strong>{inheritanceJob.fileName}</strong></div>
                     <div><span>ページ数</span><strong>{inheritanceJob.pageCount}</strong></div>
+                    <div>
+                      <span>受付番号範囲</span>
+                      <strong>
+                        {inheritanceJob.receiptSummary?.firstNumber
+                          ? `${inheritanceJob.receiptSummary.firstNumber}〜${inheritanceJob.receiptSummary.lastNumber}`
+                          : '未確認'}
+                      </strong>
+                    </div>
+                    <div>
+                      <span>読取 / 範囲件数</span>
+                      <strong>
+                        {inheritanceJob.receiptSummary?.expectedCount
+                          ? `${inheritanceJob.receiptSummary.readCount} / ${inheritanceJob.receiptSummary.expectedCount}件`
+                          : '—'}
+                      </strong>
+                    </div>
                     <div><span>単独 / 所有権移転・相続</span><strong>{inheritanceSingleTransferRows.length}件</strong></div>
                     <div><span>確認した候補</span><strong>{inheritanceJob.results.length}件</strong></div>
                   </div>
+                  {inheritanceJob.receiptSummary?.expectedCount && (
+                    <p className={`inline-message ${inheritanceJob.receiptSummary.isContinuous ? '' : 'inline-message--error'}`}>
+                      {inheritanceJob.receiptSummary.isContinuous
+                        ? `受付番号は ${inheritanceJob.receiptSummary.firstNumber}〜${inheritanceJob.receiptSummary.lastNumber} まで連続して読取済みです。`
+                        : `受付番号の抜け候補があります：${inheritanceJob.receiptSummary.missingNumbers.join('、')}${inheritanceJob.receiptSummary.missingCount > inheritanceJob.receiptSummary.missingNumbers.length ? ' ほか' : ''}`}
+                    </p>
+                  )}
 
                   {inheritanceSingleTransferRows.length ? (
                     <div className="inheritance-table-wrap">

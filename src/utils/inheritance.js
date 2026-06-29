@@ -63,8 +63,8 @@ function parseRegistrySummary(excerpt) {
   }
 }
 
-export function analyzeInheritanceText(pages) {
-  const results = []
+export function extractReceiptBlocks(pages) {
+  const blocks = []
   const seen = new Set()
   let sequence = 0
 
@@ -87,68 +87,120 @@ export function analyzeInheritanceText(pages) {
       const excerpt = receiptIndexes.length
         ? normalizeText(lines.slice(index, end).join('\n'))
         : compactExcerpt(lines, Math.max(0, index - 1), 8)
-      if (!/(土地|地番|地目|地積)/.test(excerpt)) return
       const key = `${page.pageNumber}:${index}:${excerpt.slice(0, 120)}`
       if (seen.has(key)) return
       seen.add(key)
 
       const registry = parseRegistrySummary(excerpt)
-      const hasLand = /(土地|地番|地目|地積|田|畑|宅地|山林|雑種地)/.test(excerpt)
-      const hasInheritance = /(相続|遺産分割|承継|取得)/.test(excerpt)
-      const hasSingleSignal = /(単独|全部|単有|持分全部|所有権全部)/.test(excerpt) || registry.ownershipMode === '単独'
-      const hasSharedSignal = /(共有|持分|各|共同|二分の一|２分の１|1\/2|三分の一|３分の１|1\/3)/.test(excerpt)
-      const personMatches = [...excerpt.matchAll(/(?:相続人|取得者|承継人|所有者)[：:\s]*([^\n,、]+)/g)]
-      const heirs = uniqueValues(personMatches.map((match) => match[1]).map((value) => value.replace(/外\d+名.*/, '').trim()))
+      if (!registry.receiptNumber && receiptIndexes.length) return
 
-      let score = 0
-      if (hasLand) score += 2
-      if (/地番/.test(excerpt)) score += 2
-      if (/地目/.test(excerpt)) score += 1
-      if (/地積/.test(excerpt)) score += 1
-      if (hasInheritance) score += 2
-      if (hasSingleSignal) score += 2
-      if (registry.receiptNumber) score += 1
-      if (registry.registrationCause.includes('相続')) score += 1
-      if (registry.propertyType === '土地') score += 1
-      if (hasSharedSignal) score -= 4
-      if (heirs.length === 1) score += 1
-
-      const status = hasSharedSignal
-        ? '要確認（共有・持分表記あり）'
-        : score >= 6
-          ? '単独相続候補'
-          : '要確認'
-
-      const reasons = [
-        hasLand && '土地関連語あり',
-        hasInheritance && '相続関連語あり',
-        hasSingleSignal && '全部・単独系の表記あり',
-        hasSharedSignal && '共有・持分系の表記あり',
-        heirs.length === 1 && '相続人/取得者らしき氏名が1名',
-      ].filter(Boolean)
-
-      results.push({
+      blocks.push({
         sequence: sequence++,
         pageNumber: page.pageNumber,
         lineNumber: index + 1,
         scanOrder,
-        status,
-        score,
-        location: pickField(excerpt, '所在'),
-        lotNumber: pickField(excerpt, '地番'),
-        landCategory: pickField(excerpt, '地目'),
-        area: pickField(excerpt, '地積'),
-        receiptNumber: registry.receiptNumber,
-        receiptDate: registry.receiptDate,
-        ownershipMode: registry.ownershipMode,
-        registrationCause: registry.registrationCause,
-        propertyType: registry.propertyType,
-        registryAddress: registry.registryAddress,
-        extraCount: registry.extraCount,
-        heirs,
-        reasons,
         excerpt,
+        ...registry,
       })
+    })
+  })
+
+  return blocks.sort((a, b) => a.sequence - b.sequence)
+}
+
+export function summarizeInheritanceReceipts(pages) {
+  const blocks = extractReceiptBlocks(pages)
+  const numbers = blocks
+    .map((block) => Number(block.receiptNumber))
+    .filter(Number.isFinite)
+  const uniqueNumbers = [...new Set(numbers)].sort((a, b) => a - b)
+  const firstNumber = uniqueNumbers[0] || null
+  const lastNumber = uniqueNumbers.at(-1) || null
+  const expectedCount = firstNumber && lastNumber ? lastNumber - firstNumber + 1 : 0
+  const missingNumbers = []
+
+  if (firstNumber && lastNumber) {
+    const numberSet = new Set(uniqueNumbers)
+    for (let number = firstNumber; number <= lastNumber; number += 1) {
+      if (!numberSet.has(number)) missingNumbers.push(number)
+    }
+  }
+
+  return {
+    firstNumber,
+    lastNumber,
+    expectedCount,
+    readCount: uniqueNumbers.length,
+    blockCount: blocks.length,
+    missingCount: missingNumbers.length,
+    missingNumbers: missingNumbers.slice(0, 30),
+    isContinuous: expectedCount > 0 && missingNumbers.length === 0 && uniqueNumbers.length === expectedCount,
+  }
+}
+
+export function analyzeInheritanceText(pages) {
+  const blocks = extractReceiptBlocks(pages)
+  const results = []
+
+  blocks.forEach((block) => {
+    const { excerpt } = block
+    if (!/(土地|地番|地目|地積)/.test(excerpt)) return
+    const registry = block
+    const hasLand = /(土地|地番|地目|地積|田|畑|宅地|山林|雑種地)/.test(excerpt)
+    const hasInheritance = /(相続|遺産分割|承継|取得)/.test(excerpt)
+    const hasSingleSignal = /(単独|全部|単有|持分全部|所有権全部)/.test(excerpt) || registry.ownershipMode === '単独'
+    const hasSharedSignal = /(共有|持分|各|共同|二分の一|２分の１|1\/2|三分の一|３分の１|1\/3)/.test(excerpt)
+    const personMatches = [...excerpt.matchAll(/(?:相続人|取得者|承継人|所有者)[：:\s]*([^\n,、]+)/g)]
+    const heirs = uniqueValues(personMatches.map((match) => match[1]).map((value) => value.replace(/外\d+名.*/, '').trim()))
+
+    let score = 0
+    if (hasLand) score += 2
+    if (/地番/.test(excerpt)) score += 2
+    if (/地目/.test(excerpt)) score += 1
+    if (/地積/.test(excerpt)) score += 1
+    if (hasInheritance) score += 2
+    if (hasSingleSignal) score += 2
+    if (registry.receiptNumber) score += 1
+    if (registry.registrationCause.includes('相続')) score += 1
+    if (registry.propertyType === '土地') score += 1
+    if (hasSharedSignal) score -= 4
+    if (heirs.length === 1) score += 1
+
+    const status = hasSharedSignal
+      ? '要確認（共有・持分表記あり）'
+      : score >= 6
+        ? '単独相続候補'
+        : '要確認'
+
+    const reasons = [
+      hasLand && '土地関連語あり',
+      hasInheritance && '相続関連語あり',
+      hasSingleSignal && '全部・単独系の表記あり',
+      hasSharedSignal && '共有・持分系の表記あり',
+      heirs.length === 1 && '相続人/取得者らしき氏名が1名',
+    ].filter(Boolean)
+
+    results.push({
+      sequence: block.sequence,
+      pageNumber: block.pageNumber,
+      lineNumber: block.lineNumber,
+      scanOrder: block.scanOrder,
+      status,
+      score,
+      location: pickField(excerpt, '所在'),
+      lotNumber: pickField(excerpt, '地番'),
+      landCategory: pickField(excerpt, '地目'),
+      area: pickField(excerpt, '地積'),
+      receiptNumber: registry.receiptNumber,
+      receiptDate: registry.receiptDate,
+      ownershipMode: registry.ownershipMode,
+      registrationCause: registry.registrationCause,
+      propertyType: registry.propertyType,
+      registryAddress: registry.registryAddress,
+      extraCount: registry.extraCount,
+      heirs,
+      reasons,
+      excerpt,
     })
   })
 

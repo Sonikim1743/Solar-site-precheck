@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from 'node:fs'
 
 import { parseCoordinateInput, toDegreeMinutes } from '../src/utils/coordinates.js'
 import { escapeCsv } from '../src/utils/csv.js'
-import { analyzeInheritanceText } from '../src/utils/inheritance.js'
+import { analyzeInheritanceText, summarizeInheritanceReceipts } from '../src/utils/inheritance.js'
 import { snowRateLevel } from '../src/utils/snowRates.js'
 import { interpolateHorizonAngle, peakSolarWindowReference, solarPositionAtHour } from '../src/utils/solarWindow.js'
 import { DETAILED_HORIZON_DIRECTIONS, HORIZON_DIRECTIONS, createHorizonDirections, recalculateTerrainObstruction } from '../src/services/gsi.js'
@@ -212,6 +212,27 @@ test('inheritance text analyzer does not drop later receipt blocks', () => {
   assert.equal(results.length, 120)
   assert.equal(results[119].registryAddress, '庄原市テスト町120')
   assert.equal(results[119].extraCount, 120)
+})
+
+test('inheritance receipt summary checks first, last and missing numbers', () => {
+  const summary = summarizeInheritanceReceipts([{
+    pageNumber: 1,
+    text: [
+      '┃【第１４１８号】３月２日受付（単独）抹消登記│┃',
+      '┃既）土地三次市三次町１│┃',
+      '┃【第１４１９号】３月２日受付（単独）所有権移転・相続│┃',
+      '┃既）土地三次市三次町２外１│┃',
+      '┃【第１４２１号】３月２日受付（単独）所有権移転・相続│┃',
+      '┃既）土地三次市三次町３外２│┃',
+    ].join('\n'),
+  }])
+  assert.equal(summary.firstNumber, 1418)
+  assert.equal(summary.lastNumber, 1421)
+  assert.equal(summary.expectedCount, 4)
+  assert.equal(summary.readCount, 3)
+  assert.equal(summary.missingCount, 1)
+  assert.deepEqual(summary.missingNumbers, [1420])
+  assert.equal(summary.isContinuous, false)
 })
 
 test('solar window check compares winter peak sun height against horizon direction', () => {
