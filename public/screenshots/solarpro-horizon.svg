@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="460" viewBox="0 0 760 460">
+  <rect width="760" height="460" fill="#eef3f0"/>
+  <rect x="28" y="26" width="704" height="408" rx="12" fill="#fff" stroke="#b8c7c0"/>
+  <rect x="28" y="26" width="704" height="42" rx="12" fill="#dfe9e4"/>
+  <text x="48" y="53" font-family="Yu Gothic, Meiryo, sans-serif" font-size="18" font-weight="700" fill="#18342e">Solar Pro 入力画面イメージ：地平線データ</text>
+  <rect x="54" y="96" width="652" height="296" rx="8" fill="#fbfdfc" stroke="#d1ded8"/>
+  <text x="76" y="132" font-family="Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="700" fill="#176b52">地平線データ入力</text>
+  <text x="76" y="158" font-family="Yu Gothic, Meiryo, sans-serif" font-size="13" fill="#6c7f79">候補地点から算出した方位別仰角を転記します。</text>
+  <g font-family="Consolas, Yu Gothic, Meiryo, sans-serif" font-size="15">
+    <rect x="76" y="188" width="608" height="36" fill="#edf6f1" stroke="#c7d9d1"/>
+    <text x="92" y="211" fill="#17322d">方位</text><text x="196" y="211" fill="#17322d">0°</text><text x="276" y="211" fill="#17322d">45°</text><text x="356" y="211" fill="#17322d">90°</text><text x="436" y="211" fill="#17322d">135°</text><text x="516" y="211" fill="#17322d">180°</text><text x="596" y="211" fill="#17322d">225°</text>
+    <rect x="76" y="224" width="608" height="48" fill="#fff" stroke="#c7d9d1"/>
+    <text x="92" y="253" fill="#17322d">仰角</text>
+    <rect x="176" y="234" width="58" height="26" rx="4" fill="#fffaf0" stroke="#e2cf9b"/><text x="194" y="253" fill="#176b52">__</text>
+    <rect x="256" y="234" width="58" height="26" rx="4" fill="#fffaf0" stroke="#e2cf9b"/><text x="274" y="253" fill="#176b52">__</text>
+    <rect x="336" y="234" width="58" height="26" rx="4" fill="#fffaf0" stroke="#e2cf9b"/><text x="354" y="253" fill="#176b52">__</text>
+    <rect x="416" y="234" width="58" height="26" rx="4" fill="#fffaf0" stroke="#e2cf9b"/><text x="434" y="253" fill="#176b52">__</text>
+    <rect x="496" y="234" width="58" height="26" rx="4" fill="#fffaf0" stroke="#e2cf9b"/><text x="514" y="253" fill="#176b52">__</text>
+    <rect x="576" y="234" width="58" height="26" rx="4" fill="#fffaf0" stroke="#e2cf9b"/><text x="594" y="253" fill="#176b52">__</text>
+  </g>
+  <rect x="76" y="304" width="608" height="56" rx="8" fill="#f1f9f5" stroke="#aed2bf"/>
+  <text x="96" y="329" font-family="Yu Gothic, Meiryo, sans-serif" font-size="14" font-weight="700" fill="#176b52">このツールの「地平線7方位を分析」の値をここへ転記</text>
+  <text x="96" y="350" font-family="Yu Gothic, Meiryo, sans-serif" font-size="12" fill="#6c7f79">実際のSolar Pro画面キャプチャに差し替え可能です。</text>
+</svg>

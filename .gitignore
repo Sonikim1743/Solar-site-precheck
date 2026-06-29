@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.vite/
+*.local
+*.log
+.pnpm-store/
+tmp/
+outputs/
+.agents/
+.codex/
+work/*
+!work/
+!work/serve-dist.mjs
+*.zip
+eng.traineddata

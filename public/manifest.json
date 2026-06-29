@@ -1,0 +1,27 @@
+{
+  "name": "Solar Site Precheck",
+  "short_name": "Solar Precheck",
+  "description": "太陽光発電候補地の初期確認とSolar Pro入力準備を支援するWebアプリ",
+  "lang": "ja",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f3f7f4",
+  "theme_color": "#176b52",
+  "categories": ["business", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

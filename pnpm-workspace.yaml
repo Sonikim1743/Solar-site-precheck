@@ -1,0 +1,6 @@
+allowBuilds:
+  esbuild: true
+  tesseract.js: true
+onlyBuiltDependencies:
+  - esbuild
+  - tesseract.js

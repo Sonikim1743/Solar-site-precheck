@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="460" viewBox="0 0 760 460">
+  <rect width="760" height="460" fill="#eef3f0"/>
+  <rect x="28" y="26" width="704" height="408" rx="12" fill="#fff" stroke="#b8c7c0"/>
+  <rect x="28" y="26" width="704" height="42" rx="12" fill="#dfe9e4"/>
+  <text x="48" y="53" font-family="Yu Gothic, Meiryo, sans-serif" font-size="18" font-weight="700" fill="#18342e">Solar Pro 入力画面イメージ：積雪・発電量係数</text>
+  <rect x="54" y="96" width="652" height="296" rx="8" fill="#fbfdfc" stroke="#d1ded8"/>
+  <text x="76" y="132" font-family="Yu Gothic, Meiryo, sans-serif" font-size="17" font-weight="700" fill="#176b52">積雪10cm以上出現率 / 発電量係数</text>
+  <text x="76" y="158" font-family="Yu Gothic, Meiryo, sans-serif" font-size="13" fill="#6c7f79">NEDO MONSOLA Web取得値を月別に確認して転記します。</text>
+  <g font-family="Consolas, Yu Gothic, Meiryo, sans-serif" font-size="14">
+    <rect x="76" y="188" width="608" height="34" fill="#edf6f1" stroke="#c7d9d1"/>
+    <text x="92" y="210" fill="#17322d">月</text><text x="160" y="210" fill="#17322d">1月</text><text x="230" y="210" fill="#17322d">2月</text><text x="300" y="210" fill="#17322d">3月</text><text x="370" y="210" fill="#17322d">4月</text><text x="440" y="210" fill="#17322d">5月</text><text x="510" y="210" fill="#17322d">6月</text><text x="580" y="210" fill="#17322d">...</text>
+    <rect x="76" y="222" width="608" height="44" fill="#fff" stroke="#c7d9d1"/>
+    <text x="92" y="249" fill="#17322d">出現率</text>
+    <rect x="150" y="232" width="50" height="24" rx="4" fill="#fffaf0" stroke="#e2cf9b"/><text x="164" y="250" fill="#176b52">0.__</text>
+    <rect x="220" y="232" width="50" height="24" rx="4" fill="#fffaf0" stroke="#e2cf9b"/><text x="234" y="250" fill="#176b52">0.__</text>
+    <rect x="290" y="232" width="50" height="24" rx="4" fill="#fffaf0" stroke="#e2cf9b"/><text x="304" y="250" fill="#176b52">0.__</text>
+    <rect x="360" y="232" width="50" height="24" rx="4" fill="#fffaf0" stroke="#e2cf9b"/><text x="374" y="250" fill="#176b52">0.__</text>
+    <rect x="430" y="232" width="50" height="24" rx="4" fill="#fffaf0" stroke="#e2cf9b"/><text x="444" y="250" fill="#176b52">0.__</text>
+    <rect x="500" y="232" width="50" height="24" rx="4" fill="#fffaf0" stroke="#e2cf9b"/><text x="514" y="250" fill="#176b52">0.__</text>
+    <rect x="76" y="266" width="608" height="44" fill="#fff" stroke="#c7d9d1"/>
+    <text x="92" y="293" fill="#17322d">係数</text>
+    <text x="164" y="294" fill="#176b52">0.__</text><text x="234" y="294" fill="#176b52">0.__</text><text x="304" y="294" fill="#176b52">0.__</text><text x="374" y="294" fill="#176b52">0.__</text><text x="444" y="294" fill="#176b52">0.__</text><text x="514" y="294" fill="#176b52">0.__</text>
+  </g>
+  <rect x="76" y="334" width="608" height="44" rx="8" fill="#f1f9f5" stroke="#aed2bf"/>
+  <text x="96" y="361" font-family="Yu Gothic, Meiryo, sans-serif" font-size="14" font-weight="700" fill="#176b52">NEDO Web取得後の月別値をSolar Proへ入力</text>
+</svg>
