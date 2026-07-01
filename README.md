@@ -49,6 +49,22 @@ npm run test
 npm run share
 ```
 
+## 別PCへ持ち出して使う場合
+
+GitHubには `node_modules/` と `dist/` は含めていないため、別PCでGitHubからソースだけを取得してもそのままでは起動できません。
+
+もっとも簡単に別PCへ持ち出す場合は、作業PCで `MAKE_PORTABLE_PACKAGE.cmd` をダブルクリックしてください。
+
+作成されるファイル：
+
+```text
+outputs/SolarSitePrecheck_v1.1_portable.zip
+```
+
+このzipを別PCへコピーして展開し、`RUN_PORTABLE.cmd` をダブルクリックすると、ビルド済みアプリを `http://127.0.0.1:5173/` で起動できます。
+
+別PCにCodex DesktopのNode.jsランタイム、または通常のNode.js 20.19以上が必要です。
+
 ## ファイル構成
 
 ```text
