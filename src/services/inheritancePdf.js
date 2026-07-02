@@ -64,7 +64,7 @@ export async function readInheritancePdfOnServer(file, onProgress = () => {}) {
       'Content-Type': 'application/pdf',
       'X-File-Name': encodeURIComponent(file.name || '相続資料.pdf'),
     },
-    body: await file.arrayBuffer(),
+    body: file,
   })
 
   if (!response.ok) {

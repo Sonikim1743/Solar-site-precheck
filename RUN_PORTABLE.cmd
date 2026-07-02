@@ -49,8 +49,13 @@ if not exist "work\serve-dist.mjs" (
 echo Solar Site Precheck portable app is starting.
 echo Keep this black window open while using the app.
 echo.
+if "%HOST%"=="" set "HOST=0.0.0.0"
 echo Open this URL in the browser:
 echo http://127.0.0.1:5173/
+echo.
+echo For smartphone testing on the same Wi-Fi, open:
+echo http://^<this PC LAN IP^>:5173/
+echo If Windows Firewall asks, allow node.exe on private networks.
 echo.
 "%NODE_EXE%" "work\serve-dist.mjs"
 echo.

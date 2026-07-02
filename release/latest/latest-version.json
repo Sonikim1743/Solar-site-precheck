@@ -1,9 +1,9 @@
 ﻿{
     "app":  "Solar Site Precheck",
     "version":  "1.1",
-    "buildDate":  "2026-07-02",
+    "buildDate":  "2026-07-03",
     "packageName":  "SolarSitePrecheck_v1.1_release_light.zip",
     "zipUrl":  "https://raw.githubusercontent.com/Sonikim1743/Solar-site-precheck/main/release/latest/SolarSitePrecheck_v1.1_release_light.zip",
     "notes":  "Light update package. Keep existing runtime/node.exe on desktop.",
-    "sizeBytes":  1500790
+    "sizeBytes":  2004365
 }

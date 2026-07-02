@@ -51,6 +51,7 @@ if exist "%PACKAGE_DIR%\dist\sw.js" del "%PACKAGE_DIR%\dist\sw.js"
 copy "work\serve-dist.mjs" "%PACKAGE_DIR%\work\serve-dist.mjs" >nul
 copy "work\inheritance-server.mjs" "%PACKAGE_DIR%\work\inheritance-server.mjs" >nul
 copy "node_modules\pdfjs-dist\legacy\build\pdf.mjs" "%PACKAGE_DIR%\work\pdfjs\pdf.mjs" >nul
+copy "node_modules\pdfjs-dist\legacy\build\pdf.worker.mjs" "%PACKAGE_DIR%\work\pdfjs\pdf.worker.mjs" >nul
 copy "RUN_PORTABLE.cmd" "%PACKAGE_DIR%\RUN_PORTABLE.cmd" >nul
 copy "UPDATE_APP_FROM_RELEASE.cmd" "%PACKAGE_DIR%\UPDATE_APP_FROM_RELEASE.cmd" >nul
 copy "UPDATE_APP_FROM_RELEASE.ps1" "%PACKAGE_DIR%\UPDATE_APP_FROM_RELEASE.ps1" >nul

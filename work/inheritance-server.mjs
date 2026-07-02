@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs'
+
 function normalizeText(text) {
   return String(text || '')
     .replace(/\r/g, '\n')
@@ -8,10 +10,89 @@ function normalizeText(text) {
 
 let pdfModulePromise = null
 
+function pdfWorkerSrc() {
+  const portableWorker = new URL('./pdfjs/pdf.worker.mjs', import.meta.url)
+  if (existsSync(portableWorker)) return portableWorker.href
+  return new URL('../node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs', import.meta.url).href
+}
+
+function installPdfNodePolyfills() {
+  if (typeof globalThis.DOMMatrix === 'undefined') {
+    globalThis.DOMMatrix = class DOMMatrix {
+      constructor(init) {
+        const values = Array.isArray(init) ? init : []
+        this.a = values[0] ?? 1
+        this.b = values[1] ?? 0
+        this.c = values[2] ?? 0
+        this.d = values[3] ?? 1
+        this.e = values[4] ?? 0
+        this.f = values[5] ?? 0
+        this.m11 = this.a
+        this.m12 = this.b
+        this.m21 = this.c
+        this.m22 = this.d
+        this.m41 = this.e
+        this.m42 = this.f
+      }
+
+      multiply() {
+        return this
+      }
+
+      translate() {
+        return this
+      }
+
+      scale() {
+        return this
+      }
+
+      rotate() {
+        return this
+      }
+
+      inverse() {
+        return this
+      }
+    }
+  }
+
+  if (typeof globalThis.Path2D === 'undefined') {
+    globalThis.Path2D = class Path2D {}
+  }
+
+  if (typeof globalThis.ImageData === 'undefined') {
+    globalThis.ImageData = class ImageData {
+      constructor(data, width, height) {
+        this.data = data
+        this.width = width
+        this.height = height
+      }
+    }
+  }
+}
+
 async function loadPdfJs() {
   if (!pdfModulePromise) {
+    installPdfNodePolyfills()
     pdfModulePromise = import('./pdfjs/pdf.mjs')
-      .catch(() => import('../node_modules/pdfjs-dist/legacy/build/pdf.mjs'))
+      .catch(async (portableError) => {
+        try {
+          return await import('../node_modules/pdfjs-dist/legacy/build/pdf.mjs')
+        } catch (fallbackError) {
+          throw new Error([
+            'PDF.jsの読込に失敗しました。',
+            `portable: ${portableError?.message || portableError}`,
+            `fallback: ${fallbackError?.message || fallbackError}`,
+          ].join(' '))
+        }
+      })
+      .then((module) => {
+        if (module.GlobalWorkerOptions) {
+          module.GlobalWorkerOptions.workerSrc = pdfWorkerSrc()
+        }
+        return module
+      })
   }
   return pdfModulePromise
 }
@@ -193,6 +274,7 @@ export async function readInheritancePdfOnServer(buffer, fileName = '相続資�
   const data = new Uint8Array(buffer)
   const pdf = await getDocument({
     data,
+    disableWorker: true,
     isOffscreenCanvasSupported: false,
     useWorkerFetch: false,
     disableFontFace: true,

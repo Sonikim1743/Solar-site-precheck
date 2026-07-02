@@ -667,16 +667,34 @@ export default function App() {
       if (shouldPreferServerPdfParsing()) {
         try {
           job = await readInheritancePdfOnServer(file, onProgress)
-        } catch {
-          job = await readInheritancePdf(file, onProgress)
+        } catch (serverError) {
+          console.warn('Server-side inheritance PDF parsing failed.', serverError)
+          setInheritanceStatus({
+            status: 'loading',
+            message: `ローカルサーバー解析に失敗しました。ブラウザ内解析を試しています…（${serverError.message || '詳細不明'}）`,
+          })
+          try {
+            job = await readInheritancePdf(file, onProgress)
+          } catch (browserError) {
+            throw new Error([
+              '相続資料PDFを読み取れませんでした。',
+              `サーバー解析: ${serverError.message || '失敗'}`,
+              `ブラウザ解析: ${browserError.message || '失敗'}`,
+            ].join(' '))
+          }
         }
       } else {
         try {
           job = await readInheritancePdf(file, onProgress)
         } catch (error) {
           setInheritanceStatus({ status: 'loading', message: 'ブラウザ内解析に失敗したため、ローカルサーバー解析を試しています…' })
-          job = await readInheritancePdfOnServer(file, onProgress).catch(() => {
-            throw error
+          job = await readInheritancePdfOnServer(file, onProgress).catch((serverError) => {
+            console.warn('Server-side inheritance PDF parsing failed.', serverError)
+            throw new Error([
+              '相続資料PDFを読み取れませんでした。',
+              `ブラウザ解析: ${error.message || '失敗'}`,
+              `サーバー解析: ${serverError.message || '失敗'}`,
+            ].join(' '))
           })
         }
       }
