@@ -22,6 +22,8 @@ if not exist "node_modules\vite\bin\vite.js" (
 )
 
 echo Building app...
+for /f %%i in ('powershell -NoProfile -Command "Get-Date -Format yyyy-MM-dd"') do set "VITE_BUILD_DATE=%%i"
+set "VITE_DISABLE_SW=1"
 "%NODE_EXE%" "node_modules\vite\bin\vite.js" build --configLoader runner
 if errorlevel 1 (
   echo.
@@ -34,10 +36,14 @@ echo Preparing portable folder...
 if exist "%PACKAGE_DIR%" rmdir /s /q "%PACKAGE_DIR%"
 mkdir "%PACKAGE_DIR%"
 mkdir "%PACKAGE_DIR%\work"
+mkdir "%PACKAGE_DIR%\runtime"
 
 xcopy "dist" "%PACKAGE_DIR%\dist" /e /i /y >nul
+if exist "%PACKAGE_DIR%\dist\templates" rmdir /s /q "%PACKAGE_DIR%\dist\templates"
+if exist "%PACKAGE_DIR%\dist\sw.js" del "%PACKAGE_DIR%\dist\sw.js"
 copy "work\serve-dist.mjs" "%PACKAGE_DIR%\work\serve-dist.mjs" >nul
 copy "RUN_PORTABLE.cmd" "%PACKAGE_DIR%\RUN_PORTABLE.cmd" >nul
+copy "%NODE_EXE%" "%PACKAGE_DIR%\runtime\node.exe" >nul
 
 (
   echo Solar Site Precheck Portable
@@ -46,10 +52,9 @@ copy "RUN_PORTABLE.cmd" "%PACKAGE_DIR%\RUN_PORTABLE.cmd" >nul
   echo 2. Double-click RUN_PORTABLE.cmd.
   echo 3. Open http://127.0.0.1:5173/ in the browser.
   echo.
-  echo If Node.js is not found, install Node.js 20.19 or later:
-  echo https://nodejs.org/
+  echo A portable node.exe is included in this package.
   echo.
-  echo This package contains built app files only. It does not contain source code or node_modules.
+  echo This package contains built app files and node.exe only. It does not contain source code, node_modules, or internal .spt templates.
 ) > "%PACKAGE_DIR%\README_PORTABLE.txt"
 
 echo Creating zip...

@@ -36,6 +36,7 @@ const initialPlaceInfo = { status: 'idle', data: null, message: '', positionKey:
 const DRAFT_KEY = 'solar-site-precheck-draft-v1'
 const TERRAIN_ANALYSIS_VERSION = 2
 const APP_VERSION = '1.1'
+const BUILD_DATE = typeof __BUILD_DATE__ !== 'undefined' ? __BUILD_DATE__ : 'dev'
 
 function isSingleInheritanceLandTransfer(item) {
   return item?.ownershipMode === '単独' &&
@@ -210,10 +211,14 @@ export default function App() {
   const [drawingConvertStatus, setDrawingConvertStatus] = useState({ status: 'idle', message: '' })
   const [drawingJob, setDrawingJob] = useState(null)
   const [drawingSelectedPages, setDrawingSelectedPages] = useState([])
+  const [templateFileName, setTemplateFileName] = useState('')
   const [inheritanceStatus, setInheritanceStatus] = useState({ status: 'idle', message: '' })
   const [inheritanceJob, setInheritanceJob] = useState(null)
   const [inheritanceSort, setInheritanceSort] = useState('receipt')
   const [inheritanceCopyStatus, setInheritanceCopyStatus] = useState('')
+  const [activePage, setActivePage] = useState(() =>
+    typeof window !== 'undefined' && window.location.hash === '#inheritance-check' ? 'inheritance' : 'solar',
+  )
   const draftSaveTimer = useRef(null)
 
   useEffect(() => {
@@ -559,29 +564,85 @@ export default function App() {
     }
   }
 
+  function handleTemplateFile(event) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    setTemplateFileName(file?.name || '')
+  }
+
   function toggleDrawingPage(pageNumber) {
     setDrawingSelectedPages((current) => current.includes(pageNumber)
       ? current.filter((value) => value !== pageNumber)
       : [...current, pageNumber].sort((a, b) => a - b))
   }
 
-  async function saveSelectedDrawingPages({ chooseFolder = false } = {}) {
+  function sanitizeSuggestedFileName(name, fallback = 'output') {
+    return String(name || fallback)
+      .replace(/[\\/:*?"<>|]/g, '_')
+      .trim() || fallback
+  }
+
+  async function saveBlobWithPicker(blob, suggestedName, options = {}) {
+    if (typeof window !== 'undefined' && window.showSaveFilePicker) {
+      const fileHandle = await window.showSaveFilePicker({
+        suggestedName,
+        types: options.types || [],
+      })
+      const writable = await fileHandle.createWritable()
+      await writable.write(blob)
+      await writable.close()
+      return true
+    }
+
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = suggestedName
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(link.href)
+    return false
+  }
+
+  async function saveSelectedDrawingPages({ chooseLocation = false } = {}) {
     if (!drawingJob || !drawingSelectedPages.length) return
     let directoryHandle = null
-    if (chooseFolder) {
-      if (!window.showDirectoryPicker) {
-        setDrawingConvertStatus({ status: 'error', message: 'このブラウザでは保存先フォルダ選択に対応していません。通常保存を使用してください。' })
+    let fileHandle = null
+    let fileNameBase = drawingJob.baseName
+    if (chooseLocation) {
+      try {
+        if (drawingSelectedPages.length === 1 && window.showSaveFilePicker) {
+          const pageNumber = drawingSelectedPages[0]
+          const suffix = drawingJob.pageCount > 1 ? `_p${String(pageNumber).padStart(2, '0')}` : ''
+          fileHandle = await window.showSaveFilePicker({
+            suggestedName: `${drawingJob.baseName}${suffix}.jpg`,
+            types: [{ description: 'JPG画像', accept: { 'image/jpeg': ['.jpg', '.jpeg'] } }],
+          })
+          fileNameBase = drawingJob.baseName
+        } else if (window.showDirectoryPicker) {
+          directoryHandle = await window.showDirectoryPicker({ mode: 'readwrite' })
+          const inputName = window.prompt('保存するJPGの基本ファイル名を入力してください。複数ページの場合は _p01 のようにページ番号を付けて保存します。', drawingJob.baseName)
+          fileNameBase = sanitizeSuggestedFileName(inputName || drawingJob.baseName, drawingJob.baseName)
+        } else {
+          setDrawingConvertStatus({ status: 'error', message: 'このブラウザでは保存先選択に対応していません。通常保存を使用してください。' })
+          return
+        }
+      } catch (error) {
+        if (error?.name === 'AbortError') {
+          setDrawingConvertStatus({ status: 'idle', message: '保存をキャンセルしました。' })
+          return
+        }
+        setDrawingConvertStatus({ status: 'error', message: error.message || '保存先の選択に失敗しました。' })
         return
       }
-      directoryHandle = await window.showDirectoryPicker({ mode: 'readwrite' })
     }
     setDrawingConvertStatus({ status: 'loading', message: '選択ページをJPGとして保存しています…' })
     try {
       const { savePdfPagesAsJpg } = await import('./services/pdfToJpg.js')
       const count = await savePdfPagesAsJpg(drawingJob.file, drawingSelectedPages, (message) => {
         setDrawingConvertStatus({ status: 'loading', message })
-      }, { directoryHandle })
-      setDrawingConvertStatus({ status: 'success', message: `${count}ページをJPGとして保存しました。` })
+      }, { directoryHandle, fileHandle, fileNameBase })
+      setDrawingConvertStatus({ status: 'success', message: `${count}ページをJPGとして保存しました。${chooseLocation ? '保存先を指定しました。' : ''}` })
     } catch (error) {
       setDrawingConvertStatus({ status: 'error', message: error.message || 'JPG保存に失敗しました。' })
     }
@@ -619,7 +680,7 @@ export default function App() {
     setInheritanceCopyStatus('')
   }
 
-  function downloadInheritanceCsv() {
+  async function downloadInheritanceCsv() {
     if (!sortedInheritanceRows.length) return
     const rows = [
       ['受付番号', '受付日', '土地', '住所', '外記載'],
@@ -633,11 +694,20 @@ export default function App() {
     ]
     const csv = `\uFEFF${rows.map((row) => row.map(escapeCsv).join(',')).join('\r\n')}`
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
-    const link = document.createElement('a')
-    link.href = URL.createObjectURL(blob)
-    link.download = `${inheritanceJob.fileName.replace(/\.pdf$/i, '') || '相続資料'}_単独所有権移転相続リスト.csv`
-    link.click()
-    URL.revokeObjectURL(link.href)
+    const baseName = sanitizeSuggestedFileName(inheritanceJob.fileName.replace(/\.pdf$/i, '') || '相続資料', '相続資料')
+    const suggestedName = `${baseName}_単独所有権移転相続リスト.csv`
+    try {
+      await saveBlobWithPicker(blob, suggestedName, {
+        types: [{ description: 'CSVファイル', accept: { 'text/csv': ['.csv'] } }],
+      })
+      setInheritanceStatus((current) => ({ ...current, status: 'success', message: `${suggestedName} を保存しました。` }))
+    } catch (error) {
+      if (error?.name === 'AbortError') {
+        setInheritanceStatus((current) => ({ ...current, message: 'CSV保存をキャンセルしました。' }))
+        return
+      }
+      setInheritanceStatus((current) => ({ ...current, status: 'error', message: error.message || 'CSV保存に失敗しました。' }))
+    }
   }
 
   async function copyInheritanceRow(item, index) {
@@ -827,11 +897,19 @@ export default function App() {
   const showHorizonResult = Boolean(terrain) || terrainStatus === 'error'
   const snowStation = snowData.station
   const snowIsConfirmed = isConfirmedSnowStation(snowStation)
-  const canChooseSaveFolder = typeof window !== 'undefined' && 'showDirectoryPicker' in window
+  const canChooseSaveLocation = typeof window !== 'undefined' && ('showSaveFilePicker' in window || 'showDirectoryPicker' in window)
   const parcelResults = useMemo(
     () => searchParcels(parcelData, parcelQuery),
     [parcelData, parcelQuery],
   )
+
+  function switchPage(nextPage) {
+    setActivePage(nextPage)
+    if (typeof window !== 'undefined') {
+      window.history.replaceState(null, '', nextPage === 'inheritance' ? '#inheritance-check' : '#site-select')
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }
 
   return (
     <div className="app">
@@ -843,10 +921,30 @@ export default function App() {
             <div className="brand-subtitle">太陽光候補地・入力準備ツール</div>
           </div>
         </div>
-        <div className="status-pill"><span></span>MVP プロトタイプ</div>
+        <div className="topbar-actions">
+          <nav className="page-switcher" aria-label="画面切替">
+            <button
+              type="button"
+              className={activePage === 'solar' ? 'page-switcher__button page-switcher__button--active' : 'page-switcher__button'}
+              onClick={() => switchPage('solar')}
+            >
+              太陽光チェック
+            </button>
+            <button
+              type="button"
+              className={activePage === 'inheritance' ? 'page-switcher__button page-switcher__button--active' : 'page-switcher__button'}
+              onClick={() => switchPage('inheritance')}
+            >
+              相続登記チェック
+            </button>
+          </nav>
+          <div className="status-pill"><span></span>MVP プロトタイプ</div>
+        </div>
       </header>
 
       <main>
+        {activePage === 'solar' && (
+          <>
         <section className="hero">
           <p className="eyebrow">SITE SCREENING WORKSPACE</p>
           <h1>候補地の情報を、<br /><span>Solar Pro入力前</span>にひとまとめ。</h1>
@@ -878,9 +976,9 @@ export default function App() {
                 <button type="button" disabled={!drawingSelectedPages.length || drawingConvertStatus.status === 'loading'} onClick={() => saveSelectedDrawingPages()}>
                   選択ページを保存
                 </button>
-                {canChooseSaveFolder && (
-                  <button type="button" disabled={!drawingSelectedPages.length || drawingConvertStatus.status === 'loading'} onClick={() => saveSelectedDrawingPages({ chooseFolder: true })}>
-                    保存先フォルダを選んで保存
+                {canChooseSaveLocation && (
+                  <button type="button" disabled={!drawingSelectedPages.length || drawingConvertStatus.status === 'loading'} onClick={() => saveSelectedDrawingPages({ chooseLocation: true })}>
+                    保存先・ファイル名を選んで保存
                   </button>
                 )}
               </div>
@@ -1565,12 +1663,14 @@ export default function App() {
 
             <article className="knowledge-card">
               <span className="knowledge-card__label">報告書テンプレート</span>
-              <h3>Solar Pro用テンプレートをダウンロード</h3>
-              <p>作成済みのSolar Proレポートテンプレート（.spt）を保存して、Solar Pro側のレポートテンプレートフォルダーへ配置してください。</p>
-              <a className="template-download-button" href="/templates/Kaihatu.spt" download="Kaihatu.spt">
-                Kaihatu.spt をダウンロード
-              </a>
-              <small>配置先例：Solar Pro 5.0 / Samples / レポートテンプレート。社内運用に合わせて保存先を確認してください。</small>
+              <h3>Solar Pro用テンプレートの確認</h3>
+              <p>社内テンプレート（.spt）はアプリに同梱せず、各自のPCまたは社内共有フォルダーから選択して確認します。</p>
+              <label className="template-download-button template-download-button--file">
+                ローカル .spt を選択
+                <input type="file" accept=".spt" onChange={handleTemplateFile} />
+              </label>
+              {templateFileName && <small>選択中：{templateFileName}</small>}
+              <small>配置先例：Solar Pro 5.0 / Samples / レポートテンプレート。内部テンプレートは公開用ZIPやGitHubには含めないでください。</small>
             </article>
 
             <article className="knowledge-card">
@@ -1632,19 +1732,23 @@ export default function App() {
           </div>
         </section>
         </div>
+          </>
+        )}
 
-        <section className="inheritance-section panel" id="inheritance-check">
-          <details className="inheritance-disclosure">
-            <summary className="inheritance-disclosure__summary">
+        {activePage === 'inheritance' && (
+        <section className="inheritance-section panel inheritance-section--standalone" id="inheritance-check">
+            <div className="inheritance-page-heading">
               <div className="section-heading">
                 <div className="step-number">相</div>
                 <div>
-                  <h2>相続資料PDFチェック（実験機能）</h2>
+                  <h2>相続登記チェック</h2>
                   <p>法務局資料PDFから土地の単独相続候補を拾い出す、オフライン確認補助です。</p>
                 </div>
               </div>
-              <span className="manual-disclosure__toggle">クリックして開く</span>
-            </summary>
+              <button type="button" className="secondary-button" onClick={() => switchPage('solar')}>
+                太陽光チェックへ戻る
+              </button>
+            </div>
 
             <div className="inheritance-disclosure__body">
               <div className="privacy-note">
@@ -1662,7 +1766,7 @@ export default function App() {
                   <input type="file" accept="application/pdf,.pdf" onChange={handleInheritancePdf} />
                 </label>
                 <button type="button" className="secondary-button" disabled={!inheritanceJob} onClick={clearInheritanceJob}>結果クリア</button>
-                <button type="button" className="primary-button" disabled={!inheritanceSingleTransferRows.length} onClick={downloadInheritanceCsv}>Excel用CSV出力</button>
+                <button type="button" className="primary-button" disabled={!inheritanceSingleTransferRows.length} onClick={downloadInheritanceCsv}>保存先を選んでCSV出力</button>
               </div>
 
               {inheritanceStatus.message && (
@@ -1782,13 +1886,13 @@ export default function App() {
                 </div>
               )}
             </div>
-          </details>
         </section>
+        )}
       </main>
 
       <footer>
         <span>Solar Site Precheck — 入力内容はこのブラウザに自動保存</span>
-        <span>Version {APP_VERSION} / 地図・標高：国土地理院 / 積雪出現率：NEDO MONSOLA-11</span>
+        <span>Version {APP_VERSION} / Build {BUILD_DATE} / 地図・標高：国土地理院 / 積雪出現率：NEDO MONSOLA-11</span>
       </footer>
     </div>
   )

@@ -1,5 +1,5 @@
-import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist/build/pdf.mjs'
-import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
+import pdfWorkerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url'
 
 GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 
@@ -77,10 +77,16 @@ async function writeBlobToDirectory(directoryHandle, fileName, blob) {
   await writable.close()
 }
 
+async function writeBlobToFileHandle(fileHandle, blob) {
+  const writable = await fileHandle.createWritable()
+  await writable.write(blob)
+  await writable.close()
+}
+
 export async function savePdfPagesAsJpg(file, pageNumbers, onProgress = () => {}, options = {}) {
   const scale = options.scale ?? 2.4
   const quality = options.quality ?? 0.92
-  const baseName = safeFileName(file.name)
+  const baseName = safeFileName(options.fileNameBase || file.name)
   const data = new Uint8Array(await file.arrayBuffer())
   const pdf = await getDocument({ data }).promise
   const selected = pageNumbers.length ? pageNumbers : Array.from({ length: pdf.numPages }, (_, index) => index + 1)
@@ -92,7 +98,8 @@ export async function savePdfPagesAsJpg(file, pageNumbers, onProgress = () => {}
     const blob = await canvasToJpegBlob(canvas, quality)
     const suffix = pdf.numPages > 1 ? `_p${String(pageNumber).padStart(2, '0')}` : ''
     const fileName = `${baseName}${suffix}.jpg`
-    if (options.directoryHandle) await writeBlobToDirectory(options.directoryHandle, fileName, blob)
+    if (options.fileHandle && selected.length === 1) await writeBlobToFileHandle(options.fileHandle, blob)
+    else if (options.directoryHandle) await writeBlobToDirectory(options.directoryHandle, fileName, blob)
     else downloadBlob(blob, fileName)
     canvas.width = 1
     canvas.height = 1

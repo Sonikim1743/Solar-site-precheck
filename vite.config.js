@@ -15,7 +15,9 @@ function nedoMonsolaProxy() {
       return
     }
     try {
-      const nedoResponse = await fetch(`https://domessolar.infop.nedo.go.jp/appww/cgi-bin/monsola.cgi?m=${mesh}`)
+      const nedoResponse = await fetch(`https://domessolar.infop.nedo.go.jp/appww/cgi-bin/monsola.cgi?m=${mesh}`, {
+        signal: AbortSignal.timeout(10000),
+      })
       if (!nedoResponse.ok) throw new Error(`NEDO HTTP ${nedoResponse.status}`)
       response.writeHead(200, {
         'Content-Type': 'text/html; charset=utf-8',
@@ -41,6 +43,12 @@ function nedoMonsolaProxy() {
 
 export default defineConfig({
   plugins: [react(), nedoMonsolaProxy()],
+  define: {
+    __BUILD_DATE__: JSON.stringify(process.env.VITE_BUILD_DATE || new Date().toISOString().slice(0, 10)),
+  },
+  build: {
+    target: ['es2020', 'safari14'],
+  },
   server: {
     host: '127.0.0.1',
     port: 5173,

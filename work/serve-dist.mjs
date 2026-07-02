@@ -24,8 +24,9 @@ function fileForUrl(url) {
   const pathname = decodeURIComponent(new URL(url, `http://${host}:${port}`).pathname)
   const requested = normalize(pathname).replace(/^(\.\.[/\\])+/, '')
   const candidate = resolve(join(root, requested))
-  if (!candidate.startsWith(root)) return null
+  if (candidate !== root && !candidate.startsWith(`${root}\\`) && !candidate.startsWith(`${root}/`)) return null
   if (existsSync(candidate) && statSync(candidate).isFile()) return candidate
+  if (/^\/(?:assets|data|icons|screenshots|templates)\//.test(pathname)) return null
   return join(root, 'index.html')
 }
 
@@ -38,7 +39,9 @@ createServer((request, response) => {
       response.end('Invalid mesh code')
       return
     }
-    fetch(`https://domessolar.infop.nedo.go.jp/appww/cgi-bin/monsola.cgi?m=${mesh}`)
+    fetch(`https://domessolar.infop.nedo.go.jp/appww/cgi-bin/monsola.cgi?m=${mesh}`, {
+      signal: AbortSignal.timeout(10000),
+    })
       .then((nedoResponse) => {
         if (!nedoResponse.ok) throw new Error(`NEDO HTTP ${nedoResponse.status}`)
         return nedoResponse.text()

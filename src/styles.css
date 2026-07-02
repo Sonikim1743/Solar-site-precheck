@@ -52,6 +52,35 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
 .brand-name { font-size: 20px; letter-spacing: -0.02em; }
 .brand-name strong { color: var(--green); }
 .brand-subtitle { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.page-switcher {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px;
+  border: 1px solid #d7e5df;
+  border-radius: 999px;
+  background: #f7fbf8;
+}
+.page-switcher__button {
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 13px;
+  color: #4f675f;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.page-switcher__button--active {
+  color: #fff;
+  background: linear-gradient(135deg, var(--green), #1f946e);
+  box-shadow: 0 8px 18px rgba(23, 107, 82, 0.18);
+}
 .status-pill {
   padding: 8px 12px;
   border: 1px solid #cfe2da;
@@ -1952,6 +1981,17 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
   padding: 22px;
   scroll-margin-top: 92px;
 }
+.inheritance-section--standalone {
+  margin-top: 28px;
+}
+.inheritance-page-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
 .inheritance-disclosure__summary {
   display: flex;
   align-items: center;
@@ -2231,6 +2271,9 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
   filter: brightness(1.05);
   transform: translateY(-1px);
 }
+.template-download-button--file input {
+  display: none;
+}
 .external-link-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2342,6 +2385,26 @@ footer {
   .map-shell {
     max-width: 100%;
     min-width: 0;
+  }
+  .topbar {
+    height: auto;
+    min-height: 76px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .topbar-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .page-switcher {
+    flex: 1;
+    justify-content: center;
+  }
+  .inheritance-page-heading {
+    align-items: stretch;
+    flex-direction: column;
   }
   .workflow { grid-template-columns: 1fr; }
   .support-sections { grid-template-columns: 1fr; }
@@ -2493,7 +2556,7 @@ footer {
 }
 
 @media (max-width: 560px) {
-  .topbar { height: 68px; padding: 0 16px; }
+  .topbar { min-height: 68px; padding: 10px 16px; }
   .brand { min-width: 0; }
   .brand-name,
   .brand-subtitle {
@@ -2502,6 +2565,12 @@ footer {
     white-space: nowrap;
   }
   .status-pill { display: none; }
+  .topbar-actions { gap: 8px; }
+  .page-switcher__button {
+    flex: 1;
+    padding: 8px 9px;
+    font-size: 12px;
+  }
   main { padding: 0 14px 40px; }
   .hero { padding: 38px 4px 28px; }
   .hero h1 { font-size: 34px; }

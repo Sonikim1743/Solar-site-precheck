@@ -3,8 +3,12 @@ cd /d "%~dp0"
 
 set "NODE_EXE="
 
+if exist "runtime\node.exe" (
+  set "NODE_EXE=%CD%\runtime\node.exe"
+)
+
 if exist "%USERPROFILE%\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe" (
-  set "NODE_EXE=%USERPROFILE%\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe"
+  if "%NODE_EXE%"=="" set "NODE_EXE=%USERPROFILE%\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe"
 )
 
 if "%NODE_EXE%"=="" (
