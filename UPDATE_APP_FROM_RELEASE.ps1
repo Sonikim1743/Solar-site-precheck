@@ -1,5 +1,5 @@
 param(
-  [string]$VersionUrl = "https://github.com/Sonikim1743/Solar-site-precheck/releases/latest/download/latest-version.json"
+  [string]$VersionUrl = "https://raw.githubusercontent.com/Sonikim1743/Solar-site-precheck/main/release/latest/latest-version.json"
 )
 
 $ErrorActionPreference = "Stop"

@@ -12,4 +12,5 @@ work/*
 !work/
 !work/serve-dist.mjs
 *.zip
+!release/latest/*.zip
 eng.traineddata

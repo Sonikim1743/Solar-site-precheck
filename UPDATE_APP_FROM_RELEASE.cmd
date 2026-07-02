@@ -1,7 +1,7 @@
 @echo off
 cd /d "%~dp0"
 
-set "VERSION_URL=https://github.com/Sonikim1743/Solar-site-precheck/releases/latest/download/latest-version.json"
+set "VERSION_URL=https://raw.githubusercontent.com/Sonikim1743/Solar-site-precheck/main/release/latest/latest-version.json"
 
 echo Solar Site Precheck updater
 echo.

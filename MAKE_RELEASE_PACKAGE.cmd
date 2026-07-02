@@ -8,7 +8,7 @@ set "PACKAGE_DIR=outputs\SolarSitePrecheck_Release_Light"
 set "PACKAGE_ZIP=outputs\SolarSitePrecheck_v%VERSION%_release_light.zip"
 set "VERSION_JSON=outputs\latest-version.json"
 set "ZIP_NAME=SolarSitePrecheck_v%VERSION%_release_light.zip"
-set "RELEASE_BASE_URL=https://github.com/Sonikim1743/Solar-site-precheck/releases/latest/download"
+set "RELEASE_BASE_URL=https://raw.githubusercontent.com/Sonikim1743/Solar-site-precheck/main/release/latest"
 
 if not exist "%NODE_EXE%" (
   echo Bundled Node was not found.
@@ -76,6 +76,11 @@ if errorlevel 1 (
 echo Creating latest-version.json...
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$zip = Get-Item '%PACKAGE_ZIP%'; $meta = [ordered]@{ app='Solar Site Precheck'; version='%VERSION%'; buildDate='%BUILD_DATE%'; packageName='%ZIP_NAME%'; zipUrl='%RELEASE_BASE_URL%/%ZIP_NAME%'; notes='Light update package. Keep existing runtime/node.exe on desktop.'; sizeBytes=$zip.Length }; $meta | ConvertTo-Json -Depth 5 | Set-Content -Path '%VERSION_JSON%' -Encoding UTF8"
 
+echo Copying release files to release\latest...
+if not exist "release\latest" mkdir "release\latest"
+copy "%PACKAGE_ZIP%" "release\latest\%ZIP_NAME%" >nul
+copy "%VERSION_JSON%" "release\latest\latest-version.json" >nul
+
 echo.
 echo Release package created:
 echo %PACKAGE_ZIP%
@@ -83,7 +88,7 @@ echo.
 echo Version metadata created:
 echo %VERSION_JSON%
 echo.
-echo Upload both files to GitHub Release:
+echo Commit and push these files for online update:
 echo - %ZIP_NAME%
 echo - latest-version.json
 echo.
