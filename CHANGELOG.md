@@ -11,6 +11,7 @@
 - ローカル配信用サーバーのNEDO取得に10秒タイムアウトを追加し、存在しない静的アセットは404を返すよう改善。
 - フッターにBuild日付を表示し、チーム内で使用中バージョンを確認しやすくした。
 - モバイルSafariでPDF読取時に発生する互換性エラー対策として、PDF.js legacyビルドとブラウザ互換ポリフィルを追加。
+- iOS/SafariではPDF.jsの通常Workerではなく、メインスレッド側のfake workerを優先するようにし、PDF読取の互換性をさらに改善。
 - GitHub Release配布向けに、node.exeを含まない軽量更新ZIPと `latest-version.json` を生成する仕組みを追加。
 - デスクトップ側でReleaseの `latest-version.json` を読み取り、最新ZIPを取得・バックアップ・更新するスクリプトを追加。
 

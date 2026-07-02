@@ -1,7 +1,7 @@
-import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
-import pdfWorkerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url'
+import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { PSM, createWorker } from 'tesseract.js'
 import { thirdMeshCenter } from './nedo.js'
+import { configurePdfJs, pdfLoadOptions } from './pdfCompat.js'
 import {
   elevationCandidatesFromOcrText,
   meshCandidatesFromOcrText,
@@ -9,8 +9,6 @@ import {
   selectConsistentRates,
   validateRateSummaries,
 } from './nedoValidation.js'
-
-GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 
 function cropCanvas(source, leftRatio, topRatio, widthRatio, heightRatio) {
   const canvas = document.createElement('canvas')
@@ -173,9 +171,10 @@ function normalizeRate(value) {
 
 export async function extractMonsolaPdf(file, onProgress = () => {}, expected = {}) {
   const { mesh: expectedMesh = '', elevation: referenceElevation = null } = expected
+  await configurePdfJs()
   onProgress('PDFを読み込んでいます…')
   const data = new Uint8Array(await file.arrayBuffer())
-  const pdf = await getDocument({ data }).promise
+  const pdf = await getDocument(pdfLoadOptions(data)).promise
   if (pdf.numPages < 2) throw new Error('NEDO帳票のページ構成を確認できませんでした')
 
   const firstPage = await renderPage(pdf, 1)

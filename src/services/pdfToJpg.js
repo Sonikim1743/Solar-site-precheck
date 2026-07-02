@@ -1,7 +1,5 @@
-import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
-import pdfWorkerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url'
-
-GlobalWorkerOptions.workerSrc = pdfWorkerUrl
+import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
+import { configurePdfJs, pdfLoadOptions } from './pdfCompat.js'
 
 function safeFileName(name) {
   return String(name || 'drawing')
@@ -44,9 +42,10 @@ async function renderPageToCanvas(pdf, pageNumber, scale) {
 }
 
 export async function preparePdfJpgPreview(file, onProgress = () => {}, options = {}) {
+  await configurePdfJs()
   const previewScale = options.previewScale ?? 0.7
   const data = new Uint8Array(await file.arrayBuffer())
-  const pdf = await getDocument({ data }).promise
+  const pdf = await getDocument(pdfLoadOptions(data)).promise
   const pages = []
 
   for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
@@ -84,11 +83,12 @@ async function writeBlobToFileHandle(fileHandle, blob) {
 }
 
 export async function savePdfPagesAsJpg(file, pageNumbers, onProgress = () => {}, options = {}) {
+  await configurePdfJs()
   const scale = options.scale ?? 2.4
   const quality = options.quality ?? 0.92
   const baseName = safeFileName(options.fileNameBase || file.name)
   const data = new Uint8Array(await file.arrayBuffer())
-  const pdf = await getDocument({ data }).promise
+  const pdf = await getDocument(pdfLoadOptions(data)).promise
   const selected = pageNumbers.length ? pageNumbers : Array.from({ length: pdf.numPages }, (_, index) => index + 1)
 
   for (let index = 0; index < selected.length; index += 1) {

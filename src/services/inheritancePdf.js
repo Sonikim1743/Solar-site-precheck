@@ -1,8 +1,6 @@
-import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
-import pdfWorkerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url'
+import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
+import { configurePdfJs, pdfLoadOptions } from './pdfCompat.js'
 import { analyzeInheritanceText, normalizeInheritanceText, summarizeInheritanceReceipts } from '../utils/inheritance.js'
-
-GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 
 function textLinesFromPdfItems(items) {
   const rows = []
@@ -30,8 +28,9 @@ function textLinesFromPdfItems(items) {
 }
 
 export async function readInheritancePdf(file, onProgress = () => {}) {
+  await configurePdfJs()
   const data = await file.arrayBuffer()
-  const pdf = await getDocument({ data }).promise
+  const pdf = await getDocument(pdfLoadOptions(data)).promise
   const pages = []
 
   for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
