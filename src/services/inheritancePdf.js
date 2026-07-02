@@ -55,3 +55,31 @@ export async function readInheritancePdf(file, onProgress = () => {}) {
     results: analyzeInheritanceText(pages),
   }
 }
+
+export async function readInheritancePdfOnServer(file, onProgress = () => {}) {
+  onProgress('PDFをローカルサーバーで解析しています…')
+  const response = await fetch('/api/inheritance-pdf', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/pdf',
+      'X-File-Name': encodeURIComponent(file.name || '相続資料.pdf'),
+    },
+    body: await file.arrayBuffer(),
+  })
+
+  if (!response.ok) {
+    const message = await response.text().catch(() => '')
+    throw new Error(message || 'ローカルサーバーでPDFを解析できませんでした。')
+  }
+
+  return response.json()
+}
+
+export function shouldPreferServerPdfParsing() {
+  if (typeof navigator === 'undefined') return false
+  const ua = navigator.userAgent || ''
+  const vendor = navigator.vendor || ''
+  const isApple = /Apple/.test(vendor) || /iPad|iPhone|iPod/.test(ua)
+  const isSafari = /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|OPiOS/.test(ua)
+  return isApple && isSafari
+}

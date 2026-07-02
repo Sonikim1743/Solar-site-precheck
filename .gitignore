@@ -12,6 +12,7 @@ outputs/
 work/*
 !work/
 !work/serve-dist.mjs
+!work/inheritance-server.mjs
 *.zip
 !release/latest/*.zip
 eng.traineddata

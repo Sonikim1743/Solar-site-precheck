@@ -1,10 +1,12 @@
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { extname, join, normalize, resolve } from 'node:path'
+import { readInheritancePdfOnServer } from './inheritance-server.mjs'
 
 const root = resolve('dist')
 const host = process.env.HOST || '127.0.0.1'
 const port = Number(process.env.PORT || 5173)
+const maxPdfUploadBytes = 80 * 1024 * 1024
 
 const types = {
   '.html': 'text/html; charset=utf-8',
@@ -30,8 +32,48 @@ function fileForUrl(url) {
   return join(root, 'index.html')
 }
 
-createServer((request, response) => {
+function readRequestBody(request) {
+  return new Promise((resolveBody, rejectBody) => {
+    const chunks = []
+    let size = 0
+    request.on('data', (chunk) => {
+      size += chunk.length
+      if (size > maxPdfUploadBytes) {
+        request.destroy()
+        rejectBody(new Error('PDFファイルが大きすぎます。80MB以下のファイルを選択してください。'))
+        return
+      }
+      chunks.push(chunk)
+    })
+    request.on('end', () => resolveBody(Buffer.concat(chunks)))
+    request.on('error', rejectBody)
+  })
+}
+
+createServer(async (request, response) => {
   const requestUrl = new URL(request.url || '/', `http://${host}:${port}`)
+  if (requestUrl.pathname === '/api/inheritance-pdf') {
+    if (request.method !== 'POST') {
+      response.writeHead(405, { 'Content-Type': 'text/plain; charset=utf-8' })
+      response.end('Method not allowed')
+      return
+    }
+    try {
+      const fileName = decodeURIComponent(request.headers['x-file-name'] || '相続資料.pdf')
+      const buffer = await readRequestBody(request)
+      const result = await readInheritancePdfOnServer(buffer, fileName)
+      response.writeHead(200, {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Cache-Control': 'no-store',
+      })
+      response.end(JSON.stringify(result))
+    } catch (error) {
+      response.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' })
+      response.end(error.message || 'PDF解析に失敗しました。')
+    }
+    return
+  }
+
   if (requestUrl.pathname === '/api/nedo-monsola') {
     const mesh = requestUrl.searchParams.get('mesh') || ''
     if (!/^\d{8}$/.test(mesh)) {

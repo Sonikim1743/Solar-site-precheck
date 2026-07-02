@@ -655,10 +655,31 @@ export default function App() {
     setInheritanceStatus({ status: 'loading', message: '相続資料PDFをブラウザ内で読み込んでいます…' })
     setInheritanceJob(null)
     try {
-      const { readInheritancePdf } = await import('./services/inheritancePdf.js')
-      const job = await readInheritancePdf(file, (message) => {
+      const {
+        readInheritancePdf,
+        readInheritancePdfOnServer,
+        shouldPreferServerPdfParsing,
+      } = await import('./services/inheritancePdf.js')
+      const onProgress = (message) => {
         setInheritanceStatus({ status: 'loading', message })
-      })
+      }
+      let job
+      if (shouldPreferServerPdfParsing()) {
+        try {
+          job = await readInheritancePdfOnServer(file, onProgress)
+        } catch {
+          job = await readInheritancePdf(file, onProgress)
+        }
+      } else {
+        try {
+          job = await readInheritancePdf(file, onProgress)
+        } catch (error) {
+          setInheritanceStatus({ status: 'loading', message: 'ブラウザ内解析に失敗したため、ローカルサーバー解析を試しています…' })
+          job = await readInheritancePdfOnServer(file, onProgress).catch(() => {
+            throw error
+          })
+        }
+      }
       setInheritanceJob(job)
       const singleTransferCount = job.results.filter(isSingleInheritanceLandTransfer).length
       const receiptSummary = job.receiptSummary
