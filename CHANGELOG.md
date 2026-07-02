@@ -2,6 +2,8 @@
 
 ## 2026-07-03 — 相続PDFサーバー解析修正
 
+- PDF図面JPG変換で、古いブラウザキャッシュが存在しない旧chunk名を参照した場合に備え、ローカルサーバー側で最新 `pdfToJpg` chunkへ復旧する処理を追加。
+- PWA Service Workerが `/assets/` 配下のJavaScript chunkをキャッシュしないよう変更し、更新後の動的import不整合を抑制。
 - release_light配布環境で `/api/inheritance-pdf` が500エラーになる問題を修正。
 - Node環境でPDF.jsを読み込む際に必要な最小DOMMatrix / Path2D / ImageDataポリフィルを追加。
 - 軽量更新ZIPとポータブルZIPに `work/pdfjs/pdf.worker.mjs` を含めるよう修正。

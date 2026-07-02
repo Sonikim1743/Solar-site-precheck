@@ -1,4 +1,4 @@
-const CACHE_NAME = 'solar-site-precheck-v2'
+const CACHE_NAME = 'solar-site-precheck-v3'
 const APP_SHELL = [
   '/',
   '/manifest.json',
@@ -30,6 +30,10 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return
   if (url.origin !== self.location.origin) return
   if (url.pathname.startsWith('/api/')) return
+  if (url.pathname.startsWith('/assets/')) {
+    event.respondWith(fetch(request))
+    return
+  }
 
   if (request.mode === 'navigate') {
     event.respondWith(

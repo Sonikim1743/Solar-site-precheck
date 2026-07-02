@@ -1,4 +1,4 @@
-import { createReadStream, existsSync, statSync } from 'node:fs'
+import { createReadStream, existsSync, readdirSync, statSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { extname, join, normalize, resolve } from 'node:path'
 import { readInheritancePdfOnServer } from './inheritance-server.mjs'
@@ -22,12 +22,27 @@ const types = {
   '.wasm': 'application/wasm',
 }
 
+function findCurrentChunk(prefix) {
+  const assetsDir = join(root, 'assets')
+  if (!existsSync(assetsDir)) return null
+  try {
+    const match = readdirSync(assetsDir)
+      .filter((name) => name.startsWith(prefix) && /\.js$/.test(name))
+      .sort()
+      .at(-1)
+    return match ? join(assetsDir, match) : null
+  } catch {
+    return null
+  }
+}
+
 function fileForUrl(url) {
   const pathname = decodeURIComponent(new URL(url, `http://${host}:${port}`).pathname)
   const requested = normalize(pathname).replace(/^(\.\.[/\\])+/, '')
   const candidate = resolve(join(root, requested))
   if (candidate !== root && !candidate.startsWith(`${root}\\`) && !candidate.startsWith(`${root}/`)) return null
   if (existsSync(candidate) && statSync(candidate).isFile()) return candidate
+  if (/^\/assets\/pdfToJpg-[A-Za-z0-9_-]+\.jsf?$/.test(pathname)) return findCurrentChunk('pdfToJpg-')
   if (/^\/(?:assets|data|icons|screenshots|templates)\//.test(pathname)) return null
   return join(root, 'index.html')
 }
