@@ -14,11 +14,23 @@ $tempRoot = Join-Path $root "_update_tmp"
 $downloadZip = Join-Path $tempRoot "latest.zip"
 $extractDir = Join-Path $tempRoot "extract"
 $backupRoot = Join-Path $root "backup"
+$tokenFile = Join-Path $root "github-token.txt"
 $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $backupDir = Join-Path $backupRoot "backup_$timestamp"
 
+function Get-GitHubHeaders {
+  if (Test-Path $tokenFile) {
+    $token = (Get-Content -LiteralPath $tokenFile -Raw).Trim()
+    if ($token) {
+      return @{ Authorization = "Bearer $token"; "User-Agent" = "SolarSitePrecheckUpdater" }
+    }
+  }
+  return @{ "User-Agent" = "SolarSitePrecheckUpdater" }
+}
+
 Write-Step "Checking latest release"
-$meta = Invoke-RestMethod -Uri $VersionUrl -UseBasicParsing
+$headers = Get-GitHubHeaders
+$meta = Invoke-RestMethod -Uri $VersionUrl -UseBasicParsing -Headers $headers
 
 if (-not $meta.zipUrl) {
   throw "latest-version.json does not contain zipUrl."
@@ -38,7 +50,7 @@ New-Item -ItemType Directory -Path $extractDir | Out-Null
 New-Item -ItemType Directory -Path $backupRoot -Force | Out-Null
 
 Write-Step "Downloading latest zip"
-Invoke-WebRequest -Uri $meta.zipUrl -OutFile $downloadZip -UseBasicParsing
+Invoke-WebRequest -Uri $meta.zipUrl -OutFile $downloadZip -UseBasicParsing -Headers $headers
 
 if (-not (Test-Path $downloadZip)) {
   throw "Download failed."

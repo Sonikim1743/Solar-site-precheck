@@ -3,6 +3,7 @@ dist/
 .vite/
 *.local
 *.log
+github-token.txt
 .pnpm-store/
 tmp/
 outputs/

@@ -36,6 +36,19 @@
    - 最新ZIPの内容で更新
    - `update-status.json` に更新結果を保存
 
+## private repository の場合
+
+GitHub repositoryがprivateの場合、`raw.githubusercontent.com` のURLは認証なしでは404になる。
+この場合はデスクトップ側のアプリフォルダーに `github-token.txt` を作成し、GitHub Personal Access Tokenを1行だけ保存する。
+
+推奨:
+
+- fine-grained token
+- 対象repo: `Sonikim1743/Solar-site-precheck`
+- 権限: Contents read-only
+
+`github-token.txt` は `.gitignore` 対象のため、GitHubへコミットしない。
+
 ## OpenClaw / Telegram連携の考え方
 
 - Telegramで `/update solar` を送る。
