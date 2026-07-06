@@ -41,8 +41,14 @@ function makeArea(points, minElevation, maxElevation, rangeMeters) {
 
 function TerrainProfileChart({ line, minElevation, maxElevation }) {
   const range = line.rangeMeters || 100
+  const interval = line.intervalMeters || 10
+  const distanceTicks = Array.from(
+    { length: Math.floor((range * 2) / interval) + 1 },
+    (_, index) => -range + index * interval,
+  )
   const path = makePath(line.points, minElevation, maxElevation, range)
   const area = makeArea(line.points, minElevation, maxElevation, range)
+  const span = Math.max(1, maxElevation - minElevation)
 
   return (
     <div className="terrain-section-chart">
@@ -63,18 +69,36 @@ function TerrainProfileChart({ line, minElevation, maxElevation }) {
             </g>
           )
         })}
-        {[-range, -50, 0, 50, range].map((distance) => {
+        {distanceTicks.map((distance) => {
           const x = padding.left + ((distance + range) / (range * 2)) * plotWidth
+          const isMajor = distance % 50 === 0
+          const isLabeled = distance % 20 === 0 || distance === -range || distance === range
           return (
             <g key={distance}>
-              <line className="terrain-section-chart__grid" x1={x} x2={x} y1={padding.top} y2={padding.top + plotHeight} />
-              <text x={x} y={graphHeight - 11} textAnchor="middle">{distance === 0 ? '候補地' : `${distance}m`}</text>
+              <line
+                className={`terrain-section-chart__grid terrain-section-chart__grid--${isMajor ? 'major' : 'minor'}`}
+                x1={x}
+                x2={x}
+                y1={padding.top}
+                y2={padding.top + plotHeight}
+              />
+              {isLabeled && (
+                <text x={x} y={graphHeight - 11} textAnchor="middle">{distance === 0 ? '候補地' : `${distance}m`}</text>
+              )}
             </g>
           )
         })}
         <path className="terrain-section-chart__area" d={area} />
         <path className="terrain-section-chart__line" d={path} />
+        {line.points
+          .filter((point) => Number.isFinite(point.elevation))
+          .map((point) => {
+            const x = padding.left + ((point.distance + range) / (range * 2)) * plotWidth
+            const y = padding.top + plotHeight - ((point.elevation - minElevation) / span) * plotHeight
+            return <circle key={point.distance} className="terrain-section-chart__sample" cx={x} cy={y} r="2.4" />
+          })}
         <line className="terrain-section-chart__center" x1={padding.left + plotWidth / 2} x2={padding.left + plotWidth / 2} y1={padding.top} y2={padding.top + plotHeight} />
+        <text className="terrain-section-chart__interval" x={padding.left + plotWidth - 4} y={padding.top + 14} textAnchor="end">10m刻み</text>
       </svg>
     </div>
   )
@@ -105,8 +129,8 @@ export default function TerrainSectionPreview({ analysis }) {
           />
         ))}
       </div>
-      <p>
-        国土地理院DEMを利用した概算です。造成後地形・擁壁・道路・細かな法面は反映されないため、現地確認や正式図面の代替ではありません。
+      <p className="terrain-section-source-note">
+        ※ 標高データは国土地理院DEM標高タイルに基づく概算です。10m間隔の取得点を線で結んで表示しています。造成後地形・擁壁・道路・細かな法面は反映されないため、現地確認や正式図面の代替ではありません。
       </p>
     </section>
   )

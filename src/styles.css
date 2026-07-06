@@ -757,6 +757,13 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
   stroke-width: 1;
   stroke-dasharray: 3 4;
 }
+.terrain-section-chart__grid--minor {
+  stroke: rgba(80, 110, 100, 0.14);
+  stroke-dasharray: 2 6;
+}
+.terrain-section-chart__grid--major {
+  stroke: rgba(80, 110, 100, 0.32);
+}
 .terrain-section-chart__area {
   fill: rgba(22, 126, 93, 0.16);
 }
@@ -767,10 +774,26 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
   stroke-linejoin: round;
   stroke-linecap: round;
 }
+.terrain-section-chart__sample {
+  fill: #fff;
+  stroke: #0d6c55;
+  stroke-width: 1.4;
+}
 .terrain-section-chart__center {
   stroke: #d0502d;
   stroke-width: 1.8;
   stroke-dasharray: 5 4;
+}
+.terrain-section-chart__interval {
+  fill: #0d6c55;
+  font-size: 11px;
+  font-weight: 950;
+}
+.terrain-section-source-note {
+  padding: 9px 10px;
+  border-radius: 10px;
+  background: #f7fbf9;
+  border: 1px solid #dcebe4;
 }
 .selected-parcel-card {
   margin-top: 10px;
