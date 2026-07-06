@@ -1474,6 +1474,167 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
 .horizon-result-panel {
   border-left: 5px solid #69a985;
 }
+.horizon-graph-card {
+  margin: 2px 0;
+  padding: 12px;
+  border: 1px solid #cfe5d9;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #fafffc, #f4fbf7);
+  box-shadow: 0 10px 24px rgba(25, 89, 64, 0.08);
+}
+.horizon-graph-card__heading {
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+.horizon-graph-card__heading div {
+  display: grid;
+  gap: 3px;
+}
+.horizon-graph-card__heading strong {
+  color: var(--green-dark);
+  font-size: 15px;
+  font-weight: 950;
+}
+.horizon-graph-card__heading span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.horizon-graph-card__heading em {
+  flex: 0 0 auto;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: #e8f6ef;
+  color: var(--green-dark);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 900;
+}
+.horizon-graph-scroll {
+  overflow-x: auto;
+  border: 1px solid #b9d9c7;
+  border-radius: 12px;
+  background: #bff5f5;
+}
+.horizon-graph {
+  display: block;
+  min-width: 640px;
+  width: 100%;
+  height: auto;
+  font-family: "Yu Gothic", "Meiryo", system-ui, sans-serif;
+}
+.horizon-graph__sky { fill: #baf4f4; }
+.horizon-graph__grid {
+  stroke: rgba(30, 70, 65, 0.55);
+  stroke-width: 0.8;
+  stroke-dasharray: 3 4;
+}
+.horizon-graph__axis-text,
+.horizon-graph__label,
+.horizon-graph__direction {
+  fill: #1b3f3a;
+  font-size: 11px;
+  font-weight: 800;
+}
+.horizon-graph__label { font-size: 12px; }
+.horizon-graph__direction { font-size: 13px; }
+.horizon-graph__horizon-area {
+  fill: rgba(255, 224, 67, 0.78);
+}
+.horizon-graph__horizon-line {
+  fill: none;
+  stroke: #006b4b;
+  stroke-width: 3;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.horizon-graph__terrain-line {
+  fill: none;
+  stroke: rgba(50, 78, 70, 0.75);
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  stroke-dasharray: 5 4;
+}
+.horizon-graph__sun {
+  fill: none;
+  stroke-width: 2.1;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.horizon-graph__sun--summer { stroke: #e9552d; }
+.horizon-graph__sun--equinox { stroke: #f2a51a; }
+.horizon-graph__sun--winter { stroke: #2d6be8; }
+.horizon-graph__peak circle {
+  fill: #ffffff;
+  stroke: #1f6f57;
+  stroke-width: 2;
+}
+.horizon-graph__peak text {
+  fill: #13503e;
+  font-size: 10px;
+  font-weight: 950;
+}
+.horizon-graph__peak--tightest circle {
+  fill: #ffe0d6;
+  stroke: #d94d2b;
+  stroke-width: 3;
+}
+.horizon-graph__peak--tightest text { fill: #b8331a; }
+.horizon-graph-legend {
+  margin-top: 9px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 13px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 800;
+}
+.horizon-graph-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.legend-line {
+  display: inline-block;
+  width: 24px;
+  height: 0;
+  border-top: 3px solid #006b4b;
+  border-radius: 99px;
+}
+.legend-line--terrain {
+  border-top-color: #5f756d;
+  border-top-style: dashed;
+}
+.legend-line--summer { border-top-color: #e9552d; }
+.legend-line--equinox { border-top-color: #f2a51a; }
+.legend-line--winter { border-top-color: #2d6be8; }
+.horizon-graph-peak {
+  margin-top: 8px;
+  padding: 8px 10px;
+  display: grid;
+  gap: 3px;
+  border-radius: 11px;
+  background: #edf8f2;
+  color: var(--green-dark);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.horizon-graph-peak strong {
+  font-size: 12px;
+  font-weight: 950;
+}
+.horizon-graph-peak--watch {
+  background: #fff7df;
+  color: #815b07;
+}
+.horizon-graph-peak--danger {
+  background: #fff0ed;
+  color: #a9361d;
+}
 .snow-result-panel {
   border-left: 5px solid #e2b84e;
 }

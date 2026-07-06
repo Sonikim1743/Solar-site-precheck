@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import MapPanel from './components/MapPanel.jsx'
 import ReportPreview from './components/ReportPreview.jsx'
+import HorizonGraphPreview from './components/HorizonGraphPreview.jsx'
 import {
   DETAILED_HORIZON_DIRECTIONS,
   HORIZON_DIRECTIONS,
@@ -1266,6 +1267,11 @@ export default function App() {
                         )}
                       </div>
                     )}
+                    <HorizonGraphPreview
+                      position={position}
+                      terrain={terrain}
+                      solarReference={solarReference}
+                    />
                     <label className="assumption-row">
                       <span>保守的に加算する想定樹高</span>
                       <span className="number-with-unit">
