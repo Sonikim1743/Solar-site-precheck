@@ -5,6 +5,12 @@ import { existsSync, readFileSync } from 'node:fs'
 import { parseCoordinateInput, toDegreeMinutes } from '../src/utils/coordinates.js'
 import { escapeCsv } from '../src/utils/csv.js'
 import { analyzeInheritanceText, summarizeInheritanceReceipts } from '../src/utils/inheritance.js'
+import {
+  OBSTRUCTION_ELEVATIONS_HEADER,
+  buildObstructionElevationsCsv,
+  interpolateHorizonElevations,
+  southerlyOrientedAzimuth,
+} from '../src/utils/obstructionElevations.js'
 import { snowRateLevel } from '../src/utils/snowRates.js'
 import { interpolateHorizonAngle, peakSolarWindowReference, solarPositionAtHour } from '../src/utils/solarWindow.js'
 import { DETAILED_HORIZON_DIRECTIONS, HORIZON_DIRECTIONS, createHorizonDirections, recalculateTerrainObstruction } from '../src/services/gsi.js'
@@ -299,4 +305,62 @@ test('tree height changes recalculate horizon angles without dropping terrain re
   assert.equal(recalculated.samples[0].profile[0].obstructionHeight, 30)
   assert.equal(recalculated.samples[0].profile[0].effectiveElevation, 130)
   assert.ok(Number.isFinite(recalculated.maxAngle))
+})
+
+test('Solar Pro obstruction CSV interpolates horizon values every 1 degree', () => {
+  const rows = interpolateHorizonElevations([
+    { bearing: 0, angle: 0 },
+    { bearing: 90, angle: 9 },
+    { bearing: 180, angle: 18 },
+    { bearing: 270, angle: 9 },
+  ])
+  assert.equal(rows.length, 361)
+  assert.equal(rows[0].elevation, 0)
+  assert.equal(rows[360].elevation, rows[0].elevation)
+  assert.ok(Math.abs(rows[45].elevation - 4.5) < 1e-12)
+  assert.ok(Math.abs(rows[135].elevation - 13.5) < 1e-12)
+})
+
+test('Solar Pro obstruction CSV uses southerly oriented azimuth conversion', () => {
+  assert.equal(southerlyOrientedAzimuth(0), -180)
+  assert.equal(southerlyOrientedAzimuth(90), -90)
+  assert.equal(southerlyOrientedAzimuth(180), 0)
+  assert.equal(southerlyOrientedAzimuth(270), 90)
+  assert.equal(southerlyOrientedAzimuth(360), 180)
+})
+
+test('Solar Pro obstruction CSV keeps the verified sample structure', () => {
+  const sample = readFileSync('tests/fixtures/ObstructionElevations.csv', 'utf8')
+  const sampleLines = sample.split(/\r?\n/)
+  const csv = buildObstructionElevationsCsv({
+    samples: [
+      { bearing: 0, angle: 3.7 },
+      { bearing: 45, angle: 5.0 },
+      { bearing: 90, angle: 2.2 },
+      { bearing: 135, angle: 1.7 },
+      { bearing: 180, angle: 3.1 },
+      { bearing: 225, angle: 7.4 },
+      { bearing: 270, angle: 5.1 },
+      { bearing: 315, angle: 7.1 },
+    ],
+    position: { lat: 34.8617, lon: 133.2433 },
+    sessionName: 'テスト候補地',
+  })
+  const lines = csv.split(/\r?\n/)
+  assert.equal(lines[0], sampleLines[0])
+  assert.equal(lines[6], '')
+  assert.equal(lines[7], sampleLines[7])
+  assert.equal(lines[8], '')
+  assert.equal(lines[9], 'begin data')
+  assert.equal(lines[10], OBSTRUCTION_ELEVATIONS_HEADER)
+  assert.equal(lines[10], sampleLines[10])
+  assert.equal(lines.filter((line) => /^\d+,/.test(line)).length, 361)
+  assert.equal(lines[2], 'Latitude:,34.8617')
+  assert.equal(lines[3], 'Longitude:,133.2433')
+  assert.equal(lines[11].split(',')[4], lines[371].split(',')[4])
+})
+
+test('Solar Pro obstruction CSV is not generated without horizon results', () => {
+  assert.equal(buildObstructionElevationsCsv({ samples: [], position: { lat: 35, lon: 135 } }), null)
+  assert.equal(buildObstructionElevationsCsv({ samples: [{ bearing: 0, angle: null }], position: { lat: 35, lon: 135 } }), null)
 })

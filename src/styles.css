@@ -891,6 +891,21 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
   padding-inline: 14px;
   white-space: nowrap;
 }
+.horizon-csv-button--solarpro {
+  border-color: #c9a75a;
+  background: #fff9e9;
+  color: #78520c;
+}
+.horizon-export-note {
+  margin: 10px 0 0;
+  padding: 9px 11px;
+  border: 1px solid #e2d5aa;
+  border-radius: 10px;
+  background: #fffdf5;
+  color: #6b6048;
+  font-size: 12px;
+  line-height: 1.65;
+}
 .solar-angle-warning {
   margin-top: 10px;
   padding: 11px 13px;

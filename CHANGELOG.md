@@ -1,5 +1,11 @@
 # 更新履歴
 
+## 2026-07-07 — Solar Pro地平線CSV出力
+
+- Solar Proが読み込むSunEye形式の `ObstructionElevations.csv` 出力を追加。
+- DEM地平線解析結果を0〜360°の1°間隔へ線形補間し、Average / Maximum / Sky01 Elevationへ同一値として出力。
+- 地平線分析ボタンを、分析後は結果パネルの開閉ボタンとして使えるように変更。
+
 ## 2026-07-06 — Cloudflare Pages対応と地平線グラフ
 
 - 地図下の緯度・経度・標高カードを、選択地点ミニ表示＋周辺100m地形断面プレビューへ変更。

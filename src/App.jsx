@@ -23,6 +23,7 @@ import {
 } from './services/nedo.js'
 import { parseCoordinateInput, toDegreeMinutes } from './utils/coordinates.js'
 import { escapeCsv } from './utils/csv.js'
+import { buildObstructionElevationsCsv } from './utils/obstructionElevations.js'
 import { solarAltitudeReference } from './utils/solarWindow.js'
 import { snowRateLevel } from './utils/snowRates.js'
 import {
@@ -191,6 +192,8 @@ export default function App() {
     draftSeed.detailedHorizon ?? (draftSeed.terrain?.samples?.length > HORIZON_DIRECTIONS.length),
   )
   const [terrainStatus, setTerrainStatus] = useState('idle')
+  const [horizonPanelOpen, setHorizonPanelOpen] = useState(false)
+  const [horizonExportMessage, setHorizonExportMessage] = useState('')
   const [address, setAddress] = useState('')
   const [addressResults, setAddressResults] = useState([])
   const [searchStatus, setSearchStatus] = useState('idle')
@@ -308,6 +311,8 @@ export default function App() {
     setPosition(nextPosition)
     setTerrain(null)
     setTerrainStatus('idle')
+    setHorizonPanelOpen(false)
+    setHorizonExportMessage('')
     setTerrainSection(null)
     setTerrainSectionStatus('idle')
     setElevation({ status: 'loading', value: null, source: '', message: '' })
@@ -435,7 +440,13 @@ export default function App() {
 
   async function handleTerrainAnalysis() {
     if (!position || !Number.isFinite(elevation.value)) return
+    if (terrain?.samples?.length && terrainStatus !== 'loading') {
+      setHorizonPanelOpen((current) => !current)
+      return
+    }
     setTerrainStatus('loading')
+    setHorizonPanelOpen(true)
+    setHorizonExportMessage('')
     try {
       const directions = detailedHorizon ? DETAILED_HORIZON_DIRECTIONS : HORIZON_DIRECTIONS
       const result = await analyzeSurroundingTerrain(
@@ -447,8 +458,10 @@ export default function App() {
       )
       setTerrain(result)
       setTerrainStatus('success')
+      setHorizonPanelOpen(true)
     } catch {
       setTerrainStatus('error')
+      setHorizonPanelOpen(true)
     }
   }
 
@@ -476,6 +489,7 @@ export default function App() {
       : sample)
     setTerrain(terrainFromSamples(samples))
     setTerrainStatus('manual')
+    setHorizonPanelOpen(true)
   }
 
   async function handleNedoPdf(event) {
@@ -950,13 +964,41 @@ export default function App() {
     URL.revokeObjectURL(url)
   }
 
+  function downloadSolarProObstructionCsv() {
+    setHorizonExportMessage('')
+    if (!position) {
+      setHorizonExportMessage('先に候補地点を選択してください。')
+      return
+    }
+    if (!terrain?.samples?.length) {
+      setHorizonExportMessage('先に地平線分析を完了してください。')
+      return
+    }
+    const csv = buildObstructionElevationsCsv({
+      samples: terrain.samples,
+      position,
+      sessionName: siteName || selectedPlaceLabel || expectedSnowMesh || 'Solar Site Precheck DEM Horizon',
+    })
+    if (!csv) {
+      setHorizonExportMessage('有効な地平線結果がないためCSVを作成できません。')
+      return
+    }
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'ObstructionElevations.csv'
+    link.click()
+    URL.revokeObjectURL(url)
+    setHorizonExportMessage('Solar Pro用CSVを作成しました。SunEye実測値ではなくDEM概算データです。')
+  }
+
   const horizonDirections = terrain?.samples?.length
     ? terrain.samples.map(({ direction, bearing }) => ({ direction, bearing }))
     : (detailedHorizon ? DETAILED_HORIZON_DIRECTIONS : HORIZON_DIRECTIONS)
   const horizonSamples = horizonDirections.map((item) =>
     terrain?.samples?.find((sample) => sample.bearing === item.bearing) || { ...item, angle: null },
   )
-  const showHorizonResult = Boolean(terrain) || terrainStatus === 'error'
+  const showHorizonResult = horizonPanelOpen && (Boolean(terrain) || terrainStatus === 'error' || terrainStatus === 'loading')
   const snowStation = snowData.station
   const snowIsConfirmed = isConfirmedSnowStation(snowStation)
   const canChooseSaveLocation = typeof window !== 'undefined' && ('showSaveFilePicker' in window || 'showDirectoryPicker' in window)
@@ -1263,8 +1305,14 @@ export default function App() {
                   </div>
                   <div className="terrain-actions">
                     <button type="button" className="action-button action-button--terrain" disabled={!position || !Number.isFinite(elevation.value) || terrainStatus === 'loading'} onClick={handleTerrainAnalysis}>
-                      <span>{terrainStatus === 'loading' ? '分析中…' : (detailedHorizon ? '詳細地平線36方位を分析' : '地平線8方位を分析')}</span>
-                      <small>{position ? '選択地点から周辺地形を取得' : '先に地図で地点を選択'}</small>
+                      <span>
+                        {terrainStatus === 'loading'
+                          ? '分析中…'
+                          : terrain?.samples?.length
+                            ? (horizonPanelOpen ? '地平線結果を閉じる' : '地平線結果を開く')
+                            : (detailedHorizon ? '詳細地平線36方位を分析' : '地平線8方位を分析')}
+                      </span>
+                      <small>{terrain?.samples?.length ? '再クリックで結果を開閉' : (position ? '選択地点から周辺地形を取得' : '先に地図で地点を選択')}</small>
                     </button>
                     <label className="horizon-detail-toggle">
                       <input
@@ -1274,6 +1322,8 @@ export default function App() {
                           setDetailedHorizon(event.target.checked)
                           setTerrain(null)
                           setTerrainStatus('idle')
+                          setHorizonPanelOpen(false)
+                          setHorizonExportMessage('')
                         }}
                       />
                       <span>詳細分析（10°間隔・36方位）</span>
@@ -1281,8 +1331,16 @@ export default function App() {
                     <button type="button" className="secondary-button horizon-csv-button" disabled={!terrain?.samples?.length} onClick={downloadHorizonCsv}>
                       地平線CSV出力
                     </button>
+                    <button type="button" className="secondary-button horizon-csv-button horizon-csv-button--solarpro" disabled={!position || !terrain?.samples?.length} onClick={downloadSolarProObstructionCsv}>
+                      Solar Pro地平線CSV出力
+                    </button>
                   </div>
                 </div>
+                <p className="horizon-export-note">
+                  DEMによる地平線解析結果を1°間隔に補間し、Solar Proで読み込めるCSV形式で出力します。<br />
+                  ※ SunEye実測値ではなく、DEM解析結果を変換した概算データです。
+                </p>
+                {horizonExportMessage && <p className="inline-message">{horizonExportMessage}</p>}
                 {showHorizonResult && (
                   <div className="horizon-result-panel">
                     <div className="solarpro-guide-row">
