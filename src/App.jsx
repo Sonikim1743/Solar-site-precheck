@@ -187,6 +187,7 @@ export default function App() {
   )
   const [terrainSection, setTerrainSection] = useState(null)
   const [terrainSectionStatus, setTerrainSectionStatus] = useState('idle')
+  const [terrainSectionOpen, setTerrainSectionOpen] = useState(false)
   const [obstructionHeight, setObstructionHeight] = useState(draftSeed.obstructionHeight ?? 20)
   const [detailedHorizon, setDetailedHorizon] = useState(
     draftSeed.detailedHorizon ?? (draftSeed.terrain?.samples?.length > HORIZON_DIRECTIONS.length),
@@ -315,6 +316,7 @@ export default function App() {
     setHorizonExportMessage('')
     setTerrainSection(null)
     setTerrainSectionStatus('idle')
+    setTerrainSectionOpen(false)
     setElevation({ status: 'loading', value: null, source: '', message: '' })
     loadPlaceInfo(nextPosition)
     loadNearestSnow(nextPosition)
@@ -467,8 +469,13 @@ export default function App() {
 
   async function handleTerrainSectionAnalysis() {
     if (!position) return
+    if (terrainSection && terrainSectionStatus === 'success') {
+      setTerrainSectionOpen((current) => !current)
+      return
+    }
     setTerrainSectionStatus('loading')
     setTerrainSection(null)
+    setTerrainSectionOpen(true)
     try {
       const result = await analyzeTerrainCrossSection(position.lat, position.lon, {
         rangeMeters: 100,
@@ -476,8 +483,10 @@ export default function App() {
       })
       setTerrainSection(result)
       setTerrainSectionStatus('success')
+      setTerrainSectionOpen(true)
     } catch {
       setTerrainSectionStatus('error')
+      setTerrainSectionOpen(true)
     }
   }
 
@@ -928,42 +937,6 @@ export default function App() {
     URL.revokeObjectURL(url)
   }
 
-  function downloadHorizonCsv() {
-    const samples = terrain?.samples || []
-    if (!samples.length) return
-    const rows = [
-      ['Solar Site Precheck 地平線CSV（仮形式）'],
-      ['注意', '公開検索ではSolar Pro公式CSV仕様を確認できないため、方位角・高度角を中心にした転記/確認用CSVです。'],
-      ['候補地名', siteName],
-      ['候補地点3次メッシュ', expectedSnowMesh],
-      ['緯度（度分）', position ? toDegreeMinutes(position.lat, 'lat') : ''],
-      ['経度（度分）', position ? toDegreeMinutes(position.lon, 'lon') : ''],
-      ['標高(m)', Number.isFinite(elevation.value) ? elevation.value.toFixed(1) : ''],
-      ['想定樹高(m)', obstructionHeight.toFixed(1)],
-      [],
-      ['方位角(度)', '方位', '地平線仰角_地形+想定樹高(度)', '地形のみ仰角(度)', '最高点距離(m)', '地形最高点距離(m)', '最高点標高(m)'],
-      ...samples
-        .slice()
-        .sort((a, b) => a.bearing - b.bearing)
-        .map((sample) => [
-          sample.bearing,
-          sample.direction,
-          Number.isFinite(sample.angle) ? sample.angle.toFixed(1) : '',
-          Number.isFinite(sample.terrainAngle) ? sample.terrainAngle.toFixed(1) : '',
-          Number.isFinite(sample.distance) ? Math.round(sample.distance) : '',
-          Number.isFinite(sample.terrainDistance) ? Math.round(sample.terrainDistance) : '',
-          Number.isFinite(sample.elevation) ? sample.elevation.toFixed(1) : '',
-        ]),
-    ]
-    const csv = `\uFEFF${rows.map((row) => row.map(escapeCsv).join(',')).join('\r\n')}`
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `${siteName || expectedSnowMesh || '候補地'}_地平線.csv`
-    link.click()
-    URL.revokeObjectURL(url)
-  }
-
   function downloadSolarProObstructionCsv() {
     setHorizonExportMessage('')
     if (!position) {
@@ -1217,23 +1190,22 @@ export default function App() {
                 <span>選択地点</span>
                 <strong>{position ? `${toDegreeMinutes(position.lat, 'lat')} / ${toDegreeMinutes(position.lon, 'lon')}` : '地図で地点を選択'}</strong>
                 <small>
-                  標高：
-                  {elevation.status === 'loading' && '取得中…'}
-                  {elevation.status === 'success' && `${elevation.value.toFixed(1)} m`}
-                  {elevation.status === 'error' && '未取得'}
-                  {elevation.status === 'idle' && '—'}
+                  {elevation.status === 'loading' && '標高 取得中…'}
+                  {elevation.status === 'success' && `標高 ${elevation.value.toFixed(1)}m`}
+                  {elevation.status === 'error' && '標高 未取得'}
+                  {elevation.status === 'idle' && '標高 —'}
                   {selectedPlaceLabel ? ` / ${selectedPlaceLabel}` : ''}
                 </small>
               </div>
               <div className="terrain-section-quick">
                 <div>
                   <strong>
-                    {terrainSectionStatus === 'success' && '周辺100m断面を表示中'}
+                    {terrainSectionStatus === 'success' && (terrainSectionOpen ? '周辺100m断面を表示中' : '周辺100m断面を取得済み')}
                     {terrainSectionStatus === 'loading' && '周辺100m断面を取得中…'}
                     {terrainSectionStatus === 'error' && '断面取得失敗'}
                     {terrainSectionStatus === 'idle' && '周辺100mの地形断面'}
                   </strong>
-                  <span>候補地点を中心に東西・南北へ各100m、10m間隔で標高を確認します。</span>
+                  <span>東西・南北へ各100m、10m間隔で確認</span>
                 </div>
                 <button
                   type="button"
@@ -1241,13 +1213,13 @@ export default function App() {
                   disabled={!position || terrainSectionStatus === 'loading'}
                   onClick={handleTerrainSectionAnalysis}
                 >
-                  {terrainSectionStatus === 'loading' ? '取得中…' : '断面を確認'}
+                  {terrainSectionStatus === 'loading' ? '取得中…' : terrainSection ? (terrainSectionOpen ? '閉じる' : '開く') : '断面を確認'}
                 </button>
               </div>
               {terrainSectionStatus === 'error' && (
                 <p className="inline-message inline-message--error">周辺100mの標高断面を取得できませんでした。時間をおいて再試行してください。</p>
               )}
-              <TerrainSectionPreview analysis={terrainSection} />
+              {terrainSectionOpen && <TerrainSectionPreview analysis={terrainSection} />}
             </div>
             {selectedParcel && (
               <div className="selected-parcel-card">
@@ -1328,9 +1300,6 @@ export default function App() {
                       />
                       <span>詳細分析（10°間隔・36方位）</span>
                     </label>
-                    <button type="button" className="secondary-button horizon-csv-button" disabled={!terrain?.samples?.length} onClick={downloadHorizonCsv}>
-                      地平線CSV出力
-                    </button>
                     <button type="button" className="secondary-button horizon-csv-button horizon-csv-button--solarpro" disabled={!position || !terrain?.samples?.length} onClick={downloadSolarProObstructionCsv}>
                       Solar Pro地平線CSV出力
                     </button>

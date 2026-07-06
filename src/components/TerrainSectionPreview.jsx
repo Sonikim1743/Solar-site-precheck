@@ -115,9 +115,8 @@ export default function TerrainSectionPreview({ analysis }) {
       <div className="terrain-section-preview__heading">
         <div>
           <strong>候補地周辺100m 断面プレビュー</strong>
-          <span>候補地点を中心に、東西・南北方向を10m間隔で標高取得した簡易断面です。</span>
+          <span>候補地点を中心に、東西・南北方向それぞれ21点（10m間隔）で標高取得した簡易断面です。</span>
         </div>
-        <em>{analysis.summary.sampleCount}点</em>
       </div>
       <div className="terrain-section-preview__charts">
         {analysis.lines.map((line) => (

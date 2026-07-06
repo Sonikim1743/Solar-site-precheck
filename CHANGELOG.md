@@ -5,6 +5,8 @@
 - Solar Proが読み込むSunEye形式の `ObstructionElevations.csv` 出力を追加。
 - DEM地平線解析結果を0〜360°の1°間隔へ線形補間し、Average / Maximum / Sky01 Elevationへ同一値として出力。
 - 地平線分析ボタンを、分析後は結果パネルの開閉ボタンとして使えるように変更。
+- 地平線CSV出力ボタンをSolar Pro用の1つに整理し、仮形式CSVボタンを削除。
+- 地図下の選択地点情報と周辺100m断面ボタンを小型の1行表示へ変更し、断面プレビューは開閉式に整理。
 
 ## 2026-07-06 — Cloudflare Pages対応と地平線グラフ
 
