@@ -1268,7 +1268,6 @@ export default function App() {
                   {position
                     ? `現在の選択地点: ${selectedPlaceLabel || (placeInfo.status === 'loading' ? '確認中…' : '住所未取得')}`
                     : '地点を選択すると周辺住所を表示します。'}
-                  {' '}NEDO 3次メッシュ取得と地平線分析の両方が完了すると、未入力時のみ3次メッシュの地域名を候補として反映します。
                 </small>
               </label>
               <div className="data-priority-note">
@@ -1288,7 +1287,10 @@ export default function App() {
                   <div>
                     <strong>{formatHorizonSummary(terrain)}</strong>
                     <span>{detailedHorizon ? '10°間隔・36方位を一括分析（詳細）' : '0° / 45° / 90° / 135° / 180° / 225° / 270° / 315°を一括分析'}</span>
-                    <small className="terrain-box-note">DEM解析結果を1°間隔に補間し、Solar Proで読み込めるCSV形式で出力します。※ SunEye実測値ではなく概算データです。</small>
+                    <small className="terrain-box-note">
+                      DEM解析結果を1°間隔に補間してSolar Pro用CSVに出力します。<br />
+                      ※ SunEye実測値ではなく概算データです。
+                    </small>
                   </div>
                   <div className="terrain-actions">
                     <button type="button" className="action-button action-button--terrain" disabled={!position || !Number.isFinite(elevation.value) || terrainStatus === 'loading'} onClick={handleTerrainAnalysis}>
@@ -1301,7 +1303,7 @@ export default function App() {
                       </span>
                       <small>{terrain?.samples?.length ? '再クリックで結果を開閉' : (position ? '選択地点から周辺地形を取得' : '先に地図で地点を選択')}</small>
                     </button>
-                    <label className="horizon-tool-button horizon-detail-toggle">
+                    <label className="horizon-tool-button horizon-detail-toggle" title="10°間隔・36方位で地平線を分析します。通常より細かく確認したい場合に使用します。">
                       <input
                         type="checkbox"
                         checked={detailedHorizon}
@@ -1313,7 +1315,7 @@ export default function App() {
                           setHorizonExportMessage('')
                         }}
                       />
-                      <span>詳細分析（10°間隔・36方位）</span>
+                      <span>詳細分析</span>
                     </label>
                     <button type="button" className="horizon-tool-button horizon-csv-button horizon-csv-button--solarpro" disabled={!position || !terrain?.samples?.length} onClick={downloadSolarProObstructionCsv}>
                       Solar Pro地平線CSV出力

@@ -825,13 +825,13 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
   align-items: start;
 }
 .details-panel .form-stack > label { grid-column: span 5; }
-.details-panel .form-stack > .site-name-field { grid-column: span 7; }
-.details-panel .form-stack > .data-priority-note { grid-column: span 3; min-height: 118px; }
+.details-panel .form-stack > .site-name-field { grid-column: span 5; }
+.details-panel .form-stack > .data-priority-note { grid-column: span 5; min-height: 90px; }
 .details-panel .form-stack > .field-block { grid-column: 1 / -1; }
 .form-stack { display: grid; gap: 17px; margin-top: 22px; }
 .form-stack label, .field-block { display: grid; gap: 7px; }
 .site-name-field {
-  min-height: 118px;
+  min-height: 90px;
   align-content: start;
 }
 .form-stack label > span, .field-label-row > span { font-size: 16px; font-weight: 900; }
@@ -869,10 +869,10 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
   display: block;
   color: #6b6048;
   font-size: 11px;
-  line-height: 1.55;
+  line-height: 1.5;
 }
 .terrain-actions {
-  width: min(420px, 100%);
+  width: min(360px, 100%);
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: center;
@@ -884,7 +884,7 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
 }
 .horizon-tool-button {
   min-height: 42px;
-  padding: 8px 11px;
+  padding: 8px 12px;
   display: inline-flex !important;
   justify-content: center;
   align-items: center;
@@ -1213,7 +1213,7 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
 .inline-message--error { color: #a04d42; }
 
 .data-priority-note {
-  padding: 12px;
+  padding: 10px 12px;
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 4px 12px;
@@ -1222,8 +1222,8 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
   background: #f8fbf9;
 }
 .data-priority-note > span { font-size: 12px; font-weight: 800; }
-.data-priority-note > strong { color: var(--green); font-family: Consolas, monospace; font-size: 15px; }
-.data-priority-note > small { grid-column: 1 / -1; color: var(--muted); font-size: 10px; line-height: 1.6; }
+.data-priority-note > strong { color: var(--green); font-family: Consolas, monospace; font-size: 16px; }
+.data-priority-note > small { grid-column: 1 / -1; color: var(--muted); font-size: 10px; line-height: 1.45; }
 
 .horizon-table {
   display: grid;
