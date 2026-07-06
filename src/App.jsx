@@ -937,7 +937,7 @@ export default function App() {
     URL.revokeObjectURL(url)
   }
 
-  function downloadSolarProObstructionCsv() {
+  async function downloadSolarProObstructionCsv() {
     setHorizonExportMessage('')
     if (!position) {
       setHorizonExportMessage('先に候補地点を選択してください。')
@@ -956,13 +956,27 @@ export default function App() {
       setHorizonExportMessage('有効な地平線結果がないためCSVを作成できません。')
       return
     }
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    if (typeof window !== 'undefined' && window.showSaveFilePicker) {
+      try {
+        const fileHandle = await window.showSaveFilePicker({
+          suggestedName: 'ObstructionElevations.csv',
+          types: [{ description: 'Solar Pro地平線CSV', accept: { 'text/csv': ['.csv'] } }],
+        })
+        const writable = await fileHandle.createWritable()
+        await writable.write(blob)
+        await writable.close()
+        return
+      } catch (error) {
+        if (error?.name === 'AbortError') return
+      }
+    }
+    const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
     link.download = 'ObstructionElevations.csv'
     link.click()
     URL.revokeObjectURL(url)
-    setHorizonExportMessage('Solar Pro用CSVを作成しました。SunEye実測値ではなくDEM概算データです。')
   }
 
   const horizonDirections = terrain?.samples?.length
@@ -1274,6 +1288,7 @@ export default function App() {
                   <div>
                     <strong>{formatHorizonSummary(terrain)}</strong>
                     <span>{detailedHorizon ? '10°間隔・36方位を一括分析（詳細）' : '0° / 45° / 90° / 135° / 180° / 225° / 270° / 315°を一括分析'}</span>
+                    <small className="terrain-box-note">DEM解析結果を1°間隔に補間し、Solar Proで読み込めるCSV形式で出力します。※ SunEye実測値ではなく概算データです。</small>
                   </div>
                   <div className="terrain-actions">
                     <button type="button" className="action-button action-button--terrain" disabled={!position || !Number.isFinite(elevation.value) || terrainStatus === 'loading'} onClick={handleTerrainAnalysis}>
@@ -1286,7 +1301,7 @@ export default function App() {
                       </span>
                       <small>{terrain?.samples?.length ? '再クリックで結果を開閉' : (position ? '選択地点から周辺地形を取得' : '先に地図で地点を選択')}</small>
                     </button>
-                    <label className="horizon-detail-toggle">
+                    <label className="horizon-tool-button horizon-detail-toggle">
                       <input
                         type="checkbox"
                         checked={detailedHorizon}
@@ -1300,15 +1315,11 @@ export default function App() {
                       />
                       <span>詳細分析（10°間隔・36方位）</span>
                     </label>
-                    <button type="button" className="secondary-button horizon-csv-button horizon-csv-button--solarpro" disabled={!position || !terrain?.samples?.length} onClick={downloadSolarProObstructionCsv}>
+                    <button type="button" className="horizon-tool-button horizon-csv-button horizon-csv-button--solarpro" disabled={!position || !terrain?.samples?.length} onClick={downloadSolarProObstructionCsv}>
                       Solar Pro地平線CSV出力
                     </button>
                   </div>
                 </div>
-                <p className="horizon-export-note">
-                  DEMによる地平線解析結果を1°間隔に補間し、Solar Proで読み込めるCSV形式で出力します。<br />
-                  ※ SunEye実測値ではなく、DEM解析結果を変換した概算データです。
-                </p>
                 {horizonExportMessage && <p className="inline-message">{horizonExportMessage}</p>}
                 {showHorizonResult && (
                   <div className="horizon-result-panel">
@@ -1329,13 +1340,6 @@ export default function App() {
                           <div className={`solar-peak-check solar-peak-check--${solarReference.peakWindow.status}`}>
                             <strong>発電ピーク時間帯（冬至10〜14時）：{solarReference.peakWindow.label}</strong>
                             <span>{solarReference.peakWindow.message}</span>
-                            <div className="solar-peak-points">
-                              {solarReference.peakWindow.points.map((point) => (
-                                <span key={point.hour}>
-                                  {point.hour}時 太陽{point.altitude.toFixed(1)}° / 山・木{Number.isFinite(point.horizonAngle) ? point.horizonAngle.toFixed(1) : '—'}°
-                                </span>
-                              ))}
-                            </div>
                           </div>
                         )}
                       </div>

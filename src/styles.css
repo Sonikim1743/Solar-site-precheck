@@ -624,7 +624,7 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
 }
 .selected-point-mini {
   min-width: 0;
-  padding: 6px 8px;
+  padding: 5px 7px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -635,7 +635,7 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
 .selected-point-mini span {
   flex: 0 0 auto;
   color: #84948e;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 900;
   letter-spacing: 0.12em;
 }
@@ -645,7 +645,7 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
   overflow-wrap: anywhere;
   color: var(--green-dark);
   font-family: Consolas, "Yu Gothic UI", monospace;
-  font-size: 12px;
+  font-size: 11px;
 }
 .selected-point-mini small {
   flex: 0 1 auto;
@@ -653,7 +653,7 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 10px;
   line-height: 1.3;
 }
 .terrain-section-quick,
@@ -686,8 +686,10 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
   line-height: 1.35;
 }
 .terrain-section-button {
-  min-height: 32px;
-  padding: 5px 10px;
+  min-height: 40px;
+  padding: 7px 16px;
+  font-size: 13px;
+  font-weight: 900;
   white-space: nowrap;
 }
 .terrain-section-preview {
@@ -824,10 +826,14 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
 }
 .details-panel .form-stack > label { grid-column: span 5; }
 .details-panel .form-stack > .site-name-field { grid-column: span 7; }
-.details-panel .form-stack > .data-priority-note { grid-column: span 3; min-height: 76px; }
+.details-panel .form-stack > .data-priority-note { grid-column: span 3; min-height: 118px; }
 .details-panel .form-stack > .field-block { grid-column: 1 / -1; }
 .form-stack { display: grid; gap: 17px; margin-top: 22px; }
 .form-stack label, .field-block { display: grid; gap: 7px; }
+.site-name-field {
+  min-height: 118px;
+  align-content: start;
+}
 .form-stack label > span, .field-label-row > span { font-size: 16px; font-weight: 900; }
 .form-stack input, .form-stack select, .form-stack textarea {
   width: 100%;
@@ -858,10 +864,17 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
 .terrain-box strong, .terrain-box span { display: block; }
 .terrain-box strong { font-size: 16px; }
 .terrain-box span { margin-top: 4px; color: var(--muted); font-size: 12px; }
+.terrain-box-note {
+  margin-top: 8px;
+  display: block;
+  color: #6b6048;
+  font-size: 11px;
+  line-height: 1.55;
+}
 .terrain-actions {
   width: min(420px, 100%);
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: center;
   gap: 8px;
 }
@@ -869,18 +882,21 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
   grid-column: 1 / -1;
   width: 100%;
 }
-.horizon-detail-toggle {
+.horizon-tool-button {
   min-height: 42px;
   padding: 8px 11px;
   display: inline-flex !important;
+  justify-content: center;
   align-items: center;
   gap: 8px !important;
   border: 1px solid #cfe2d8;
-  border-radius: 999px;
+  border-radius: 10px;
   background: #ffffff;
   color: var(--green-dark);
   font-size: 12px;
   font-weight: 900;
+  line-height: 1.25;
+  text-align: center;
   cursor: pointer;
   user-select: none;
 }
@@ -890,24 +906,12 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
   accent-color: var(--green);
 }
 .horizon-csv-button {
-  min-height: 42px;
-  padding-inline: 14px;
   white-space: nowrap;
 }
 .horizon-csv-button--solarpro {
   border-color: #c9a75a;
   background: #fff9e9;
   color: #78520c;
-}
-.horizon-export-note {
-  margin: 10px 0 0;
-  padding: 9px 11px;
-  border: 1px solid #e2d5aa;
-  border-radius: 10px;
-  background: #fffdf5;
-  color: #6b6048;
-  font-size: 12px;
-  line-height: 1.65;
 }
 .solar-angle-warning {
   margin-top: 10px;

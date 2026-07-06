@@ -157,10 +157,6 @@ export default function HorizonGraphPreview({ position, terrain, solarReference 
         <span><i className="legend-line legend-line--winter" />冬至</span>
       </div>
 
-      <p className="horizon-graph-note">
-        本グラフは候補地の一次確認用に、取得した地形標高と想定樹高から独自に描画した概算です。Laplace Systems / Solar Proの公式グラフ・公式連携データではありません。
-      </p>
-
       {peakPoints.length > 0 && (
         <div className={`horizon-graph-peak horizon-graph-peak--${solarReference?.peakWindow?.status || 'ok'}`}>
           <strong>冬至10〜14時チェック</strong>
