@@ -2,11 +2,11 @@ import { interpolateHorizonAngle, solarPositionAtHour } from '../utils/solarWind
 
 const graph = {
   width: 720,
-  height: 360,
+  height: 382,
   left: 48,
   right: 24,
   top: 24,
-  bottom: 48,
+  bottom: 70,
 }
 
 const plotWidth = graph.width - graph.left - graph.right
@@ -92,9 +92,9 @@ export default function HorizonGraphPreview({ position, terrain, solarReference 
       <div className="horizon-graph-card__heading">
         <div>
           <strong>地平線グラフプレビュー</strong>
-          <span>分析値からSolar Proの地平線画面に近い形で自動描画します。</span>
+          <span>Solar Site Precheck独自の簡易グラフです。Solar Pro公式画面・公式出力ではありません。</span>
         </div>
-        <em>転記前の確認用</em>
+        <em>概算確認用</em>
       </div>
 
       <div className="horizon-graph-scroll">
@@ -110,12 +110,12 @@ export default function HorizonGraphPreview({ position, terrain, solarReference 
           {[0, 45, 90, 135, 180, 225, 270, 315, 360].map((bearing) => (
             <g key={`bearing-${bearing}`}>
               <line className="horizon-graph__grid" x1={xForBearing(bearing)} x2={xForBearing(bearing)} y1={graph.top} y2={graph.top + plotHeight} />
-              <text className="horizon-graph__axis-text" x={xForBearing(bearing)} y={graph.top + plotHeight + 17} textAnchor="middle">{bearing}</text>
+              <text className="horizon-graph__axis-text" x={xForBearing(bearing)} y={graph.top + plotHeight + 17} textAnchor="middle">{bearing}°</text>
             </g>
           ))}
 
           <text className="horizon-graph__label" x={18} y={graph.top + 100} transform={`rotate(-90 18 ${graph.top + 100})`}>高度角[°]</text>
-          <text className="horizon-graph__label" x={graph.left + plotWidth / 2} y={graph.height - 10} textAnchor="middle">方位角[°]</text>
+          <text className="horizon-graph__label" x={graph.left + plotWidth / 2} y={graph.height - 12} textAnchor="middle">方位角[°]</text>
 
           {horizonPoints.length > 0 && (
             <polygon className="horizon-graph__horizon-area" points={pointsToArea(horizonPoints)} />
@@ -141,11 +141,11 @@ export default function HorizonGraphPreview({ position, terrain, solarReference 
             )
           })}
 
-          <text className="horizon-graph__direction" x={xForBearing(0)} y={graph.height - 28} textAnchor="middle">北</text>
-          <text className="horizon-graph__direction" x={xForBearing(90)} y={graph.height - 28} textAnchor="middle">東</text>
-          <text className="horizon-graph__direction" x={xForBearing(180)} y={graph.height - 28} textAnchor="middle">南</text>
-          <text className="horizon-graph__direction" x={xForBearing(270)} y={graph.height - 28} textAnchor="middle">西</text>
-          <text className="horizon-graph__direction" x={xForBearing(360)} y={graph.height - 28} textAnchor="middle">北</text>
+          <text className="horizon-graph__direction" x={xForBearing(0)} y={graph.top + plotHeight + 39} textAnchor="middle">北</text>
+          <text className="horizon-graph__direction" x={xForBearing(90)} y={graph.top + plotHeight + 39} textAnchor="middle">東</text>
+          <text className="horizon-graph__direction" x={xForBearing(180)} y={graph.top + plotHeight + 39} textAnchor="middle">南</text>
+          <text className="horizon-graph__direction" x={xForBearing(270)} y={graph.top + plotHeight + 39} textAnchor="middle">西</text>
+          <text className="horizon-graph__direction" x={xForBearing(360)} y={graph.top + plotHeight + 39} textAnchor="middle">北</text>
         </svg>
       </div>
 
@@ -156,6 +156,10 @@ export default function HorizonGraphPreview({ position, terrain, solarReference 
         <span><i className="legend-line legend-line--equinox" />春分・秋分</span>
         <span><i className="legend-line legend-line--winter" />冬至</span>
       </div>
+
+      <p className="horizon-graph-note">
+        本グラフは候補地の一次確認用に、取得した地形標高と想定樹高から独自に描画した概算です。Laplace Systems / Solar Proの公式グラフ・公式連携データではありません。
+      </p>
 
       {peakPoints.length > 0 && (
         <div className={`horizon-graph-peak horizon-graph-peak--${solarReference?.peakWindow?.status || 'ok'}`}>

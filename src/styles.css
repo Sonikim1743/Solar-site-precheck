@@ -1514,21 +1514,24 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
   font-weight: 900;
 }
 .horizon-graph-scroll {
-  overflow-x: auto;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
   border: 1px solid #b9d9c7;
   border-radius: 12px;
-  background: #bff5f5;
+  background: #eef8f4;
 }
 .horizon-graph {
   display: block;
-  min-width: 640px;
+  min-width: 0;
+  max-width: 100%;
   width: 100%;
   height: auto;
   font-family: "Yu Gothic", "Meiryo", system-ui, sans-serif;
 }
-.horizon-graph__sky { fill: #baf4f4; }
+.horizon-graph__sky { fill: #eef8f4; }
 .horizon-graph__grid {
-  stroke: rgba(30, 70, 65, 0.55);
+  stroke: rgba(56, 94, 84, 0.38);
   stroke-width: 0.8;
   stroke-dasharray: 3 4;
 }
@@ -1540,13 +1543,17 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
   font-weight: 800;
 }
 .horizon-graph__label { font-size: 12px; }
-.horizon-graph__direction { font-size: 13px; }
+.horizon-graph__direction {
+  fill: #0d6c55;
+  font-size: 14px;
+  font-weight: 950;
+}
 .horizon-graph__horizon-area {
-  fill: rgba(255, 224, 67, 0.78);
+  fill: rgba(63, 151, 113, 0.18);
 }
 .horizon-graph__horizon-line {
   fill: none;
-  stroke: #006b4b;
+  stroke: #0d6c55;
   stroke-width: 3;
   stroke-linejoin: round;
   stroke-linecap: round;
@@ -1622,6 +1629,16 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
   color: var(--green-dark);
   font-size: 12px;
   line-height: 1.6;
+}
+.horizon-graph-note {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #f7faf8;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.7;
 }
 .horizon-graph-peak strong {
   font-size: 12px;
