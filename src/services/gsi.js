@@ -203,7 +203,7 @@ export async function reverseGeocode(lat, lon) {
   }
 }
 
-function pointAtDistance(lat, lon, distanceMeters, bearingDegrees) {
+export function pointAtDistance(lat, lon, distanceMeters, bearingDegrees) {
   const earthRadius = 6371000
   const bearing = (bearingDegrees * Math.PI) / 180
   const lat1 = (lat * Math.PI) / 180
@@ -220,6 +220,105 @@ function pointAtDistance(lat, lon, distanceMeters, bearingDegrees) {
   )
 
   return { lat: (lat2 * 180) / Math.PI, lon: (lon2 * 180) / Math.PI }
+}
+
+function summarizeProfile(points) {
+  const valid = points.filter((point) => Number.isFinite(point.elevation))
+  if (!valid.length) {
+    return {
+      minElevation: null,
+      maxElevation: null,
+      elevationDiff: null,
+      totalRise: 0,
+      totalFall: 0,
+      averageSlopePercent: null,
+      maxSlopePercent: null,
+    }
+  }
+
+  let totalRise = 0
+  let totalFall = 0
+  let maxSlopePercent = 0
+
+  for (let index = 1; index < valid.length; index += 1) {
+    const previous = valid[index - 1]
+    const current = valid[index]
+    const elevationDelta = current.elevation - previous.elevation
+    const distanceDelta = Math.abs(current.distance - previous.distance) || 1
+    const slopePercent = Math.abs(elevationDelta / distanceDelta) * 100
+    maxSlopePercent = Math.max(maxSlopePercent, slopePercent)
+    if (elevationDelta > 0) totalRise += elevationDelta
+    if (elevationDelta < 0) totalFall += Math.abs(elevationDelta)
+  }
+
+  const first = valid[0]
+  const last = valid[valid.length - 1]
+  const horizontalDistance = Math.abs(last.distance - first.distance) || 1
+  const elevationDiff = last.elevation - first.elevation
+
+  return {
+    minElevation: Math.min(...valid.map((point) => point.elevation)),
+    maxElevation: Math.max(...valid.map((point) => point.elevation)),
+    elevationDiff,
+    totalRise,
+    totalFall,
+    averageSlopePercent: Math.abs(elevationDiff / horizontalDistance) * 100,
+    maxSlopePercent,
+  }
+}
+
+async function buildCrossSectionLine(lat, lon, label, negativeBearing, positiveBearing, rangeMeters, intervalMeters) {
+  const distances = []
+  for (let distance = -rangeMeters; distance <= rangeMeters; distance += intervalMeters) {
+    distances.push(distance)
+  }
+
+  const points = await Promise.all(distances.map(async (distance) => {
+    const bearing = distance < 0 ? negativeBearing : positiveBearing
+    const point = distance === 0
+      ? { lat, lon }
+      : pointAtDistance(lat, lon, Math.abs(distance), bearing)
+    const result = await fetchElevation(point.lat, point.lon)
+    return {
+      distance,
+      lat: point.lat,
+      lon: point.lon,
+      elevation: result.value,
+      source: result.dataSource,
+    }
+  }))
+
+  return {
+    label,
+    rangeMeters,
+    intervalMeters,
+    points,
+    summary: summarizeProfile(points),
+  }
+}
+
+export async function analyzeTerrainCrossSection(lat, lon, options = {}) {
+  const rangeMeters = options.rangeMeters ?? 100
+  const intervalMeters = options.intervalMeters ?? 10
+  const [eastWest, northSouth] = await Promise.all([
+    buildCrossSectionLine(lat, lon, '東西断面', 270, 90, rangeMeters, intervalMeters),
+    buildCrossSectionLine(lat, lon, '南北断面', 180, 0, rangeMeters, intervalMeters),
+  ])
+
+  const allElevations = [...eastWest.points, ...northSouth.points]
+    .map((point) => point.elevation)
+    .filter(Number.isFinite)
+
+  return {
+    rangeMeters,
+    intervalMeters,
+    lines: [eastWest, northSouth],
+    summary: {
+      minElevation: allElevations.length ? Math.min(...allElevations) : null,
+      maxElevation: allElevations.length ? Math.max(...allElevations) : null,
+      sampleCount: allElevations.length,
+    },
+  }
 }
 
 const DIRECTIONS = [

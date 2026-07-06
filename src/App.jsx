@@ -2,9 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import MapPanel from './components/MapPanel.jsx'
 import ReportPreview from './components/ReportPreview.jsx'
 import HorizonGraphPreview from './components/HorizonGraphPreview.jsx'
+import TerrainSectionPreview from './components/TerrainSectionPreview.jsx'
 import {
   DETAILED_HORIZON_DIRECTIONS,
   HORIZON_DIRECTIONS,
+  analyzeTerrainCrossSection,
   analyzeSurroundingTerrain,
   fetchElevation,
   recalculateTerrainObstruction,
@@ -182,6 +184,8 @@ export default function App() {
   const [terrain, setTerrain] = useState(
     draftSeed.terrainAnalysisVersion === TERRAIN_ANALYSIS_VERSION ? (draftSeed.terrain || null) : null,
   )
+  const [terrainSection, setTerrainSection] = useState(null)
+  const [terrainSectionStatus, setTerrainSectionStatus] = useState('idle')
   const [obstructionHeight, setObstructionHeight] = useState(draftSeed.obstructionHeight ?? 20)
   const [detailedHorizon, setDetailedHorizon] = useState(
     draftSeed.detailedHorizon ?? (draftSeed.terrain?.samples?.length > HORIZON_DIRECTIONS.length),
@@ -304,6 +308,8 @@ export default function App() {
     setPosition(nextPosition)
     setTerrain(null)
     setTerrainStatus('idle')
+    setTerrainSection(null)
+    setTerrainSectionStatus('idle')
     setElevation({ status: 'loading', value: null, source: '', message: '' })
     loadPlaceInfo(nextPosition)
     loadNearestSnow(nextPosition)
@@ -443,6 +449,22 @@ export default function App() {
       setTerrainStatus('success')
     } catch {
       setTerrainStatus('error')
+    }
+  }
+
+  async function handleTerrainSectionAnalysis() {
+    if (!position) return
+    setTerrainSectionStatus('loading')
+    setTerrainSection(null)
+    try {
+      const result = await analyzeTerrainCrossSection(position.lat, position.lon, {
+        rangeMeters: 100,
+        intervalMeters: 10,
+      })
+      setTerrainSection(result)
+      setTerrainSectionStatus('success')
+    } catch {
+      setTerrainSectionStatus('error')
     }
   }
 
@@ -1148,18 +1170,42 @@ export default function App() {
               onParcelSelect={chooseParcel}
             />
 
-            <div className="coordinate-strip">
-              <div><span>LATITUDE</span><strong>{position ? toDegreeMinutes(position.lat, 'lat') : '—'}</strong></div>
-              <div><span>LONGITUDE</span><strong>{position ? toDegreeMinutes(position.lon, 'lon') : '—'}</strong></div>
-              <div>
-                <span>ELEVATION</span>
-                <strong>
+            <div className="map-analysis-strip">
+              <div className="selected-point-mini">
+                <span>選択地点</span>
+                <strong>{position ? `${toDegreeMinutes(position.lat, 'lat')} / ${toDegreeMinutes(position.lon, 'lon')}` : '地図で地点を選択'}</strong>
+                <small>
+                  標高：
                   {elevation.status === 'loading' && '取得中…'}
                   {elevation.status === 'success' && `${elevation.value.toFixed(1)} m`}
                   {elevation.status === 'error' && '未取得'}
                   {elevation.status === 'idle' && '—'}
-                </strong>
+                  {selectedPlaceLabel ? ` / ${selectedPlaceLabel}` : ''}
+                </small>
               </div>
+              <div className="terrain-section-quick">
+                <div>
+                  <strong>
+                    {terrainSectionStatus === 'success' && '周辺100m断面を表示中'}
+                    {terrainSectionStatus === 'loading' && '周辺100m断面を取得中…'}
+                    {terrainSectionStatus === 'error' && '断面取得失敗'}
+                    {terrainSectionStatus === 'idle' && '周辺100mの地形断面'}
+                  </strong>
+                  <span>候補地点を中心に東西・南北へ各100m、10m間隔で標高を確認します。</span>
+                </div>
+                <button
+                  type="button"
+                  className="secondary-button terrain-section-button"
+                  disabled={!position || terrainSectionStatus === 'loading'}
+                  onClick={handleTerrainSectionAnalysis}
+                >
+                  {terrainSectionStatus === 'loading' ? '取得中…' : '断面を確認'}
+                </button>
+              </div>
+              {terrainSectionStatus === 'error' && (
+                <p className="inline-message inline-message--error">周辺100mの標高断面を取得できませんでした。時間をおいて再試行してください。</p>
+              )}
+              <TerrainSectionPreview analysis={terrainSection} />
             </div>
             {selectedParcel && (
               <div className="selected-parcel-card">
