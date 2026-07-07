@@ -134,13 +134,20 @@ function Icon({ children }) {
   return <span className="button-icon" aria-hidden="true">{children}</span>
 }
 
-function SolarProPreviewButton({ label, image, caption, path, placement = 'right' }) {
+function SolarProPreviewButton({ label, image, caption, path, placement = 'right', highlight = '' }) {
   return (
     <span className={`solarpro-preview solarpro-preview--${placement}`}>
       <button type="button" className="preview-button">{label}</button>
       <span className="preview-popover">
         {path && <span className="preview-path">{path}</span>}
-        <img src={image} alt={caption} />
+        <span className="preview-image-wrap">
+          <img src={image} alt={caption} />
+          {highlight === 'location' && (
+            <span className="preview-highlight preview-highlight--location">
+              <em>ここに入力</em>
+            </span>
+          )}
+        </span>
         <small>{caption}</small>
       </span>
     </span>
@@ -157,6 +164,7 @@ export default function App() {
   const [terrainSection, setTerrainSection] = useState(null)
   const [terrainSectionStatus, setTerrainSectionStatus] = useState('idle')
   const [terrainSectionOpen, setTerrainSectionOpen] = useState(false)
+  const [terrainSectionRange, setTerrainSectionRange] = useState(100)
   const [obstructionHeight, setObstructionHeight] = useState(draftSeed.obstructionHeight ?? 20)
   const [detailedHorizon, setDetailedHorizon] = useState(
     draftSeed.detailedHorizon ?? (draftSeed.terrain?.samples?.length > HORIZON_DIRECTIONS.length),
@@ -446,7 +454,7 @@ export default function App() {
     setTerrainSectionOpen(true)
     try {
       const result = await analyzeTerrainCrossSection(position.lat, position.lon, {
-        rangeMeters: 100,
+        rangeMeters: terrainSectionRange,
         intervalMeters: 10,
       })
       setTerrainSection(result)
@@ -846,6 +854,8 @@ export default function App() {
     obstructionHeight,
     solarReference,
     placeLabel: selectedPlaceLabel,
+    appVersion: APP_VERSION,
+    buildDate: BUILD_DATE,
     memo,
     fieldMemo,
   }), [position, elevation, terrain, terrainSection, siteName, selectedParcel, confirmedSnowStation, expectedSnowMesh, meshBoundary, snowBase, obstructionHeight, solarReference, selectedPlaceLabel, memo, fieldMemo])
@@ -1171,13 +1181,30 @@ export default function App() {
               <div className="terrain-section-quick">
                 <div>
                   <strong>
-                    {terrainSectionStatus === 'success' && (terrainSectionOpen ? '周辺100m断面を表示中' : '周辺100m断面を取得済み')}
-                    {terrainSectionStatus === 'loading' && '周辺100m断面を取得中…'}
+                    {terrainSectionStatus === 'success' && (terrainSectionOpen ? `周辺${terrainSectionRange}m断面を表示中` : `周辺${terrainSectionRange}m断面を取得済み`)}
+                    {terrainSectionStatus === 'loading' && `周辺${terrainSectionRange}m断面を取得中…`}
                     {terrainSectionStatus === 'error' && '断面取得失敗'}
-                    {terrainSectionStatus === 'idle' && '周辺100mの地形断面'}
+                    {terrainSectionStatus === 'idle' && `周辺${terrainSectionRange}mの地形断面`}
                   </strong>
-                  <span>東西・南北へ各100m、10m間隔で確認</span>
+                  <span>東西・南北へ各{terrainSectionRange}m、10m間隔で確認</span>
                 </div>
+                <label className="terrain-range-select" title="地図上の確認範囲と断面の取得距離を変更します。">
+                  <span>範囲</span>
+                  <select
+                    value={terrainSectionRange}
+                    disabled={terrainSectionStatus === 'loading'}
+                    onChange={(event) => {
+                      setTerrainSectionRange(Number(event.target.value))
+                      setTerrainSection(null)
+                      setTerrainSectionStatus('idle')
+                      setTerrainSectionOpen(false)
+                    }}
+                  >
+                    <option value={50}>50m</option>
+                    <option value={100}>100m</option>
+                    <option value={200}>200m</option>
+                  </select>
+                </label>
                 <button
                   type="button"
                   className="secondary-button terrain-section-button"
@@ -1188,7 +1215,7 @@ export default function App() {
                 </button>
               </div>
               {terrainSectionStatus === 'error' && (
-                <p className="inline-message inline-message--error">周辺100mの標高断面を取得できませんでした。時間をおいて再試行してください。</p>
+                <p className="inline-message inline-message--error">周辺{terrainSectionRange}mの標高断面を取得できませんでした。時間をおいて再試行してください。</p>
               )}
               {terrainSectionOpen && <TerrainSectionPreview analysis={terrainSection} />}
             </div>
@@ -1536,13 +1563,14 @@ export default function App() {
                         </strong>
                         <span>{snowStation.mode === 'manual-corrected' ? 'NEDO値・手動補正あり' : snowStation.mode === 'nedo-web' ? 'NEDO 3次メッシュWeb値・整合性確認済み' : 'NEDO 3次メッシュPDF値・整合性確認済み'}</span>
                         <span className="nedo-location-line">
-                          <span>北緯 {snowStation.latDeg}度 {snowStation.latMin.toFixed(1)}分 / 東経 {snowStation.lonDeg}度 {snowStation.lonMin.toFixed(1)}分 / 標高 {Number.isFinite(snowStation.elevation) ? `${snowStation.elevation}m` : 'PDF読取未確定'}</span>
+                          <span className="solarpro-location-values">北緯 {snowStation.latDeg}度 {snowStation.latMin.toFixed(1)}分 / 東経 {snowStation.lonDeg}度 {snowStation.lonMin.toFixed(1)}分 / 標高 {Number.isFinite(snowStation.elevation) ? `${snowStation.elevation}m` : 'PDF読取未確定'}</span>
                           <SolarProPreviewButton
                             label="設置場所入力画面"
                             image="/screenshots/solarpro-location.png"
                             caption="Solar Pro 設置場所入力画面"
                             path="上部ツールバー：3DCAD → 設置場所"
                             placement="side"
+                            highlight="location"
                           />
                         </span>
                         {snowStation.verification && <span>{snowStation.verification.method} / 読取差異 {snowStation.verification.disagreementColumns.length}列 / 自動補正 {snowStation.verification.correctedColumns.length}列</span>}

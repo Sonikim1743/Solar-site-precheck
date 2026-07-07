@@ -441,6 +441,7 @@ export async function analyzeSurroundingTerrain(
         return {
           distance,
           elevation: result.value,
+          source: result.dataSource,
           obstructionHeight,
           effectiveElevation: result.value + obstructionHeight,
           terrainAngle: Math.max(0, terrainAngle),

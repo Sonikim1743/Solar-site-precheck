@@ -25,12 +25,58 @@ function ValueRow({ label, children, wide = false }) {
   )
 }
 
+function demReliabilityLabel(source = '') {
+  if (/DEM5|5A|5B|5C|レーザ|航空レーザ/.test(source)) {
+    return { level: 'high', label: '◎ レーザ測量5m相当', note: '地形断面・地平線の概算に比較的使いやすい標高ソースです。' }
+  }
+  if (/DEM10|10m|DEM標高タイル|基盤地図情報/.test(source)) {
+    return { level: 'medium', label: '△ 10mメッシュ相当', note: '山林・急傾斜地では断面・地平線を参考値として扱ってください。' }
+  }
+  if (/未取得|手動|—/.test(source)) {
+    return { level: 'unknown', label: '— 未取得', note: '標高取得後に精度を確認できます。' }
+  }
+  return { level: 'unknown', label: '△ 出典確認', note: '取得元の表記を確認してください。' }
+}
+
+function collectDemSources(report) {
+  const sources = []
+  if (report.elevationSource) sources.push(report.elevationSource)
+  for (const sample of report.terrain?.samples || []) {
+    for (const point of sample.profile || []) {
+      if (point.source) sources.push(point.source)
+    }
+  }
+  for (const line of report.terrainSection?.lines || []) {
+    for (const point of line.points || []) {
+      if (point.source) sources.push(point.source)
+    }
+  }
+  return sources
+}
+
+function demSourceSummary(report) {
+  const sources = collectDemSources(report)
+  const total = sources.length
+  const dem5 = sources.filter((source) => /DEM5|5A|5B|5C|レーザ|航空レーザ/.test(source)).length
+  const dem10 = sources.filter((source) => /DEM10|10m|DEM標高タイル|基盤地図情報/.test(source)).length
+  const unknown = Math.max(0, total - dem5 - dem10)
+  const primary = demReliabilityLabel(report.elevationSource)
+  const detail = total
+    ? `DEM5系 ${dem5}点 / DEM10系 ${dem10}点${unknown ? ` / その他 ${unknown}点` : ''}`
+    : '地平線・断面を再分析するとDEM内訳を表示できます。'
+  const shouldWarn = total > 0 && dem10 / total >= 0.5
+  return { ...primary, total, dem5, dem10, unknown, detail, shouldWarn }
+}
+
 export default function ReportPreview({ report }) {
   const terrain = report.terrain
   const station = report.snowStation
   const riskClass = terrain ? `risk risk--${terrain.risk}` : 'risk'
   const solarReference = report.solarReference
   const reportTitle = report.siteName || report.placeLabel || '名称未入力の候補地'
+  const demSummary = demSourceSummary(report)
+  const buildDate = report.buildDate || '—'
+  const appVersion = report.appVersion || '—'
 
   return (
     <section className="report-card" id="report-preview">
@@ -52,6 +98,7 @@ export default function ReportPreview({ report }) {
         <ValueRow label="メッシュ境界距離">{report.meshBoundary ? `約${Math.round(report.meshBoundary.minDistanceMeters)}m` : '—'}</ValueRow>
         <ValueRow label="標高">{Number.isFinite(report.elevation) ? `${report.elevation.toFixed(1)} m` : '未取得'}</ValueRow>
         <ValueRow label="標高データ">{report.elevationSource}</ValueRow>
+        <ValueRow label="標高精度">{<span className={`dem-quality dem-quality--${demSummary.level}`}>{demSummary.label}</span>}</ValueRow>
         <ValueRow label="地番">{report.parcel?.number || '未選択'}</ValueRow>
         <ValueRow label="地番区域">{report.parcel ? [report.parcel.municipality, report.parcel.area].filter(Boolean).join(' ') : '—'}</ValueRow>
         <ValueRow label="地平線影響（概算）">{terrain ? <span className={riskClass}>{terrain.risk}</span> : '未分析'}</ValueRow>
@@ -138,8 +185,37 @@ export default function ReportPreview({ report }) {
         <ValueRow label="現地確認メモ" wide>{report.fieldMemo}</ValueRow>
       </dl>
 
+      <div className="report-data-block report-source-block">
+        <h3>データ出典・計算条件</h3>
+        <dl>
+          <div>
+            <dt>標高</dt>
+            <dd>{report.elevationSource || '未取得'} / 取得 {buildDate}</dd>
+          </div>
+          <div>
+            <dt>標高精度</dt>
+            <dd><span className={`dem-quality dem-quality--${demSummary.level}`}>{demSummary.label}</span> <small>{demSummary.detail}</small></dd>
+          </div>
+          <div>
+            <dt>積雪・日射</dt>
+            <dd>NEDO MONSOLA-11（1981–2009年平年値）{report.expectedSnowMesh ? ` / 3次メッシュ ${report.expectedSnowMesh}` : ''}</dd>
+          </div>
+          <div>
+            <dt>座標・地番</dt>
+            <dd>緯度経度表示。登記所備付地図データはファイル定義の平面直角座標系に基づき変換。</dd>
+          </div>
+          <div>
+            <dt>計算</dt>
+            <dd>Solar Site Precheck v{appVersion} / DEM点サンプリング概算 / 想定樹高 {report.obstructionHeight.toFixed(1)}m</dd>
+          </div>
+        </dl>
+        {demSummary.shouldWarn && (
+          <p className="report-source-warning">※ 地平線・断面の取得点で10mメッシュ相当のDEMが多いため、山林・急傾斜地では現地確認や詳細測量で補正してください。</p>
+        )}
+      </div>
+
       <p className="report-note">
-        ※ 地平線は国土地理院DEMによる概算です。積雪値は候補地点と同じ3次メッシュのNEDO PDFだけを採用し、最寄り観測地点の参考値は係数計算から除外しています。
+        ※ 地平線は国土地理院DEMによる概算です。積雪値は候補地点と同じ3次メッシュのNEDO値だけを採用し、最寄り観測地点の参考値は係数計算から除外しています。
       </p>
     </section>
   )

@@ -564,6 +564,14 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
 .terrain-range-tooltip::before {
   border-top-color: rgba(255, 255, 255, 0.95) !important;
 }
+.terrain-range-tooltip--inner {
+  background: rgba(255, 255, 255, 0.88) !important;
+  color: #4f6b62 !important;
+  font-size: 9px !important;
+}
+.terrain-range-tooltip--inner::before {
+  border-top-color: rgba(255, 255, 255, 0.88) !important;
+}
 .site-marker-wrapper { background: transparent; border: 0; }
 .current-location-marker-wrapper { background: transparent; border: 0; }
 .current-location-marker {
@@ -713,6 +721,32 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
   font-weight: 900;
   white-space: nowrap;
 }
+.terrain-range-select {
+  flex: 0 0 auto;
+  display: grid !important;
+  grid-template-columns: auto auto;
+  align-items: center;
+  gap: 5px !important;
+  margin: 0;
+  padding: 0;
+}
+.terrain-range-select span {
+  color: #6a7d76;
+  font-size: 10px;
+  font-weight: 900;
+}
+.terrain-range-select select {
+  width: auto;
+  min-width: 76px;
+  height: 38px;
+  padding: 0 24px 0 9px;
+  border: 1px solid #c8ddd3;
+  border-radius: 9px;
+  background: #fff;
+  color: var(--green-dark);
+  font-size: 12px;
+  font-weight: 900;
+}
 .terrain-section-preview {
   grid-column: 1 / -1;
   display: grid;
@@ -751,6 +785,10 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
   border-radius: 12px;
   background: #ffffff;
 }
+.terrain-section-chart--height-watch {
+  border-color: #e7c36d;
+  background: linear-gradient(180deg, #fffdf7, #ffffff);
+}
 .terrain-section-chart__title {
   display: grid;
   gap: 3px;
@@ -769,6 +807,16 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
   color: var(--muted);
   font-size: 11px;
   line-height: 1.5;
+}
+.terrain-section-chart__height-alert {
+  justify-self: start;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #fff1c9;
+  color: #8a5d00;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 950;
 }
 .terrain-section-chart svg {
   width: 100%;
@@ -2017,6 +2065,44 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
   border: 1px solid var(--line);
   background: #eef3f0;
 }
+.preview-image-wrap {
+  position: relative;
+  display: block;
+  width: max-content;
+  max-width: none;
+}
+.preview-image-wrap img {
+  position: relative;
+  z-index: 1;
+}
+.preview-highlight {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  border: 3px solid #ef5a35;
+  border-radius: 8px;
+  box-shadow: 0 0 0 4px rgba(255, 218, 94, 0.55), 0 8px 22px rgba(126, 60, 32, 0.18);
+}
+.preview-highlight em {
+  position: absolute;
+  left: 50%;
+  top: -31px;
+  transform: translateX(-50%);
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #ef5a35;
+  color: #fff;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 950;
+  white-space: nowrap;
+}
+.preview-highlight--location {
+  left: 58%;
+  top: 70%;
+  width: 36%;
+  height: 17%;
+}
 .preview-popover small { color: var(--muted); font-size: 11px; line-height: 1.5; }
 .nedo-reference-card { padding: 11px 12px; display: grid; gap: 4px; border: 1px dashed #c9d5d0; border-radius: 10px; background: #fafcfb; }
 .nedo-reference-card strong { font-size: 13px; }
@@ -2053,6 +2139,10 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
   flex-wrap: wrap;
 }
 .nedo-location-line > span:first-child { color: var(--muted); }
+.solarpro-location-values {
+  color: var(--green-dark) !important;
+  font-weight: 950;
+}
 .base-factor { padding: 10px 12px; display: flex !important; grid-template-columns: 1fr 90px; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); border-left: 1px solid var(--line); }
 .base-factor input { width: 82px; height: 32px; text-align: right; }
 .nedo-card > .snow-table-wrap, .nedo-card > .formula-note { grid-column: 1 / -1; }
@@ -2305,6 +2395,30 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
 .solar-badge--watch { color: #8a5d00; background: #fff1c9; }
 .solar-badge--danger { color: #993f35; background: #fbe0dc; }
 .solar-badge--idle { color: #63736e; background: #eef1ef; }
+.dem-quality {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: #eef1ef;
+  color: #52665f;
+  font-size: 12px;
+  font-weight: 950;
+  white-space: nowrap;
+}
+.dem-quality--high {
+  background: #dff2e8;
+  color: #176b52;
+}
+.dem-quality--medium {
+  background: #fff1c9;
+  color: #8a5d00;
+}
+.dem-quality--unknown {
+  background: #eef1ef;
+  color: #63736e;
+}
 .report-alert {
   margin-top: 18px;
   padding: 13px 15px;
@@ -2354,6 +2468,47 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
 .report-data-block { margin-top: 20px; padding: 15px; border: 1px solid var(--line); border-radius: 9px; }
 .report-data-block h3 { margin: 0 0 12px; color: var(--green-dark); font-size: 14px; }
 .report-source-line { margin: -4px 0 12px; color: var(--muted); font-size: 12px; }
+.report-source-block {
+  background: #fbfdfc;
+}
+.report-source-block dl {
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+.report-source-block dl > div {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+.report-source-block dt {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+.report-source-block dd {
+  margin: 0;
+  color: #334842;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.report-source-block dd small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+.report-source-warning {
+  margin: 10px 0 0;
+  padding: 9px 11px;
+  border: 1px solid #e6ca70;
+  border-radius: 10px;
+  background: #fff7df;
+  color: #8a5d00;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.55;
+}
 .report-horizon-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); }
 .report-horizon-row > div { min-width: 0; padding: 8px; display: grid; gap: 3px; border-right: 1px solid var(--line); text-align: center; }
 .report-horizon-row > div:last-child { border-right: 0; }
@@ -3170,6 +3325,10 @@ footer {
   }
   .snow-verification em {
     justify-self: stretch;
+  }
+  .report-source-block dl > div {
+    grid-template-columns: 1fr;
+    gap: 3px;
   }
   .nedo-action-panel {
     width: 100%;

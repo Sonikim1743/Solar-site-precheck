@@ -126,12 +126,31 @@ function terrainLineColor(line) {
   return '#0c7b5e'
 }
 
+function pointAtDistance(line, distance) {
+  const points = line?.points || []
+  return points.find((point) => Math.abs(point.distance - distance) < 0.5) || null
+}
+
+function lineLabelPoint(line) {
+  if (line.label === '東西断面') {
+    return {
+      point: line.points?.[line.points.length - 1],
+      direction: 'right',
+    }
+  }
+  return {
+    point: line.points?.[line.points.length - 1],
+    direction: 'top',
+  }
+}
+
 function TerrainSectionMapOverlay({ analysis }) {
   const lines = analysis?.lines || []
   const eastWest = lines.find((line) => line.label === '東西断面')
   const northSouth = lines.find((line) => line.label === '南北断面')
   if (!eastWest || !northSouth) return null
 
+  const rangeMeters = analysis.rangeMeters || eastWest.rangeMeters || 100
   const west = eastWest.points?.[0]
   const east = eastWest.points?.[eastWest.points.length - 1]
   const south = northSouth.points?.[0]
@@ -142,6 +161,15 @@ function TerrainSectionMapOverlay({ analysis }) {
     [Math.min(south.lat, north.lat), Math.min(west.lon, east.lon)],
     [Math.max(south.lat, north.lat), Math.max(west.lon, east.lon)],
   ]
+  const west50 = pointAtDistance(eastWest, -50)
+  const east50 = pointAtDistance(eastWest, 50)
+  const south50 = pointAtDistance(northSouth, -50)
+  const north50 = pointAtDistance(northSouth, 50)
+  const hasInner50 = rangeMeters >= 100 && [west50, east50, south50, north50].every((point) => Number.isFinite(point?.lat) && Number.isFinite(point?.lon))
+  const innerBounds = hasInner50 ? [
+    [Math.min(south50.lat, north50.lat), Math.min(west50.lon, east50.lon)],
+    [Math.max(south50.lat, north50.lat), Math.max(west50.lon, east50.lon)],
+  ] : null
 
   return (
     <>
@@ -156,9 +184,25 @@ function TerrainSectionMapOverlay({ analysis }) {
         }}
       >
         <Tooltip permanent direction="top" className="terrain-range-tooltip">
-          周辺100m確認範囲
+          周辺{rangeMeters}m確認範囲
         </Tooltip>
       </Rectangle>
+      {innerBounds && (
+        <Rectangle
+          bounds={innerBounds}
+          pathOptions={{
+            color: '#ffffff',
+            weight: 1.8,
+            dashArray: '4 4',
+            fillOpacity: 0,
+            opacity: 0.9,
+          }}
+        >
+          <Tooltip permanent direction="bottom" className="terrain-range-tooltip terrain-range-tooltip--inner">
+            50m確認線
+          </Tooltip>
+        </Rectangle>
+      )}
       {lines.map((line) => {
         const positions = (line.points || [])
           .filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lon))
@@ -166,6 +210,7 @@ function TerrainSectionMapOverlay({ analysis }) {
         if (positions.length < 2) return null
         const center = line.points[Math.floor(line.points.length / 2)]
         const endpoint = line.points[line.points.length - 1]
+        const label = lineLabelPoint(line)
         return (
           <Fragment key={line.label}>
             <Polyline
@@ -175,17 +220,24 @@ function TerrainSectionMapOverlay({ analysis }) {
                 weight: 4,
                 opacity: 0.92,
               }}
-            >
-              <Tooltip permanent direction={line.label === '東西断面' ? 'right' : 'top'} className="terrain-section-tooltip">
-                {line.label.replace('断面', '')} {terrainLineNote(line)}
-              </Tooltip>
-            </Polyline>
+            />
             {Number.isFinite(center?.lat) && Number.isFinite(center?.lon) && (
               <CircleMarker
                 center={[center.lat, center.lon]}
                 radius={4}
                 pathOptions={{ color: '#ffffff', weight: 2, fillColor: '#0c7b5e', fillOpacity: 1 }}
               />
+            )}
+            {Number.isFinite(label.point?.lat) && Number.isFinite(label.point?.lon) && (
+              <CircleMarker
+                center={[label.point.lat, label.point.lon]}
+                radius={0}
+                pathOptions={{ opacity: 0, fillOpacity: 0 }}
+              >
+                <Tooltip permanent direction={label.direction} className="terrain-section-tooltip">
+                  {line.label.replace('断面', '')} {terrainLineNote(line)}
+                </Tooltip>
+              </CircleMarker>
             )}
             {Number.isFinite(endpoint?.lat) && Number.isFinite(endpoint?.lon) && (
               <CircleMarker
@@ -194,7 +246,7 @@ function TerrainSectionMapOverlay({ analysis }) {
                 pathOptions={{ color: '#ffffff', weight: 2, fillColor: terrainLineColor(line), fillOpacity: 1 }}
               >
                 <Tooltip direction="top" className="terrain-section-tooltip">
-                  {line.positiveDirection || ''}側 100m
+                  {line.positiveDirection || ''}側 {rangeMeters}m
                 </Tooltip>
               </CircleMarker>
             )}

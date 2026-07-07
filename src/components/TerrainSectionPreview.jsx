@@ -26,6 +26,14 @@ function slopeDirectionText(line) {
   return `${from}→${to} ${diff > 0 ? '上り' : '下り'}`
 }
 
+function heightDiffNotice(line) {
+  const diff = line.summary?.elevationDiff
+  if (!Number.isFinite(diff) || Math.abs(diff) <= 5) return null
+  const from = line.negativeDirection || '左'
+  const to = line.positiveDirection || '右'
+  return `${from}→${to}で${diff > 0 ? '+' : ''}${diff.toFixed(1)}m`
+}
+
 function makePath(points, minElevation, maxElevation, rangeMeters) {
   const span = Math.max(1, maxElevation - minElevation)
   return points
@@ -50,6 +58,7 @@ function makeArea(points, minElevation, maxElevation, rangeMeters) {
 function TerrainProfileChart({ line, minElevation, maxElevation }) {
   const range = line.rangeMeters || 100
   const interval = line.intervalMeters || 10
+  const diffNotice = heightDiffNotice(line)
   const distanceTicks = Array.from(
     { length: Math.floor((range * 2) / interval) + 1 },
     (_, index) => -range + index * interval,
@@ -59,9 +68,10 @@ function TerrainProfileChart({ line, minElevation, maxElevation }) {
   const span = Math.max(1, maxElevation - minElevation)
 
   return (
-    <div className="terrain-section-chart">
+    <div className={`terrain-section-chart ${diffNotice ? 'terrain-section-chart--height-watch' : ''}`}>
       <div className="terrain-section-chart__title">
         <strong>{line.label} <small>（{slopeDirectionText(line)}）</small></strong>
+        {diffNotice && <em className="terrain-section-chart__height-alert">高低差あり：{diffNotice}</em>}
         <span>{profileStats(line)}</span>
       </div>
       <svg viewBox={`0 0 ${graphWidth} ${graphHeight}`} role="img">
@@ -130,8 +140,8 @@ export default function TerrainSectionPreview({ analysis }) {
     <section className="terrain-section-preview">
       <div className="terrain-section-preview__heading">
         <div>
-          <strong>候補地周辺100m 断面プレビュー</strong>
-          <span>候補地点を中心に、東西・南北方向それぞれ21点（10m間隔）で標高取得した簡易断面です。</span>
+          <strong>候補地周辺{analysis.rangeMeters || 100}m 断面プレビュー</strong>
+          <span>候補地点を中心に、東西・南北方向を10m間隔で標高取得した簡易断面です。端点差が±5mを超える場合は高低差として強調します。</span>
         </div>
       </div>
       <div className="terrain-section-preview__charts">
