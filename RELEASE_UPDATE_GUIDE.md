@@ -11,7 +11,7 @@
 ### 初回セットアップ用
 
 ```text
-outputs/SolarSitePrecheck_v1.1_portable.zip
+outputs/SolarSitePrecheck_v1.2_portable.zip
 ```
 
 - node.exe同梱版
@@ -22,7 +22,7 @@ outputs/SolarSitePrecheck_v1.1_portable.zip
 ### 更新用
 
 ```text
-release/latest/SolarSitePrecheck_v1.1_release_light.zip
+release/latest/SolarSitePrecheck_v1.2_release_light.zip
 release/latest/latest-version.json
 ```
 
@@ -45,7 +45,7 @@ MAKE_RELEASE_PACKAGE.cmd
 
 ```text
 release/latest/latest-version.json
-release/latest/SolarSitePrecheck_v1.1_release_light.zip
+release/latest/SolarSitePrecheck_v1.2_release_light.zip
 ```
 
 5. GitHubへcommit / pushする。

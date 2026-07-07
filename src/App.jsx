@@ -39,7 +39,7 @@ const initialSnow = { status: 'idle', station: null, message: '' }
 const initialPlaceInfo = { status: 'idle', data: null, message: '', positionKey: '' }
 const DRAFT_KEY = 'solar-site-precheck-draft-v1'
 const TERRAIN_ANALYSIS_VERSION = 2
-const APP_VERSION = '1.1'
+const APP_VERSION = '1.2'
 const BUILD_DATE = typeof __BUILD_DATE__ !== 'undefined' ? __BUILD_DATE__ : 'dev'
 
 function isSingleInheritanceLandTransfer(item) {

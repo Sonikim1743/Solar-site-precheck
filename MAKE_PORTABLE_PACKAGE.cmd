@@ -3,7 +3,7 @@ cd /d "%~dp0"
 
 set "NODE_EXE=%USERPROFILE%\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe"
 set "PACKAGE_DIR=outputs\SolarSitePrecheck_Portable"
-set "PACKAGE_ZIP=outputs\SolarSitePrecheck_v1.1_portable.zip"
+set "PACKAGE_ZIP=outputs\SolarSitePrecheck_v1.2_portable.zip"
 
 if not exist "%NODE_EXE%" (
   echo Bundled Node was not found.
