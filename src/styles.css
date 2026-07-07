@@ -3020,11 +3020,91 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
 footer {
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
   gap: 20px;
   padding: 22px max(28px, calc((100vw - 1280px) / 2));
   color: #71837d;
   background: #e8efeb;
   font-size: 10px;
+}
+footer > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+.diagnostic-panel {
+  min-width: min(420px, 100%);
+  border: 1px solid #cbdad3;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.62);
+  color: #52665f;
+}
+.diagnostic-panel summary {
+  padding: 9px 11px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  cursor: pointer;
+  list-style: none;
+}
+.diagnostic-panel summary::-webkit-details-marker { display: none; }
+.diagnostic-panel summary span {
+  color: var(--green-dark);
+  font-size: 12px;
+  font-weight: 950;
+}
+.diagnostic-panel summary small {
+  color: #6e817a;
+  font-size: 10px;
+  font-weight: 800;
+}
+.diagnostic-panel__body {
+  padding: 0 11px 11px;
+  display: grid;
+  gap: 9px;
+}
+.diagnostic-panel dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.diagnostic-panel dl div {
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid #dce7e2;
+  border-radius: 9px;
+  background: #fff;
+}
+.diagnostic-panel dt {
+  color: #7d8d87;
+  font-size: 9px;
+  font-weight: 900;
+}
+.diagnostic-panel dd {
+  margin: 3px 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #2f4d44;
+  font-family: Consolas, "Yu Gothic UI", monospace;
+  font-size: 11px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+.diagnostic-panel dd.is-ok {
+  color: #176b52;
+}
+.diagnostic-panel .secondary-button {
+  justify-self: end;
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 11px;
+}
+.diagnostic-panel p {
+  margin: 0;
+  color: #71837d;
+  font-size: 10px;
+  line-height: 1.55;
 }
 
 @media (max-width: 900px) {

@@ -1,0 +1,8 @@
+[pages]
+project_name = "solar-site-precheck"
+pages_build_output_dir = "dist"
+
+[vars]
+VITE_BUILD_TARGET = "cloudflare"
+VITE_PDF_LIMIT_MB = "20"
+VITE_MIN_REQUIRED_RUNTIME = "1.2"

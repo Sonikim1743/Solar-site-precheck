@@ -13,6 +13,7 @@ work/*
 !work/
 !work/serve-dist.mjs
 !work/inheritance-server.mjs
+!work/preflight-release.mjs
 *.zip
 !release/latest/*.zip
 eng.traineddata

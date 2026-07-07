@@ -45,6 +45,9 @@ export default defineConfig({
   plugins: [react(), nedoMonsolaProxy()],
   define: {
     __BUILD_DATE__: JSON.stringify(process.env.VITE_BUILD_DATE || new Date().toISOString().slice(0, 10)),
+    __BUILD_TARGET__: JSON.stringify(process.env.VITE_BUILD_TARGET || 'local'),
+    __PDF_LIMIT_MB__: JSON.stringify(process.env.VITE_PDF_LIMIT_MB || ''),
+    __MIN_REQUIRED_RUNTIME__: JSON.stringify(process.env.VITE_MIN_REQUIRED_RUNTIME || '1.2'),
   },
   build: {
     target: ['es2020', 'safari14'],

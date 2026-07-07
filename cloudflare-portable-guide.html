@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Solar Site Precheck Cloudflare / Portable 配布ガイド</title>
+  <style>
+    body { margin: 0; padding: 32px; font-family: "Yu Gothic UI", "Meiryo", sans-serif; color: #17322d; background: #f5faf7; line-height: 1.7; }
+    main { max-width: 880px; margin: auto; padding: 28px; border: 1px solid #d8e7df; border-radius: 18px; background: #fff; box-shadow: 0 12px 32px rgba(25, 80, 60, .08); }
+    h1 { margin: 0 0 8px; color: #0d503d; font-size: 26px; }
+    h2 { margin-top: 28px; color: #0d6c55; font-size: 18px; }
+    code, pre { font-family: Consolas, monospace; }
+    pre { overflow-x: auto; padding: 14px; border-radius: 12px; background: #eef7f2; }
+    .note { padding: 12px 14px; border-left: 5px solid #f5b940; border-radius: 10px; background: #fff8df; }
+    ul { padding-left: 1.4em; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Solar Site Precheck 配布ガイド</h1>
+  <p>この軽量更新ZIPには、Portable更新用ファイルに加えて Cloudflare Pages 用の <code>functions/api</code> と設定メモを同梱しています。</p>
+
+  <h2>Portable版を更新する場合</h2>
+  <ol>
+    <li>既存のSolar Site Precheckフォルダを開きます。</li>
+    <li><code>UPDATE_APP_FROM_RELEASE.cmd</code> を実行します。</li>
+    <li>起動後、画面下部の「実行環境・API診断」でVersion / Build / API状態を確認します。</li>
+  </ol>
+
+  <h2>Cloudflare Pagesへ反映する場合</h2>
+  <p>ZIPを展開したフォルダで、Wranglerを使って以下を実行します。</p>
+  <pre>npx wrangler pages deploy dist --project-name=solar-site-precheck --functions=functions</pre>
+  <p class="note">Cloudflare Pagesのドラッグ&ドロップ配布では <code>functions</code> が反映されません。NEDO Web取得を使う場合はWrangler配布を使ってください。</p>
+
+  <h2>機能差の目安</h2>
+  <ul>
+    <li>Cloudflare Pages: HTTPSで安定公開。NEDO APIはFunctionsで利用可能。相続PDFサーバー解析は別APIが無い限り利用不可。</li>
+    <li>Portable / Local: NEDO APIと相続PDFサーバー解析をローカルNodeで利用可能。PDF目安サイズは80MB。</li>
+  </ul>
+</main>
+</body>
+</html>

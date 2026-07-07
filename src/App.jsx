@@ -41,6 +41,9 @@ const DRAFT_KEY = 'solar-site-precheck-draft-v1'
 const TERRAIN_ANALYSIS_VERSION = 2
 const APP_VERSION = '1.2'
 const BUILD_DATE = typeof __BUILD_DATE__ !== 'undefined' ? __BUILD_DATE__ : 'dev'
+const BUILD_TARGET = typeof __BUILD_TARGET__ !== 'undefined' ? __BUILD_TARGET__ : 'local'
+const PDF_LIMIT_MB = typeof __PDF_LIMIT_MB__ !== 'undefined' && __PDF_LIMIT_MB__ ? __PDF_LIMIT_MB__ : ''
+const MIN_REQUIRED_RUNTIME = typeof __MIN_REQUIRED_RUNTIME__ !== 'undefined' ? __MIN_REQUIRED_RUNTIME__ : '1.2'
 
 function isSingleInheritanceLandTransfer(item) {
   return item?.ownershipMode === '単独' &&
@@ -151,6 +154,101 @@ function SolarProPreviewButton({ label, image, caption, path, placement = 'right
         <small>{caption}</small>
       </span>
     </span>
+  )
+}
+
+function detectRuntimeEnvironment() {
+  if (typeof window === 'undefined') return '不明'
+  const host = window.location.hostname
+  if (host.endsWith('.pages.dev')) return 'Cloudflare Pages'
+  if (host === 'localhost' || host === '127.0.0.1') return 'Portable / Local'
+  if (/^192\.168\.|^10\.|^172\.(1[6-9]|2\d|3[0-1])\./.test(host)) return 'Portable LAN'
+  return 'Web配信'
+}
+
+function currentBundleName() {
+  if (typeof document === 'undefined') return '—'
+  const script = document.querySelector('script[type="module"][src*="/assets/index-"]')
+  if (script?.src) return script.src.split('/').pop()
+  return '—'
+}
+
+function DiagnosticPanel() {
+  const [checks, setChecks] = useState({
+    status: 'idle',
+    nedo: '未確認',
+    badMesh: '未確認',
+    pdfApi: '未確認',
+    sw: '未確認',
+  })
+  const environment = detectRuntimeEnvironment()
+  const bundleName = currentBundleName()
+  const pdfLimitText = PDF_LIMIT_MB || (environment === 'Cloudflare Pages' ? '20' : '80')
+
+  async function runChecks() {
+    setChecks((current) => ({ ...current, status: 'checking' }))
+    const next = {
+      status: 'done',
+      nedo: 'NG',
+      badMesh: 'NG',
+      pdfApi: 'NG',
+      sw: '未確認',
+    }
+    try {
+      const response = await fetch('/api/nedo-monsola?mesh=52331366', { cache: 'no-store' })
+      next.nedo = response.ok ? 'OK' : `NG ${response.status}`
+    } catch {
+      next.nedo = 'NG'
+    }
+    try {
+      const response = await fetch('/api/nedo-monsola?mesh=bad', { cache: 'no-store' })
+      next.badMesh = response.status === 400 ? 'OK' : `NG ${response.status}`
+    } catch {
+      next.badMesh = 'NG'
+    }
+    try {
+      const response = await fetch('/api/inheritance-pdf', { method: 'GET', cache: 'no-store' })
+      next.pdfApi = response.status === 405 ? 'OK' : `NG ${response.status}`
+    } catch {
+      next.pdfApi = 'NG'
+    }
+    try {
+      if (!navigator.serviceWorker?.getRegistrations) {
+        next.sw = '非対応'
+      } else {
+        const registrations = await navigator.serviceWorker.getRegistrations()
+        next.sw = registrations.length ? `${registrations.length}件` : '整理済み'
+      }
+    } catch {
+      next.sw = '確認失敗'
+    }
+    setChecks(next)
+  }
+
+  return (
+    <details className="diagnostic-panel">
+      <summary>
+        <span>実行環境・API診断</span>
+        <small>{environment} / v{APP_VERSION}</small>
+      </summary>
+      <div className="diagnostic-panel__body">
+        <dl>
+          <div><dt>環境</dt><dd>{environment}</dd></div>
+          <div><dt>Build</dt><dd>{BUILD_DATE} / {BUILD_TARGET}</dd></div>
+          <div><dt>JS</dt><dd>{bundleName}</dd></div>
+          <div><dt>PDF目安</dt><dd>{pdfLimitText}MB</dd></div>
+          <div><dt>Runtime</dt><dd>min {MIN_REQUIRED_RUNTIME}</dd></div>
+          <div><dt>NEDO API</dt><dd className={checks.nedo === 'OK' ? 'is-ok' : ''}>{checks.nedo}</dd></div>
+          <div><dt>Bad mesh</dt><dd className={checks.badMesh === 'OK' ? 'is-ok' : ''}>{checks.badMesh}</dd></div>
+          <div><dt>PDF API</dt><dd className={checks.pdfApi === 'OK' ? 'is-ok' : ''}>{checks.pdfApi}</dd></div>
+          <div><dt>SW</dt><dd>{checks.sw}</dd></div>
+        </dl>
+        <button type="button" className="secondary-button" disabled={checks.status === 'checking'} onClick={runChecks}>
+          {checks.status === 'checking' ? '確認中…' : 'API状態を確認'}
+        </button>
+        <p>Cloudflare版ではPDFサーバー解析が無い場合があります。NEDOがOKなら積雪Web取得は利用できます。</p>
+      </div>
+    </details>
   )
 }
 
@@ -1825,7 +1923,7 @@ export default function App() {
             <div className="inheritance-disclosure__body">
               <div className="privacy-note">
                 <strong>個人情報保護のための注意</strong>
-                <span>PDFはブラウザ内で処理し、サーバー送信・自動保存はしません。受付番号・受付日・土地所在地・外記載を抽出し、最終確認は必ず原本で行ってください。</span>
+                <span>PDFは環境に応じてブラウザ内またはローカルサーバーで解析します。目安上限 {PDF_LIMIT_MB || (detectRuntimeEnvironment() === 'Cloudflare Pages' ? '20' : '80')}MB。受付番号・受付日・土地所在地・外記載を抽出し、最終確認は必ず原本で行ってください。</span>
               </div>
 
               <div className="inheritance-toolbar">
@@ -1963,8 +2061,11 @@ export default function App() {
       </main>
 
       <footer>
-        <span>Solar Site Precheck — 入力内容はこのブラウザに自動保存</span>
-        <span>Version {APP_VERSION} / Build {BUILD_DATE} / 地図・標高：国土地理院 / 積雪出現率：NEDO MONSOLA-11</span>
+        <div>
+          <span>Solar Site Precheck — 入力内容はこのブラウザに自動保存</span>
+          <span>Version {APP_VERSION} / Build {BUILD_DATE} / 地図・標高：国土地理院 / 積雪出現率：NEDO MONSOLA-11</span>
+        </div>
+        <DiagnosticPanel />
       </footer>
     </div>
   )

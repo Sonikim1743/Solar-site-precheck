@@ -9,6 +9,7 @@ set "PACKAGE_ZIP=outputs\SolarSitePrecheck_v%VERSION%_release_light.zip"
 set "VERSION_JSON=outputs\latest-version.json"
 set "ZIP_NAME=SolarSitePrecheck_v%VERSION%_release_light.zip"
 set "RELEASE_BASE_URL=https://raw.githubusercontent.com/Sonikim1743/Solar-site-precheck/main/release/latest"
+set "MIN_REQUIRED_RUNTIME=1.2"
 
 if not exist "%NODE_EXE%" (
   echo Bundled Node was not found.
@@ -31,6 +32,9 @@ for /f %%i in ('powershell -NoProfile -Command "Get-Date -Format yyyy-MM-dd"') d
 echo Building release app...
 set "VITE_BUILD_DATE=%BUILD_DATE%"
 set "VITE_DISABLE_SW=1"
+set "VITE_BUILD_TARGET=portable"
+set "VITE_PDF_LIMIT_MB=80"
+set "VITE_MIN_REQUIRED_RUNTIME=%MIN_REQUIRED_RUNTIME%"
 "%NODE_EXE%" "node_modules\vite\bin\vite.js" build --configLoader runner
 if errorlevel 1 (
   echo.
@@ -44,23 +48,29 @@ if exist "%PACKAGE_DIR%" rmdir /s /q "%PACKAGE_DIR%"
 mkdir "%PACKAGE_DIR%"
 mkdir "%PACKAGE_DIR%\work"
 mkdir "%PACKAGE_DIR%\work\pdfjs"
+mkdir "%PACKAGE_DIR%\functions"
 
 xcopy "dist" "%PACKAGE_DIR%\dist" /e /i /y >nul
+xcopy "functions" "%PACKAGE_DIR%\functions" /e /i /y >nul
 if exist "%PACKAGE_DIR%\dist\templates" rmdir /s /q "%PACKAGE_DIR%\dist\templates"
 if exist "%PACKAGE_DIR%\dist\sw.js" del "%PACKAGE_DIR%\dist\sw.js"
 copy "work\serve-dist.mjs" "%PACKAGE_DIR%\work\serve-dist.mjs" >nul
 copy "work\inheritance-server.mjs" "%PACKAGE_DIR%\work\inheritance-server.mjs" >nul
+copy "work\preflight-release.mjs" "%PACKAGE_DIR%\work\preflight-release.mjs" >nul
 copy "node_modules\pdfjs-dist\legacy\build\pdf.mjs" "%PACKAGE_DIR%\work\pdfjs\pdf.mjs" >nul
 copy "node_modules\pdfjs-dist\legacy\build\pdf.worker.mjs" "%PACKAGE_DIR%\work\pdfjs\pdf.worker.mjs" >nul
 copy "RUN_PORTABLE.cmd" "%PACKAGE_DIR%\RUN_PORTABLE.cmd" >nul
 copy "UPDATE_APP_FROM_RELEASE.cmd" "%PACKAGE_DIR%\UPDATE_APP_FROM_RELEASE.cmd" >nul
 copy "UPDATE_APP_FROM_RELEASE.ps1" "%PACKAGE_DIR%\UPDATE_APP_FROM_RELEASE.ps1" >nul
+copy "wrangler.pages.toml" "%PACKAGE_DIR%\wrangler.pages.toml" >nul
+copy "cloudflare-portable-guide.html" "%PACKAGE_DIR%\cloudflare-portable-guide.html" >nul
 
 (
   echo Solar Site Precheck Release Light
   echo.
   echo This package is for online update distribution.
   echo It does not include node.exe, source code, node_modules, Service Worker, or internal .spt templates.
+  echo It includes Cloudflare Pages helper files: functions\api, wrangler.pages.toml, cloudflare-portable-guide.html.
   echo.
   echo Existing desktop installations should keep their runtime\node.exe or installed Node.js.
   echo.
@@ -78,7 +88,7 @@ if errorlevel 1 (
 )
 
 echo Creating latest-version.json...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$zip = Get-Item '%PACKAGE_ZIP%'; $meta = [ordered]@{ app='Solar Site Precheck'; version='%VERSION%'; buildDate='%BUILD_DATE%'; packageName='%ZIP_NAME%'; zipUrl='%RELEASE_BASE_URL%/%ZIP_NAME%'; notes='Light update package. Keep existing runtime/node.exe on desktop.'; sizeBytes=$zip.Length }; $meta | ConvertTo-Json -Depth 5 | Set-Content -Path '%VERSION_JSON%' -Encoding UTF8"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$zip = Get-Item '%PACKAGE_ZIP%'; $hash = (Get-FileHash '%PACKAGE_ZIP%' -Algorithm SHA256).Hash.ToLowerInvariant(); $bundle = (Get-ChildItem 'dist\assets\index-*.js' | Sort-Object LastWriteTime -Descending | Select-Object -First 1).Name; $buildId = ('%VERSION%' + '-' + '%BUILD_DATE%' + '-' + ($hash.Substring(0,12))); $meta = [ordered]@{ app='Solar Site Precheck'; version='%VERSION%'; buildDate='%BUILD_DATE%'; buildId=$buildId; packageName='%ZIP_NAME%'; zipUrl='%RELEASE_BASE_URL%/%ZIP_NAME%'; sha256=$hash; etag=$hash.Substring(0,16); bundleName=$bundle; minRequiredRuntime='%MIN_REQUIRED_RUNTIME%'; notes='Light update package. Keep existing runtime/node.exe on desktop.'; sizeBytes=$zip.Length }; $json = $meta | ConvertTo-Json -Depth 5; [System.IO.File]::WriteAllText('%VERSION_JSON%', $json + [Environment]::NewLine, [System.Text.UTF8Encoding]::new($false))"
 
 echo Copying release files to release\latest...
 if not exist "release\latest" mkdir "release\latest"

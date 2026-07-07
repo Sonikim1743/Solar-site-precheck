@@ -170,6 +170,14 @@ function TerrainSectionMapOverlay({ analysis }) {
     [Math.min(south50.lat, north50.lat), Math.min(west50.lon, east50.lon)],
     [Math.max(south50.lat, north50.lat), Math.max(west50.lon, east50.lon)],
   ] : null
+  const rangeLabelPoint = {
+    lat: north.lat - (north.lat - south.lat) * 0.12,
+    lon: west.lon + (east.lon - west.lon) * 0.14,
+  }
+  const innerLabelPoint = hasInner50 ? {
+    lat: north50.lat,
+    lon: east50.lon,
+  } : null
 
   return (
     <>
@@ -182,26 +190,38 @@ function TerrainSectionMapOverlay({ analysis }) {
           fillColor: '#24a36f',
           fillOpacity: 0.13,
         }}
+      />
+      <CircleMarker
+        center={[rangeLabelPoint.lat, rangeLabelPoint.lon]}
+        radius={0}
+        pathOptions={{ opacity: 0, fillOpacity: 0 }}
       >
-        <Tooltip permanent direction="top" className="terrain-range-tooltip">
+        <Tooltip permanent direction="right" className="terrain-range-tooltip">
           周辺{rangeMeters}m確認範囲
         </Tooltip>
-      </Rectangle>
+      </CircleMarker>
       {innerBounds && (
-        <Rectangle
-          bounds={innerBounds}
-          pathOptions={{
-            color: '#ffffff',
-            weight: 1.8,
-            dashArray: '4 4',
-            fillOpacity: 0,
-            opacity: 0.9,
-          }}
-        >
-          <Tooltip permanent direction="bottom" className="terrain-range-tooltip terrain-range-tooltip--inner">
-            50m確認線
-          </Tooltip>
-        </Rectangle>
+        <>
+          <Rectangle
+            bounds={innerBounds}
+            pathOptions={{
+              color: '#ffffff',
+              weight: 1.8,
+              dashArray: '4 4',
+              fillOpacity: 0,
+              opacity: 0.9,
+            }}
+          />
+          <CircleMarker
+            center={[innerLabelPoint.lat, innerLabelPoint.lon]}
+            radius={0}
+            pathOptions={{ opacity: 0, fillOpacity: 0 }}
+          >
+            <Tooltip permanent direction="top" className="terrain-range-tooltip terrain-range-tooltip--inner">
+              50m確認線
+            </Tooltip>
+          </CircleMarker>
+        </>
       )}
       {lines.map((line) => {
         const positions = (line.points || [])
