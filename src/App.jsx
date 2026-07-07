@@ -1438,8 +1438,7 @@ export default function App() {
                       <details className="mesh-boundary-status mesh-boundary-status--watch snow-boundary-inline">
                         <summary>
                           <span className="mesh-boundary-status__lamp" aria-hidden="true" />
-                          <strong>境界 約{Math.round(meshBoundary.minDistanceMeters)}m</strong>
-                          <small>隣接メッシュ確認</small>
+                          <strong>境界 {Math.round(meshBoundary.minDistanceMeters)}m</strong>
                         </summary>
                         <div className="adjacent-mesh-panel__body">
                           <div className="adjacent-mesh-actions">
