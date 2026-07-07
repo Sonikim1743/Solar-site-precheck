@@ -1270,12 +1270,6 @@ export default function App() {
                     : '地点を選択すると周辺住所を表示します。'}
                 </small>
               </label>
-              <div className="data-priority-note">
-                <span>標高データ</span>
-                <strong>{Number.isFinite(elevation.value) ? `${elevation.value.toFixed(1)} m` : '未取得'}</strong>
-                <small>{elevation.source || 'NEDO PDF読込時は帳票の標高を優先し、それまでは国土地理院DEMを補助値として使用します。'}</small>
-              </div>
-
               <div className="field-block">
                 <div className="field-label-row">
                   <span>地平線仰角</span>
@@ -1429,82 +1423,82 @@ export default function App() {
                     )}
                   </div>
                   <em>{snowIsConfirmed ? '同一メッシュ確認済み' : '積雪値 未確定'}</em>
+                  {meshBoundary && (
+                    meshBoundary.isNearBoundary && adjacentMeshes.length > 0 ? (
+                      <details className="mesh-boundary-status mesh-boundary-status--watch snow-boundary-inline">
+                        <summary>
+                          <span className="mesh-boundary-status__lamp" aria-hidden="true" />
+                          <strong>境界近接</strong>
+                          <small>約{Math.round(meshBoundary.minDistanceMeters)}m</small>
+                        </summary>
+                        <div className="adjacent-mesh-panel__body">
+                          <div className="adjacent-mesh-actions">
+                            <button
+                              type="button"
+                              className="secondary-button"
+                              disabled={adjacentMeshCompare.status === 'loading'}
+                              onClick={handleAdjacentMeshCompare}
+                            >
+                              {adjacentMeshCompare.status === 'loading' ? '比較取得中…' : '隣接メッシュを比較'}
+                            </button>
+                            <small>境界付近の参考確認です。採用値は同一3次メッシュ確認済みの値だけを使用します。</small>
+                          </div>
+                          <div className="adjacent-mesh-list">
+                            {adjacentMeshes.map((item) => (
+                              <a
+                                key={item.mesh}
+                                href={`https://domessolar.infop.nedo.go.jp/appww/cgi-bin/monsola.cgi?m=${item.mesh}`}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                <span>{item.direction}</span>
+                                <strong>{item.mesh}</strong>
+                              </a>
+                            ))}
+                          </div>
+                          {adjacentMeshCompare.message && (
+                            <p className={`inline-message ${adjacentMeshCompare.status === 'error' ? 'inline-message--error' : ''}`}>{adjacentMeshCompare.message}</p>
+                          )}
+                          {adjacentMeshCompare.stations.length > 0 && (
+                            <>
+                              <p className="adjacent-mesh-note">
+                                表示値は「積雪深10cm以上の出現率」です。例：0.55 は対象期間の約55%で10cm以上の積雪が出る目安です。
+                              </p>
+                              <div className="adjacent-mesh-results">
+                                {adjacentMeshCompare.stations.map((item) => {
+                                  const monthly = item.station?.snow10cm?.monthly || []
+                                  const maxRate = monthly.length ? Math.max(...monthly) : null
+                                  return (
+                                    <div key={item.mesh} className={item.error ? 'adjacent-mesh-result adjacent-mesh-result--error' : 'adjacent-mesh-result'}>
+                                      <span>{item.direction}</span>
+                                      <strong>{item.mesh}</strong>
+                                      {item.station ? (
+                                        <dl>
+                                          <div><dt>年間平均</dt><dd>{item.station.snow10cm.annual.toFixed(2)}</dd></div>
+                                          <div><dt>冬季平均</dt><dd>{item.station.snow10cm.winter.toFixed(2)}</dd></div>
+                                          <div className={Number.isFinite(maxRate) && maxRate >= 0.5 ? 'is-alert' : ''}><dt>月最大</dt><dd>{Number.isFinite(maxRate) ? maxRate.toFixed(2) : '—'}</dd></div>
+                                        </dl>
+                                      ) : (
+                                        <small>{item.error}</small>
+                                      )}
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </details>
+                    ) : (
+                      <div className="mesh-boundary-status mesh-boundary-status--ok snow-boundary-inline">
+                        <span className="mesh-boundary-status__lamp" aria-hidden="true" />
+                        <strong>境界OK</strong>
+                        <small>約{Math.round(meshBoundary.minDistanceMeters)}m</small>
+                      </div>
+                    )
+                  )}
                   <small>NEDO Webから同じ3次メッシュ番号のMONSOLAページを取得した場合だけ係数を計算します。PDF読込は補助機能です。</small>
                 </div>
-                {meshBoundary && (
-                  meshBoundary.isNearBoundary && adjacentMeshes.length > 0 ? (
-                    <details className="mesh-boundary-status mesh-boundary-status--watch">
-                      <summary>
-                        <span className="mesh-boundary-status__lamp" aria-hidden="true" />
-                        <strong>境界近接：隣接メッシュ確認</strong>
-                        <small>境界まで約{Math.round(meshBoundary.minDistanceMeters)}m。クリックして比較を開く</small>
-                      </summary>
-                      <div className="adjacent-mesh-panel__body">
-                        <div className="adjacent-mesh-actions">
-                          <button
-                            type="button"
-                            className="secondary-button"
-                            disabled={adjacentMeshCompare.status === 'loading'}
-                            onClick={handleAdjacentMeshCompare}
-                          >
-                            {adjacentMeshCompare.status === 'loading' ? '比較取得中…' : '隣接メッシュを取得して比較'}
-                          </button>
-                          <small>比較値は採用値ではありません。候補地点の積雪係数は同一3次メッシュ確認済みの値だけを使用します。</small>
-                        </div>
-                        <div className="adjacent-mesh-list">
-                          {adjacentMeshes.map((item) => (
-                            <a
-                              key={item.mesh}
-                              href={`https://domessolar.infop.nedo.go.jp/appww/cgi-bin/monsola.cgi?m=${item.mesh}`}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              <span>{item.direction}</span>
-                              <strong>{item.mesh}</strong>
-                            </a>
-                          ))}
-                        </div>
-                        {adjacentMeshCompare.message && (
-                          <p className={`inline-message ${adjacentMeshCompare.status === 'error' ? 'inline-message--error' : ''}`}>{adjacentMeshCompare.message}</p>
-                        )}
-                        {adjacentMeshCompare.stations.length > 0 && (
-                          <>
-                            <p className="adjacent-mesh-note">
-                              表示値は「積雪深10cm以上の出現率」です。例：0.55 は対象期間の約55%で10cm以上の積雪が出る目安です。
-                            </p>
-                            <div className="adjacent-mesh-results">
-                              {adjacentMeshCompare.stations.map((item) => {
-                                const monthly = item.station?.snow10cm?.monthly || []
-                                const maxRate = monthly.length ? Math.max(...monthly) : null
-                                return (
-                                  <div key={item.mesh} className={item.error ? 'adjacent-mesh-result adjacent-mesh-result--error' : 'adjacent-mesh-result'}>
-                                    <span>{item.direction}</span>
-                                    <strong>{item.mesh}</strong>
-                                    {item.station ? (
-                                      <dl>
-                                        <div><dt>年間平均</dt><dd>{item.station.snow10cm.annual.toFixed(2)}</dd></div>
-                                        <div><dt>冬季平均</dt><dd>{item.station.snow10cm.winter.toFixed(2)}</dd></div>
-                                        <div className={Number.isFinite(maxRate) && maxRate >= 0.5 ? 'is-alert' : ''}><dt>月最大</dt><dd>{Number.isFinite(maxRate) ? maxRate.toFixed(2) : '—'}</dd></div>
-                                      </dl>
-                                    ) : (
-                                      <small>{item.error}</small>
-                                    )}
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </details>
-                  ) : (
-                    <div className="mesh-boundary-status mesh-boundary-status--ok">
-                      <span className="mesh-boundary-status__lamp" aria-hidden="true" />
-                      <strong>境界距離 OK</strong>
-                      <small>境界まで約{Math.round(meshBoundary.minDistanceMeters)}m。同一メッシュ値として扱いやすい位置です。</small>
-                    </div>
-                  )
-                )}
                 <div className="nedo-action-panel">
                   <button type="button" className="action-button action-button--nedo" disabled={!position || snowData.status === 'loading'} onClick={handleNedoWeb}>
                     <span>{snowData.status === 'loading' ? '取得中…' : 'NEDO Webから積雪データを取得'}</span>
