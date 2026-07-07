@@ -3094,6 +3094,25 @@ footer > div:first-child {
 .diagnostic-panel dd.is-ok {
   color: #176b52;
 }
+.diagnostic-panel dd.is-ng {
+  color: #a9361d;
+}
+.diagnostic-panel dd.is-ok::before,
+.diagnostic-panel dd.is-ng::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 5px;
+  border-radius: 50%;
+  vertical-align: 1px;
+}
+.diagnostic-panel dd.is-ok::before {
+  background: #27a26d;
+}
+.diagnostic-panel dd.is-ng::before {
+  background: #d26a43;
+}
 .diagnostic-panel .secondary-button {
   justify-self: end;
   min-height: 34px;

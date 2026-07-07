@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from 'node:fs'
 
 import { parseCoordinateInput, toDegreeMinutes } from '../src/utils/coordinates.js'
 import { escapeCsv } from '../src/utils/csv.js'
+import { detectRuntimeEnvironment, pdfLimitMb } from '../src/utils/buildInfo.js'
 import { analyzeInheritanceText, summarizeInheritanceReceipts } from '../src/utils/inheritance.js'
 import {
   OBSTRUCTION_ELEVATIONS_HEADER,
@@ -112,6 +113,14 @@ test('productionFactor subtracts snow occurrence rate from base factor', () => {
 test('escapeCsv protects commas, quotes and null values', () => {
   assert.equal(escapeCsv('A,B "quoted"'), '"A,B ""quoted"""')
   assert.equal(escapeCsv(null), '""')
+})
+
+test('runtime environment helpers classify deployment targets', () => {
+  assert.equal(detectRuntimeEnvironment({ hostname: 'solar-site-precheck.pages.dev' }), 'Cloudflare Pages')
+  assert.equal(detectRuntimeEnvironment({ hostname: '127.0.0.1' }), 'Portable / Local')
+  assert.equal(detectRuntimeEnvironment({ hostname: '192.168.1.20' }), 'Portable LAN')
+  assert.equal(pdfLimitMb('Cloudflare Pages'), '20')
+  assert.equal(pdfLimitMb('Portable / Local'), '80')
 })
 
 test('snowRateLevel uses shared visual thresholds', () => {
