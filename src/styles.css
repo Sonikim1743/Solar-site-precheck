@@ -826,11 +826,40 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
 }
 .details-panel .form-stack > label { grid-column: span 5; }
 .details-panel .form-stack > .site-name-field { grid-column: span 7; }
+.details-panel .form-stack > .site-mini-summary { grid-column: span 3; }
 .details-panel .form-stack > .field-block { grid-column: 1 / -1; }
 .form-stack { display: grid; gap: 17px; margin-top: 22px; }
 .form-stack label, .field-block { display: grid; gap: 7px; }
 .site-name-field {
   align-content: start;
+}
+.site-mini-summary {
+  min-height: 48px;
+  padding: 8px 10px;
+  align-self: end;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 8px;
+  border: 1px solid #dbe9e3;
+  border-radius: 10px;
+  background: #f9fcfa;
+}
+.site-mini-summary span {
+  color: #84948e;
+  font-size: 10px;
+  font-weight: 900;
+}
+.site-mini-summary strong {
+  color: var(--green-dark);
+  font-family: Consolas, "Yu Gothic UI", monospace;
+  font-size: 13px;
+  text-align: right;
+}
+.site-mini-summary small {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.35;
 }
 .form-stack label > span, .field-label-row > span { font-size: 16px; font-weight: 900; }
 .form-stack input, .form-stack select, .form-stack textarea {
@@ -1012,14 +1041,18 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
   margin-top: 4px;
 }
 .snow-boundary-inline.mesh-boundary-status {
-  padding: 7px 9px;
-  border-radius: 10px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 4px 7px;
+  border-radius: 999px;
 }
 .snow-boundary-inline.mesh-boundary-status > summary {
-  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  grid-template-columns: auto auto auto auto;
+  gap: 5px;
 }
 .snow-boundary-inline.mesh-boundary-status--ok {
-  grid-template-columns: auto auto minmax(0, 1fr);
+  grid-template-columns: auto auto auto;
+  gap: 5px;
 }
 .mesh-boundary-status > summary {
   grid-column: 1 / -1;
@@ -1048,28 +1081,30 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
   content: "閉じる −";
 }
 .snow-boundary-inline.mesh-boundary-status > summary::after {
-  content: "開く ＋";
+  content: "開く";
+  padding: 3px 7px;
+  font-size: 10px;
 }
 .snow-boundary-inline.mesh-boundary-status[open] > summary::after {
-  content: "閉じる −";
+  content: "閉じる";
 }
 .mesh-boundary-status__lamp {
-  width: 11px;
-  height: 11px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
   background: #2498d8;
   box-shadow: 0 0 0 4px rgba(36, 152, 216, .15);
 }
 .mesh-boundary-status strong {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 900;
   white-space: nowrap;
 }
 .mesh-boundary-status small {
   min-width: 0;
   color: currentColor;
-  font-size: 12px;
-  line-height: 1.45;
+  font-size: 10px;
+  line-height: 1.25;
   opacity: .86;
 }
 .mesh-boundary-status--watch {
@@ -2786,7 +2821,8 @@ footer {
   .support-sections { grid-template-columns: 1fr; }
   .map { height: 520px; }
   .details-panel .form-stack > label,
-  .details-panel .form-stack > .site-name-field { grid-column: 1 / -1; }
+  .details-panel .form-stack > .site-name-field,
+  .details-panel .form-stack > .site-mini-summary { grid-column: 1 / -1; }
   .nedo-card { grid-template-columns: 1fr; }
   .base-factor { border-left: 0; }
   .report-grid { grid-template-columns: repeat(2, 1fr); }
@@ -3023,6 +3059,16 @@ footer {
   .mesh-boundary-status > summary::after {
     grid-column: 1 / -1;
     justify-self: start;
+  }
+  .snow-boundary-inline.mesh-boundary-status,
+  .snow-boundary-inline.mesh-boundary-status > summary {
+    grid-template-columns: auto auto auto;
+  }
+  .snow-boundary-inline.mesh-boundary-status > summary small {
+    grid-column: auto;
+  }
+  .snow-boundary-inline.mesh-boundary-status > summary::after {
+    grid-column: auto;
   }
   .snow-verification {
     grid-template-columns: 1fr;

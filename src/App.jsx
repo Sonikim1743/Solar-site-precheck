@@ -1270,6 +1270,16 @@ export default function App() {
                     : '地点を選択すると周辺住所を表示します。'}
                 </small>
               </label>
+              <div className="site-mini-summary">
+                <span>選択地点メモ</span>
+                <strong>{expectedSnowMesh || '地点未選択'}</strong>
+                <small>
+                  {elevation.status === 'success' && `標高 ${elevation.value.toFixed(1)}m`}
+                  {elevation.status === 'loading' && '標高 取得中…'}
+                  {elevation.status === 'error' && '標高 未取得'}
+                  {elevation.status === 'idle' && '標高 —'}
+                </small>
+              </div>
               <div className="field-block">
                 <div className="field-label-row">
                   <span>地平線仰角</span>
@@ -1428,8 +1438,8 @@ export default function App() {
                       <details className="mesh-boundary-status mesh-boundary-status--watch snow-boundary-inline">
                         <summary>
                           <span className="mesh-boundary-status__lamp" aria-hidden="true" />
-                          <strong>境界近接</strong>
-                          <small>約{Math.round(meshBoundary.minDistanceMeters)}m</small>
+                          <strong>境界 約{Math.round(meshBoundary.minDistanceMeters)}m</strong>
+                          <small>隣接メッシュ確認</small>
                         </summary>
                         <div className="adjacent-mesh-panel__body">
                           <div className="adjacent-mesh-actions">
