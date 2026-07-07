@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef } from 'react'
 import L from 'leaflet'
-import { Circle, CircleMarker, GeoJSON, LayersControl, MapContainer, Marker, Polyline, Popup, Rectangle, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet'
+import { Circle, CircleMarker, GeoJSON, LayersControl, MapContainer, Marker, Polyline, Popup, Rectangle, ScaleControl, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet'
 import { parcelInfo } from '../services/cadastre.js'
 
 const markerIcon = L.divIcon({
@@ -36,12 +36,17 @@ function MapController({ position }) {
   return null
 }
 
-function SiteMarker({ position, placeInfo }) {
+function SiteMarker({ position, placeInfo, suppressPopup = false }) {
   const markerRef = useRef(null)
 
   useEffect(() => {
-    if (position) markerRef.current?.openPopup()
-  }, [position, placeInfo?.status, placeInfo?.data?.label])
+    if (!position) return
+    if (suppressPopup) {
+      markerRef.current?.closePopup()
+    } else {
+      markerRef.current?.openPopup()
+    }
+  }, [position, placeInfo?.status, placeInfo?.data?.label, suppressPopup])
 
   if (!position) return null
 
@@ -263,6 +268,8 @@ export default function MapPanel({
   onParcelSelect,
   terrainSection,
 }) {
+  const hasTerrainOverlay = !!terrainSection?.lines?.length
+
   return (
     <div className="map-shell">
       <MapContainer
@@ -287,6 +294,7 @@ export default function MapPanel({
             />
           </LayersControl.BaseLayer>
         </LayersControl>
+        <ScaleControl position="bottomleft" metric imperial={false} />
         <ClickHandler onSelect={onSelect} />
         <MapController position={position} />
         <ParcelLayer
@@ -297,7 +305,7 @@ export default function MapPanel({
         />
         <CurrentLocationLayer currentLocation={currentLocation} />
         <TerrainSectionMapOverlay analysis={terrainSection} />
-        <SiteMarker position={position} placeInfo={placeInfo} />
+        <SiteMarker position={position} placeInfo={placeInfo} suppressPopup={hasTerrainOverlay} />
       </MapContainer>
       <div className="map-hint">地図をクリックして候補地点を指定</div>
       <div className="map-location-control">

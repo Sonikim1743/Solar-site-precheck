@@ -1070,12 +1070,11 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
   color: #185378;
 }
 .snow-boundary-inline {
-  grid-column: 1 / -1;
-  justify-self: end;
-  margin-top: 4px;
+  justify-self: stretch;
+  margin-top: 0;
 }
 .snow-boundary-inline.mesh-boundary-status {
-  width: fit-content;
+  width: 100%;
   max-width: 100%;
   padding: 5px 8px;
   border-radius: 999px;
@@ -1085,17 +1084,20 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
   justify-self: stretch;
 }
 .snow-boundary-inline.mesh-boundary-status > summary {
-  width: fit-content;
-  justify-self: end;
+  width: 100%;
+  justify-self: stretch;
   grid-template-columns: auto auto auto;
   gap: 7px;
+  justify-content: center;
 }
 .snow-boundary-inline.mesh-boundary-status--ok {
   grid-template-columns: auto auto auto;
   gap: 8px;
-  min-width: 148px;
+  min-width: 152px;
   padding: 7px 11px;
   justify-content: center;
+  justify-items: center;
+  text-align: center;
 }
 .mesh-boundary-status > summary {
   grid-column: 1 / -1;
@@ -1149,6 +1151,7 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
   font-size: 11px;
   line-height: 1.25;
   opacity: .86;
+  text-align: center;
 }
 .mesh-boundary-status--watch {
   border-color: #e2b94b;
@@ -1585,7 +1588,7 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
   padding: 11px 12px;
   display: grid;
   grid-template-columns: 1fr auto;
-  align-items: center;
+  align-items: start;
   gap: 4px 12px;
   border: 1px solid #e2cf9b;
   border-radius: 10px;
@@ -1617,9 +1620,18 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
   font-weight: 900;
   line-height: 1.45;
 }
-.snow-verification em { padding: 5px 9px; border-radius: 999px; background: #f4e3b7; color: #785c16; font-size: 11px; font-style: normal; font-weight: 900; }
+.snow-verification__status {
+  min-width: 152px;
+  display: grid;
+  gap: 6px;
+  justify-items: stretch;
+  align-self: start;
+}
+.snow-verification__status em,
+.snow-verification em { padding: 5px 9px; border-radius: 999px; background: #f4e3b7; color: #785c16; font-size: 11px; font-style: normal; font-weight: 900; text-align: center; }
 .snow-verification small { grid-column: 1 / -1; color: var(--muted); font-size: 11px; line-height: 1.55; }
 .snow-verification--confirmed { border-color: #aed2bf; background: #f1f9f5; }
+.snow-verification--confirmed .snow-verification__status em,
 .snow-verification--confirmed em { background: #dcefe5; color: #176b52; }
 .action-button {
   min-height: 72px;
@@ -3152,8 +3164,12 @@ footer {
     grid-template-columns: 1fr;
     align-items: stretch;
   }
+  .snow-verification__status {
+    width: 100%;
+    min-width: 0;
+  }
   .snow-verification em {
-    justify-self: start;
+    justify-self: stretch;
   }
   .nedo-action-panel {
     width: 100%;
