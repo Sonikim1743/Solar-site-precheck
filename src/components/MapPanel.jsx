@@ -1,6 +1,6 @@
-import { useEffect, useRef } from 'react'
+import { Fragment, useEffect, useRef } from 'react'
 import L from 'leaflet'
-import { Circle, GeoJSON, LayersControl, MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from 'react-leaflet'
+import { Circle, CircleMarker, GeoJSON, LayersControl, MapContainer, Marker, Polyline, Popup, Rectangle, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet'
 import { parcelInfo } from '../services/cadastre.js'
 
 const markerIcon = L.divIcon({
@@ -103,6 +103,103 @@ function CurrentLocationLayer({ currentLocation }) {
   )
 }
 
+function terrainLineNote(line) {
+  const from = line.negativeDirection || '左'
+  const to = line.positiveDirection || '右'
+  const slope = line.summary?.averageSlopePercent
+  const diff = line.summary?.elevationDiff
+  const slopeText = Number.isFinite(slope) ? `平均${slope.toFixed(1)}%` : '平均—'
+  if (!Number.isFinite(diff) || Math.abs(diff) < 0.1) return `${from}→${to} ${slopeText}`
+  return `${from}→${to} ${diff > 0 ? '上り' : '下り'} ${slopeText}`
+}
+
+function terrainLineColor(line) {
+  const slope = line.summary?.averageSlopePercent
+  if (!Number.isFinite(slope)) return '#0c6b58'
+  if (slope >= 15) return '#b83b2f'
+  if (slope >= 8) return '#c88b00'
+  return '#0c7b5e'
+}
+
+function TerrainSectionMapOverlay({ analysis }) {
+  const lines = analysis?.lines || []
+  const eastWest = lines.find((line) => line.label === '東西断面')
+  const northSouth = lines.find((line) => line.label === '南北断面')
+  if (!eastWest || !northSouth) return null
+
+  const west = eastWest.points?.[0]
+  const east = eastWest.points?.[eastWest.points.length - 1]
+  const south = northSouth.points?.[0]
+  const north = northSouth.points?.[northSouth.points.length - 1]
+  if (![west, east, south, north].every((point) => Number.isFinite(point?.lat) && Number.isFinite(point?.lon))) return null
+
+  const bounds = [
+    [Math.min(south.lat, north.lat), Math.min(west.lon, east.lon)],
+    [Math.max(south.lat, north.lat), Math.max(west.lon, east.lon)],
+  ]
+
+  return (
+    <>
+      <Rectangle
+        bounds={bounds}
+        pathOptions={{
+          color: '#0c7b5e',
+          weight: 2,
+          dashArray: '6 5',
+          fillColor: '#24a36f',
+          fillOpacity: 0.13,
+        }}
+      >
+        <Tooltip permanent direction="top" className="terrain-range-tooltip">
+          周辺100m確認範囲
+        </Tooltip>
+      </Rectangle>
+      {lines.map((line) => {
+        const positions = (line.points || [])
+          .filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lon))
+          .map((point) => [point.lat, point.lon])
+        if (positions.length < 2) return null
+        const center = line.points[Math.floor(line.points.length / 2)]
+        const endpoint = line.points[line.points.length - 1]
+        return (
+          <Fragment key={line.label}>
+            <Polyline
+              positions={positions}
+              pathOptions={{
+                color: terrainLineColor(line),
+                weight: 4,
+                opacity: 0.92,
+              }}
+            >
+              <Tooltip permanent direction={line.label === '東西断面' ? 'right' : 'top'} className="terrain-section-tooltip">
+                {line.label.replace('断面', '')} {terrainLineNote(line)}
+              </Tooltip>
+            </Polyline>
+            {Number.isFinite(center?.lat) && Number.isFinite(center?.lon) && (
+              <CircleMarker
+                center={[center.lat, center.lon]}
+                radius={4}
+                pathOptions={{ color: '#ffffff', weight: 2, fillColor: '#0c7b5e', fillOpacity: 1 }}
+              />
+            )}
+            {Number.isFinite(endpoint?.lat) && Number.isFinite(endpoint?.lon) && (
+              <CircleMarker
+                center={[endpoint.lat, endpoint.lon]}
+                radius={5}
+                pathOptions={{ color: '#ffffff', weight: 2, fillColor: terrainLineColor(line), fillOpacity: 1 }}
+              >
+                <Tooltip direction="top" className="terrain-section-tooltip">
+                  {line.positiveDirection || ''}側 100m
+                </Tooltip>
+              </CircleMarker>
+            )}
+          </Fragment>
+        )
+      })}
+    </>
+  )
+}
+
 function ParcelLayer({ data, selectedParcelId, focusParcelId, onParcelSelect }) {
   const map = useMap()
   const layerRef = useRef(null)
@@ -164,6 +261,7 @@ export default function MapPanel({
   selectedParcelId,
   focusParcelId,
   onParcelSelect,
+  terrainSection,
 }) {
   return (
     <div className="map-shell">
@@ -198,6 +296,7 @@ export default function MapPanel({
           onParcelSelect={onParcelSelect}
         />
         <CurrentLocationLayer currentLocation={currentLocation} />
+        <TerrainSectionMapOverlay analysis={terrainSection} />
         <SiteMarker position={position} placeInfo={placeInfo} />
       </MapContainer>
       <div className="map-hint">地図をクリックして候補地点を指定</div>

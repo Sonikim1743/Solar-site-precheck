@@ -1153,6 +1153,7 @@ export default function App() {
               selectedParcelId={selectedParcel?.id || null}
               focusParcelId={focusParcelId}
               onParcelSelect={chooseParcel}
+              terrainSection={terrainSection}
             />
 
             <div className="map-analysis-strip">

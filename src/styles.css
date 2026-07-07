@@ -543,6 +543,27 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
 }
 .parcel-tooltip { padding: 4px 7px !important; border: 0 !important; background: #17322d !important; color: white !important; font-size: 10px !important; font-weight: 700; box-shadow: 0 4px 12px rgba(0,0,0,0.2) !important; }
 .parcel-tooltip::before { border-top-color: #17322d !important; }
+.terrain-range-tooltip,
+.terrain-section-tooltip {
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: rgba(13, 80, 61, 0.9) !important;
+  color: #fff !important;
+  font-size: 10px !important;
+  font-weight: 900 !important;
+  box-shadow: 0 6px 18px rgba(18, 55, 44, 0.22) !important;
+}
+.terrain-range-tooltip::before,
+.terrain-section-tooltip::before {
+  border-top-color: rgba(13, 80, 61, 0.9) !important;
+}
+.terrain-range-tooltip {
+  background: rgba(255, 255, 255, 0.95) !important;
+  color: var(--green-dark) !important;
+}
+.terrain-range-tooltip::before {
+  border-top-color: rgba(255, 255, 255, 0.95) !important;
+}
 .site-marker-wrapper { background: transparent; border: 0; }
 .current-location-marker-wrapper { background: transparent; border: 0; }
 .current-location-marker {
@@ -1071,7 +1092,10 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
 }
 .snow-boundary-inline.mesh-boundary-status--ok {
   grid-template-columns: auto auto auto;
-  gap: 7px;
+  gap: 8px;
+  min-width: 148px;
+  padding: 7px 11px;
+  justify-content: center;
 }
 .mesh-boundary-status > summary {
   grid-column: 1 / -1;
