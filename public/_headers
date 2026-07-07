@@ -1,6 +1,9 @@
 /*
   X-Content-Type-Options: nosniff
   Referrer-Policy: no-referrer
+  Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+  Permissions-Policy: geolocation=(self), camera=(), microphone=(), payment=(), usb=(), serial=()
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://cyberjapandata.gsi.go.jp https://cyberjapandata2.gsi.go.jp https://maps.gsi.go.jp; connect-src 'self' https://cyberjapandata.gsi.go.jp https://cyberjapandata2.gsi.go.jp https://msearch.gsi.go.jp https://mreversegeocoder.gsi.go.jp https://maps.gsi.go.jp https://domessolar.infop.nedo.go.jp; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'self'
 
 /assets/*
   Cache-Control: public, max-age=31536000, immutable

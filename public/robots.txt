@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://solar-site-precheck.pages.dev/sitemap.xml

@@ -1046,10 +1046,10 @@ export default function App() {
                 <input
                   value={address}
                   onChange={(event) => setAddress(event.target.value)}
-                  placeholder="住所・地名・緯度経度を入力（例：岡山県真庭市 / 34.8617, 133.2433）"
+                  placeholder="住所・地名・緯度経度を入力（例：広島県庄原市東城町帝釈宇山 / 34.8617, 133.2433）"
                   aria-label="住所・地名・緯度経度"
                 />
-                <button type="submit" disabled={searchStatus === 'loading'}>{searchStatus === 'loading' ? '検索中' : '検索'}</button>
+                <button type="submit" aria-label="候補地点を検索" disabled={searchStatus === 'loading'}>{searchStatus === 'loading' ? '検索中' : '検索'}</button>
                 {addressResults.length > 0 && (
                   <ul className="search-results">
                     {addressResults.map((result) => (
@@ -1189,6 +1189,7 @@ export default function App() {
                 <button
                   type="button"
                   className="secondary-button terrain-section-button"
+                  aria-label="地形断面を確認"
                   disabled={!position || terrainSectionStatus === 'loading'}
                   onClick={handleTerrainSectionAnalysis}
                 >
@@ -1262,7 +1263,13 @@ export default function App() {
                     </small>
                   </div>
                   <div className="terrain-actions">
-                    <button type="button" className="action-button action-button--terrain" disabled={!position || !Number.isFinite(elevation.value) || terrainStatus === 'loading'} onClick={handleTerrainAnalysis}>
+                    <button
+                      type="button"
+                      className="action-button action-button--terrain"
+                      aria-label="地平線を分析"
+                      disabled={!position || !Number.isFinite(elevation.value) || terrainStatus === 'loading'}
+                      onClick={handleTerrainAnalysis}
+                    >
                       <span>
                         {terrainStatus === 'loading'
                           ? '分析中…'
@@ -1286,7 +1293,13 @@ export default function App() {
                       />
                       <span>詳細分析</span>
                     </label>
-                    <button type="button" className="horizon-tool-button horizon-csv-button horizon-csv-button--solarpro" disabled={!position || !terrain?.samples?.length} onClick={downloadSolarProObstructionCsv}>
+                    <button
+                      type="button"
+                      className="horizon-tool-button horizon-csv-button horizon-csv-button--solarpro"
+                      aria-label="Solar Pro用地平線CSVを出力"
+                      disabled={!position || !terrain?.samples?.length}
+                      onClick={downloadSolarProObstructionCsv}
+                    >
                       Solar Pro地平線CSV出力
                     </button>
                   </div>
@@ -1476,23 +1489,38 @@ export default function App() {
                   <small>NEDO Webから同じ3次メッシュ番号のMONSOLAページを取得した場合だけ係数を計算します。PDF読込は補助機能です。</small>
                 </div>
                 <div className="nedo-action-panel">
-                  <button type="button" className="action-button action-button--nedo" disabled={!position || snowData.status === 'loading'} onClick={handleNedoWeb}>
+                  <button
+                    type="button"
+                    className="action-button action-button--nedo"
+                    aria-label="NEDO積雪データを取得"
+                    disabled={!position || snowData.status === 'loading'}
+                    onClick={handleNedoWeb}
+                  >
                     <span>{snowData.status === 'loading' ? '取得中…' : 'NEDO Webから積雪データを取得'}</span>
                     <small>{expectedSnowMesh ? `3次メッシュ ${expectedSnowMesh} を取得して適用` : '先に地図で地点を選択'}</small>
                   </button>
-                  <a
-                    className={`mesh-link-button ${!nedoMonsolaUrl ? 'mesh-link-button--disabled' : ''}`}
-                    href={nedoMonsolaUrl || undefined}
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-disabled={!nedoMonsolaUrl}
-                    onClick={(event) => {
-                      if (!nedoMonsolaUrl) event.preventDefault()
-                    }}
-                  >
-                    <span>3次メッシュのNEDOページを開く</span>
-                    <small>{expectedSnowMesh || '地点未選択'}</small>
-                  </a>
+                  {nedoMonsolaUrl ? (
+                    <a
+                      className="mesh-link-button"
+                      href={nedoMonsolaUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label="NEDO 3次メッシュページを開く"
+                    >
+                      <span>3次メッシュのNEDOページを開く</span>
+                      <small>{expectedSnowMesh}</small>
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      className="mesh-link-button mesh-link-button--disabled"
+                      disabled
+                      aria-label="候補地点未選択のためNEDOページは開けません"
+                    >
+                      <span>3次メッシュのNEDOページを開く</span>
+                      <small>地点未選択</small>
+                    </button>
+                  )}
                 </div>
                 <details className="nedo-optional-tools">
                   <summary>PDF読込・参考地点確認（補助機能）</summary>

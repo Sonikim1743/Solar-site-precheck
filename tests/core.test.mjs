@@ -147,6 +147,21 @@ test('serve:dist script points to an existing local server file', () => {
   assert.ok(existsSync(match[1]), `${match[1]} should exist`)
 })
 
+test('public deployment metadata and headers are explicit', () => {
+  assert.ok(existsSync('public/robots.txt'))
+  assert.ok(existsSync('public/sitemap.xml'))
+  const headers = readFileSync('public/_headers', 'utf8')
+  assert.match(headers, /Content-Security-Policy:/)
+  assert.match(headers, /Strict-Transport-Security:/)
+  assert.match(headers, /Permissions-Policy:/)
+})
+
+test('search placeholder does not mix mismatched address and coordinates', () => {
+  const app = readFileSync('src/App.jsx', 'utf8')
+  assert.doesNotMatch(app, /岡山県真庭市 \/ 34\.8617, 133\.2433/)
+  assert.match(app, /広島県庄原市東城町帝釈宇山 \/ 34\.8617, 133\.2433/)
+})
+
 test('inheritance text analyzer flags land single-inheritance candidates conservatively', () => {
   const results = analyzeInheritanceText([{
     pageNumber: 1,
