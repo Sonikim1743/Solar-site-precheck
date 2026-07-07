@@ -18,6 +18,14 @@ function profileStats(line) {
   ].join(' / ')
 }
 
+function slopeDirectionText(line) {
+  const diff = line.summary?.elevationDiff
+  const from = line.negativeDirection || '左'
+  const to = line.positiveDirection || '右'
+  if (!Number.isFinite(diff) || Math.abs(diff) < 0.1) return `${from}→${to} ほぼ水平`
+  return `${from}→${to} ${diff > 0 ? '上り' : '下り'}`
+}
+
 function makePath(points, minElevation, maxElevation, rangeMeters) {
   const span = Math.max(1, maxElevation - minElevation)
   return points
@@ -53,7 +61,7 @@ function TerrainProfileChart({ line, minElevation, maxElevation }) {
   return (
     <div className="terrain-section-chart">
       <div className="terrain-section-chart__title">
-        <strong>{line.label}</strong>
+        <strong>{line.label} <small>（{slopeDirectionText(line)}）</small></strong>
         <span>{profileStats(line)}</span>
       </div>
       <svg viewBox={`0 0 ${graphWidth} ${graphHeight}`} role="img">
@@ -83,7 +91,15 @@ function TerrainProfileChart({ line, minElevation, maxElevation }) {
                 y2={padding.top + plotHeight}
               />
               {isLabeled && (
-                <text x={x} y={graphHeight - 11} textAnchor="middle">{distance === 0 ? '候補地' : `${distance}m`}</text>
+                <text x={x} y={graphHeight - 11} textAnchor="middle">
+                  {distance === 0
+                    ? '候補地'
+                    : distance === -range
+                      ? `${line.negativeDirection || ''} ${distance}m`
+                      : distance === range
+                        ? `${line.positiveDirection || ''} ${distance}m`
+                        : `${distance}m`}
+                </text>
               )}
             </g>
           )

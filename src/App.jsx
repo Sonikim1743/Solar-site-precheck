@@ -120,37 +120,6 @@ function terrainFromSamples(samples, source = '手動入力') {
   }
 }
 
-function formatMemo(report) {
-  const horizon = report.terrain?.samples
-    ?.map((sample) => `${sample.bearing}°=${Number.isFinite(sample.angle) ? `${sample.angle.toFixed(1)}°` : '未入力'}`)
-    .join(' / ') || '未分析'
-  const snow = report.snowStation
-  const snowRates = snow?.snow10cm.monthly
-    .map((rate, index) => `${index + 1}月=${rate.toFixed(2)}`)
-    .join(' / ')
-  const snowFactors = snow?.snow10cm.monthly
-    .map((rate, index) => `${index + 1}月=${productionFactor(report.snowBase, rate).toFixed(2)}`)
-    .join(' / ')
-
-  return [
-    `候補地名: ${report.siteName || '未入力'}`,
-    `緯度: ${report.position ? toDegreeMinutes(report.position.lat, 'lat') : '未指定'}`,
-    `経度: ${report.position ? toDegreeMinutes(report.position.lon, 'lon') : '未指定'}`,
-    `候補地点3次メッシュ: ${report.expectedSnowMesh || '未指定'}`,
-    `メッシュ境界確認: ${report.meshBoundary ? (report.meshBoundary.isNearBoundary ? `境界まで約${Math.round(report.meshBoundary.minDistanceMeters)}m。隣接メッシュのNEDO値も確認推奨。` : `境界まで約${Math.round(report.meshBoundary.minDistanceMeters)}m。`) : '未確認'}`,
-    `標高: ${Number.isFinite(report.elevation) ? `${report.elevation.toFixed(1)} m` : '未取得'}`,
-    `地番: ${report.parcel?.label || '未選択'}`,
-    `地平線の想定樹高: ${report.obstructionHeight.toFixed(1)} m（地形標高に加算）`,
-    `地平線仰角: ${horizon}`,
-    `冬至南中太陽高度との比較: ${report.solarReference ? `${report.solarReference.label} / ${report.solarReference.message}` : '未計算'}`,
-    `NEDO参照地点: ${snow ? `${snow.name} / 北緯${snow.latDeg}度${snow.latMin.toFixed(1)}分 / 東経${snow.lonDeg}度${snow.lonMin.toFixed(1)}分` : '未取得'}`,
-    `積雪10cm以上出現率: ${snowRates || '未取得'}`,
-    `積雪考慮後の発電量係数（${report.snowBase.toFixed(2)}−出現率）: ${snowFactors || '未計算'}`,
-    `候補地メモ: ${report.memo || 'なし'}`,
-    `現地確認メモ: ${report.fieldMemo || 'なし'}`,
-  ].join('\n')
-}
-
 function SnowRateCell({ rate, children }) {
   const level = snowRateLevel(rate)
   return (
@@ -216,7 +185,6 @@ export default function App() {
   const [pdfProgress, setPdfProgress] = useState('')
   const [memo, setMemo] = useState('')
   const [fieldMemo, setFieldMemo] = useState('')
-  const [copyStatus, setCopyStatus] = useState('idle')
   const [drawingConvertStatus, setDrawingConvertStatus] = useState({ status: 'idle', message: '' })
   const [drawingJob, setDrawingJob] = useState(null)
   const [drawingSelectedPages, setDrawingSelectedPages] = useState([])
@@ -868,6 +836,7 @@ export default function App() {
     elevation: elevation.value,
     elevationSource: elevation.source || (elevation.status === 'error' ? '手動確認が必要' : '—'),
     terrain,
+    terrainSection,
     siteName,
     parcel: selectedParcel,
     snowStation: confirmedSnowStation,
@@ -876,23 +845,10 @@ export default function App() {
     snowBase,
     obstructionHeight,
     solarReference,
+    placeLabel: selectedPlaceLabel,
     memo,
     fieldMemo,
-  }), [position, elevation, terrain, siteName, selectedParcel, confirmedSnowStation, expectedSnowMesh, meshBoundary, snowBase, obstructionHeight, solarReference, memo, fieldMemo])
-
-  const memoText = useMemo(() => formatMemo(report), [report])
-
-  async function copyMemo() {
-    try {
-      if (!navigator.clipboard?.writeText) throw new Error('Clipboard API unavailable')
-      await navigator.clipboard.writeText(memoText)
-      setCopyStatus('done')
-    } catch {
-      setCopyStatus('failed')
-      window.prompt('コピーできない場合は、下のテキストを選択してコピーしてください。', memoText)
-    }
-    window.setTimeout(() => setCopyStatus('idle'), 1800)
-  }
+  }), [position, elevation, terrain, terrainSection, siteName, selectedParcel, confirmedSnowStation, expectedSnowMesh, meshBoundary, snowBase, obstructionHeight, solarReference, selectedPlaceLabel, memo, fieldMemo])
 
   function downloadCsv() {
     const rows = [
@@ -1624,57 +1580,15 @@ export default function App() {
         <section className="report-section" id="report-section">
           <details className="report-disclosure">
             <summary className="report-disclosure__summary">
-              <div className="section-heading"><div className="step-number">3</div><div><h2>候補地チェックレポート</h2><p>Solar Proへの転記と社内共有に使える形で整理</p></div></div>
+              <div className="section-heading"><div className="step-number">3</div><div><h2>候補地チェックレポート</h2><p>地形・地平線・積雪を1枚で確認する簡易分析レポート</p></div></div>
               <span className="report-disclosure__toggle">クリックして開く</span>
             </summary>
             <div className="report-disclosure__body">
             <div className="action-row no-print">
-              <button type="button" className="secondary-button" onClick={copyMemo}>
-                {copyStatus === 'done' ? 'コピーしました' : copyStatus === 'failed' ? '手動コピーを表示' : '入力用メモをコピー'}
-              </button>
-              <button type="button" className="secondary-button" onClick={downloadCsv}>CSV出力</button>
+              <button type="button" className="secondary-button" onClick={downloadCsv}>チェックCSV出力</button>
               <button type="button" className="primary-button" onClick={() => window.print()}>PDF印刷</button>
             </div>
-            <div className="transfer-card">
-            <div className="transfer-card__heading">
-              <span>Solar Pro転記用ミニ表</span>
-              <small>実際の入力画面を開きながら、ここだけ見れば転記しやすい形です。</small>
-            </div>
-            <div className="transfer-grid">
-              <section>
-                <h3>3DCAD → 設置場所</h3>
-                <dl>
-                  <div><dt>北緯</dt><dd>{position ? toDegreeMinutes(position.lat, 'lat', 1) : '未指定'}</dd></div>
-                  <div><dt>東経</dt><dd>{position ? toDegreeMinutes(position.lon, 'lon', 1) : '未指定'}</dd></div>
-                  <div><dt>3次メッシュ</dt><dd>{expectedSnowMesh || '未指定'}</dd></div>
-                  <div><dt>標高</dt><dd>{Number.isFinite(elevation.value) ? `${elevation.value.toFixed(1)} m` : '未取得'}</dd></div>
-                </dl>
-              </section>
-              <section>
-                <h3>3DCAD → 地平線</h3>
-                <dl>
-                  {horizonSamples.map((sample) => (
-                    <div key={sample.bearing}><dt>{sample.bearing}°</dt><dd>{Number.isFinite(sample.angle) ? `${sample.angle.toFixed(1)}°` : '未分析'}</dd></div>
-                  ))}
-                </dl>
-              </section>
-              <section>
-                <h3>傾斜面日射補正係数</h3>
-                <dl>
-                  {MONTHS.map((month, index) => {
-                    const rate = confirmedSnowStation?.snow10cm.monthly[index]
-                    return (
-                      <div key={month}>
-                        <dt>{month}</dt>
-                        <dd>{Number.isFinite(rate) ? productionFactor(snowBase, rate).toFixed(2) : '未取得'}</dd>
-                      </div>
-                    )
-                  })}
-                </dl>
-              </section>
-            </div>
-            </div>
-            <ReportPreview report={report} memoText={memoText} />
+            <ReportPreview report={report} />
             </div>
           </details>
         </section>

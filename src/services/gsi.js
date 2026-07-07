@@ -267,7 +267,7 @@ function summarizeProfile(points) {
   }
 }
 
-async function buildCrossSectionLine(lat, lon, label, negativeBearing, positiveBearing, rangeMeters, intervalMeters) {
+async function buildCrossSectionLine(lat, lon, label, negativeBearing, positiveBearing, rangeMeters, intervalMeters, negativeDirection, positiveDirection) {
   const distances = []
   for (let distance = -rangeMeters; distance <= rangeMeters; distance += intervalMeters) {
     distances.push(distance)
@@ -290,6 +290,8 @@ async function buildCrossSectionLine(lat, lon, label, negativeBearing, positiveB
 
   return {
     label,
+    negativeDirection,
+    positiveDirection,
     rangeMeters,
     intervalMeters,
     points,
@@ -301,8 +303,8 @@ export async function analyzeTerrainCrossSection(lat, lon, options = {}) {
   const rangeMeters = options.rangeMeters ?? 100
   const intervalMeters = options.intervalMeters ?? 10
   const [eastWest, northSouth] = await Promise.all([
-    buildCrossSectionLine(lat, lon, '東西断面', 270, 90, rangeMeters, intervalMeters),
-    buildCrossSectionLine(lat, lon, '南北断面', 180, 0, rangeMeters, intervalMeters),
+    buildCrossSectionLine(lat, lon, '東西断面', 270, 90, rangeMeters, intervalMeters, '西', '東'),
+    buildCrossSectionLine(lat, lon, '南北断面', 180, 0, rangeMeters, intervalMeters, '南', '北'),
   ])
 
   const allElevations = [...eastWest.points, ...northSouth.points]

@@ -739,6 +739,11 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
   font-size: 13px;
   font-weight: 950;
 }
+.terrain-section-chart__title strong small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+}
 .terrain-section-chart__title span {
   color: var(--muted);
   font-size: 11px;
@@ -1051,7 +1056,7 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
 .snow-boundary-inline.mesh-boundary-status {
   width: fit-content;
   max-width: 100%;
-  padding: 3px 5px;
+  padding: 5px 8px;
   border-radius: 999px;
 }
 .snow-boundary-inline.mesh-boundary-status[open] {
@@ -1062,11 +1067,11 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
   width: fit-content;
   justify-self: end;
   grid-template-columns: auto auto auto;
-  gap: 5px;
+  gap: 7px;
 }
 .snow-boundary-inline.mesh-boundary-status--ok {
   grid-template-columns: auto auto auto;
-  gap: 5px;
+  gap: 7px;
 }
 .mesh-boundary-status > summary {
   grid-column: 1 / -1;
@@ -1096,28 +1101,28 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
 }
 .snow-boundary-inline.mesh-boundary-status > summary::after {
   content: "確認";
-  padding: 2px 7px;
-  font-size: 10px;
+  padding: 3px 9px;
+  font-size: 11px;
 }
 .snow-boundary-inline.mesh-boundary-status[open] > summary::after {
   content: "閉じる";
 }
 .mesh-boundary-status__lamp {
-  width: 9px;
-  height: 9px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   background: #2498d8;
   box-shadow: 0 0 0 4px rgba(36, 152, 216, .15);
 }
 .mesh-boundary-status strong {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 900;
   white-space: nowrap;
 }
 .mesh-boundary-status small {
   min-width: 0;
   color: currentColor;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.25;
   opacity: .86;
 }
@@ -2236,6 +2241,12 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
 .report-card::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 5px; background: linear-gradient(90deg, var(--green), #4f9d78 65%, var(--yellow) 65%); }
 .report-card__header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
 .report-card__header h2 { margin: 0; font-size: 24px; }
+.report-card__place {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+}
 .draft-badge { padding: 6px 10px; border-radius: 4px; background: #eff6f2; color: var(--green); font-size: 12px; font-weight: 800; }
 .report-grid { display: grid; grid-template-columns: repeat(4, 1fr); margin: 0; }
 .report-value { min-height: 78px; padding: 16px 14px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
@@ -2273,6 +2284,32 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
 .report-alert--watch strong { color: #8a5d00; }
 .report-alert--danger { border-color: #e4a5a0; background: #fff0ee; }
 .report-alert--danger strong { color: #aa2e23; }
+.report-visual-grid {
+  margin-top: 20px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+.report-visual-panel {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fbfdfc;
+}
+.report-visual-panel .horizon-graph-card,
+.report-visual-panel .terrain-section-preview {
+  margin: 0;
+}
+.report-empty-panel {
+  padding: 22px 12px;
+  border: 1px dashed #cbdcd4;
+  border-radius: 10px;
+  color: var(--muted);
+  text-align: center;
+  font-size: 13px;
+  font-weight: 800;
+}
 .solar-memo { margin-top: 22px; border: 1px solid #cbdcd4; border-radius: 9px; overflow: hidden; }
 .solar-memo__title { padding: 10px 14px; background: #e8f3ee; color: var(--green-dark); font-size: 13px; font-weight: 800; }
 .solar-memo pre { margin: 0; padding: 16px; color: #2b443e; background: #fbfdfc; font-family: "Yu Gothic UI", sans-serif; font-size: 13px; line-height: 1.75; white-space: pre-wrap; }

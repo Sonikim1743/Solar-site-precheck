@@ -1,6 +1,8 @@
 import { productionFactor } from '../services/nedo.js'
 import { toDegreeMinutes } from '../utils/coordinates.js'
 import { snowRateLevel } from '../utils/snowRates.js'
+import HorizonGraphPreview from './HorizonGraphPreview.jsx'
+import TerrainSectionPreview from './TerrainSectionPreview.jsx'
 
 const MONTHS = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月']
 
@@ -23,18 +25,22 @@ function ValueRow({ label, children, wide = false }) {
   )
 }
 
-export default function ReportPreview({ report, memoText }) {
+export default function ReportPreview({ report }) {
   const terrain = report.terrain
   const station = report.snowStation
   const riskClass = terrain ? `risk risk--${terrain.risk}` : 'risk'
   const solarReference = report.solarReference
+  const reportTitle = report.siteName || report.placeLabel || '名称未入力の候補地'
 
   return (
     <section className="report-card" id="report-preview">
       <div className="report-card__header">
         <div>
-          <p className="eyebrow">候補地チェックレポート</p>
-          <h2>{report.siteName || '名称未入力の候補地'}</h2>
+          <p className="eyebrow">候補地 簡易分析レポート</p>
+          <h2>{reportTitle}</h2>
+          {report.siteName && report.placeLabel && report.siteName !== report.placeLabel && (
+            <p className="report-card__place">選択地点：{report.placeLabel}</p>
+          )}
         </div>
         <span className="draft-badge">一次検討</span>
       </div>
@@ -69,6 +75,27 @@ export default function ReportPreview({ report, memoText }) {
           <span>候補地点は3次メッシュ境界まで約{Math.round(report.meshBoundary.minDistanceMeters)}mです。積雪出現率は隣接メッシュで変わる可能性があるため、必要に応じて隣接メッシュのNEDO値も確認してください。</span>
         </div>
       )}
+
+      <div className="report-visual-grid">
+        <div className="report-visual-panel">
+          {terrain ? (
+            <HorizonGraphPreview
+              position={report.position}
+              terrain={terrain}
+              solarReference={solarReference}
+            />
+          ) : (
+            <div className="report-empty-panel">地平線グラフは未分析です。</div>
+          )}
+        </div>
+        <div className="report-visual-panel">
+          {report.terrainSection ? (
+            <TerrainSectionPreview analysis={report.terrainSection} />
+          ) : (
+            <div className="report-empty-panel">周辺100m断面は未取得です。</div>
+          )}
+        </div>
+      </div>
 
       <div className="report-data-block">
         <h3>方位別 地平線仰角（地形標高 + 想定樹高 {report.obstructionHeight.toFixed(1)}m）</h3>
@@ -110,11 +137,6 @@ export default function ReportPreview({ report, memoText }) {
         <ValueRow label="候補地メモ" wide>{report.memo}</ValueRow>
         <ValueRow label="現地確認メモ" wide>{report.fieldMemo}</ValueRow>
       </dl>
-
-      <div className="solar-memo">
-        <div className="solar-memo__title">Solar Pro 入力用メモ</div>
-        <pre>{memoText}</pre>
-      </div>
 
       <p className="report-note">
         ※ 地平線は国土地理院DEMによる概算です。積雪値は候補地点と同じ3次メッシュのNEDO PDFだけを採用し、最寄り観測地点の参考値は係数計算から除外しています。
