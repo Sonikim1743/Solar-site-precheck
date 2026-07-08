@@ -42,6 +42,8 @@ const initialSnow = { status: 'idle', station: null, message: '' }
 const initialPlaceInfo = { status: 'idle', data: null, message: '', positionKey: '' }
 const DRAFT_KEY = 'solar-site-precheck-draft-v1'
 const TERRAIN_ANALYSIS_VERSION = 2
+const GROUNDY_URL = 'https://www.app.groundy.net/map'
+const SOLAR_PRO_PORTAL_URL = 'https://laplaceid.energymntr.com/servicelist/solarpro/installer-related-info'
 
 function isSingleInheritanceLandTransfer(item) {
   return item?.ownershipMode === '単独' &&
@@ -108,7 +110,12 @@ function formatHorizonSummary(terrain) {
   return `分析済み：最大 ${terrain.maxAngle.toFixed(1)}°（${direction}${timeBand ? `・${timeBand}` : ''}）`
 }
 
-function terrainFromSamples(samples, source = '手動入力') {
+function analysisPositionKey(point) {
+  if (!point || !Number.isFinite(point.lat) || !Number.isFinite(point.lon)) return ''
+  return `${Number(point.lat).toFixed(7)},${Number(point.lon).toFixed(7)}`
+}
+
+function terrainFromSamples(samples, source = '手動入力', point = null) {
   const valid = samples.filter((sample) => Number.isFinite(sample.angle))
   if (!valid.length) return null
   const highest = valid.reduce((max, sample) => sample.angle > max.angle ? sample : max)
@@ -118,6 +125,8 @@ function terrainFromSamples(samples, source = '手動入力') {
     direction: formatHorizonDirection(highest),
     radius: source,
     samples,
+    positionKey: analysisPositionKey(point),
+    position: point ? { lat: point.lat, lon: point.lon } : null,
   }
 }
 
@@ -178,6 +187,7 @@ export default function App() {
   const [drawingJob, setDrawingJob] = useState(null)
   const [drawingSelectedPages, setDrawingSelectedPages] = useState([])
   const [templateFileName, setTemplateFileName] = useState('')
+  const [equipmentDownloadMessage, setEquipmentDownloadMessage] = useState('')
   const [inheritanceStatus, setInheritanceStatus] = useState({ status: 'idle', message: '' })
   const [inheritanceJob, setInheritanceJob] = useState(null)
   const [inheritanceSort, setInheritanceSort] = useState('receipt')
@@ -415,7 +425,11 @@ export default function App() {
         obstructionHeight,
         directions,
       )
-      setTerrain(result)
+      setTerrain({
+        ...result,
+        positionKey: analysisPositionKey(position),
+        position: { lat: position.lat, lon: position.lon },
+      })
       setTerrainStatus('success')
       setHorizonPanelOpen(true)
     } catch {
@@ -453,7 +467,7 @@ export default function App() {
     const samples = base.map((sample) => sample.bearing === bearing
       ? { ...sample, angle: Number.isFinite(value) ? value : null }
       : sample)
-    setTerrain(terrainFromSamples(samples))
+    setTerrain(terrainFromSamples(samples, '手動入力', position))
     setTerrainStatus('manual')
     setHorizonPanelOpen(true)
   }
@@ -894,9 +908,15 @@ export default function App() {
       setHorizonExportMessage('先に地平線分析を完了してください。')
       return
     }
+    const currentPositionKey = analysisPositionKey(position)
+    if (terrain.positionKey && terrain.positionKey !== currentPositionKey) {
+      setHorizonExportMessage('現在の候補地点と地平線分析結果が一致しません。地平線を再分析してからCSV出力してください。')
+      return
+    }
+    const outputPosition = { lat: Number(position.lat), lon: Number(position.lon) }
     const csv = buildObstructionElevationsCsv({
       samples: terrain.samples,
-      position,
+      position: outputPosition,
       sessionName: siteName || selectedPlaceLabel || expectedSnowMesh || 'Solar Site Precheck DEM Horizon',
     })
     if (!csv) {
@@ -924,6 +944,41 @@ export default function App() {
     link.download = 'ObstructionElevations.csv'
     link.click()
     URL.revokeObjectURL(url)
+  }
+
+  async function saveEquipmentFile(filePath, suggestedName) {
+    setEquipmentDownloadMessage('')
+    try {
+      const response = await fetch(filePath)
+      if (!response.ok) throw new Error('file-not-found')
+      const blob = await response.blob()
+
+      if (typeof window !== 'undefined' && window.showSaveFilePicker) {
+        try {
+          const fileHandle = await window.showSaveFilePicker({
+            suggestedName,
+            types: [{ description: 'Solar Pro太陽電池データ', accept: { 'application/octet-stream': ['.MD0W'] } }],
+          })
+          const writable = await fileHandle.createWritable()
+          await writable.write(blob)
+          await writable.close()
+          setEquipmentDownloadMessage(`${suggestedName} を保存しました。`)
+          return
+        } catch (error) {
+          if (error?.name === 'AbortError') return
+        }
+      }
+
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = suggestedName
+      link.click()
+      URL.revokeObjectURL(url)
+      setEquipmentDownloadMessage('このブラウザでは保存先を選べないため、通常のダウンロードとして保存しました。')
+    } catch {
+      setEquipmentDownloadMessage('モジュールデータを取得できませんでした。アプリを更新してから再度お試しください。')
+    }
   }
 
   const horizonDirections = terrain?.samples?.length
@@ -976,7 +1031,7 @@ export default function App() {
               相続登記チェック
             </button>
           </nav>
-          <div className="status-pill"><span></span>MVP プロトタイプ</div>
+          <div className="status-pill"><span></span>作業補助ツール</div>
         </div>
       </header>
 
@@ -984,9 +1039,29 @@ export default function App() {
         {activePage === 'solar' && (
           <>
         <section className="hero">
-          <p className="eyebrow">SITE SCREENING WORKSPACE</p>
-          <h1>候補地の情報を、<br /><span>Solar Pro入力前</span>にひとまとめ。</h1>
-          <p>航空写真から位置を選び、標高・地平線・NEDO積雪データを一次検討レポートに整理します。</p>
+          <div className="hero-layout">
+            <div>
+              <p className="eyebrow">SITE SCREENING WORKSPACE</p>
+              <h1>
+                候補地の情報を、<br />
+                <a className="hero-title-link" href={SOLAR_PRO_PORTAL_URL} target="_blank" rel="noreferrer">Solar Pro入力前</a>
+                にひとまとめ。
+              </h1>
+              <p>航空写真から位置を選び、標高・地平線・NEDO積雪データを一次検討レポートに整理します。</p>
+            </div>
+            <div className="hero-service-links no-print" aria-label="外部サービスを開く">
+              <a href={GROUNDY_URL} target="_blank" rel="noreferrer">
+                <span className="hero-service-links__icon">地</span>
+                <strong>Groundy</strong>
+                <small>地図を開く</small>
+              </a>
+              <a href={SOLAR_PRO_PORTAL_URL} target="_blank" rel="noreferrer">
+                <span className="hero-service-links__icon">SP</span>
+                <strong>Solar Pro</strong>
+                <small>管理・DL</small>
+              </a>
+            </div>
+          </div>
         </section>
 
         <section className="utility-panel no-print">
@@ -1037,7 +1112,18 @@ export default function App() {
           <section className="panel map-panel" id="site-select">
             <div className="section-heading">
               <div className="step-number">1</div>
-              <div><h2>候補地点を選択</h2><p>住所・地名・緯度経度をまとめて検索、または航空写真を直接クリック</p></div>
+              <div>
+                <div className="heading-with-help">
+                  <h2>候補地点を選択</h2>
+                  <span className="help-tooltip" tabIndex="0" aria-label="GroundyやGoogleマップで現地情報と位置を確認してから入力すると、候補地点の指定精度が上がります。">
+                    ?
+                    <span className="help-tooltip__body" role="tooltip">
+                      GroundyやGoogleマップで現地情報・周辺道路・区画を確認してから住所や座標を入力すると、位置指定の精度が上がります。
+                    </span>
+                  </span>
+                </div>
+                <p>住所・地名・緯度経度をまとめて検索、または航空写真を直接クリック</p>
+              </div>
             </div>
 
             <div className="site-search-row">
@@ -1641,7 +1727,7 @@ export default function App() {
                   <div className="step-number">M</div>
                   <div>
                     <h2>Solar Pro入力マニュアル</h2>
-                    <p>図面と候補地チェック結果を見ながら、Solar Proで簡易シミュレーションを行うための作業手順</p>
+                    <p>候補地チェック結果、地平線CSV、積雪補正値を使ってSolar Proへ入力するための作業手順</p>
                   </div>
                 </div>
                 <span className="manual-disclosure__toggle">クリックして開く</span>
@@ -1655,9 +1741,9 @@ export default function App() {
               <ol>
                 <li>候補地点を地図・住所・座標で指定する。</li>
                 <li>緯度・経度・標高・3次メッシュを確認する。</li>
-                <li>地平線8方位を分析し、必要なら手動補正する。</li>
+                <li>地平線を分析し、Solar Pro用CSVとして出力する。</li>
                 <li>NEDO Webから同一3次メッシュの積雪出現率を取得する。</li>
-                <li>Solar Pro転記用ミニ表を開き、入力値を確認する。</li>
+                <li>簡易レポートでCSV、積雪、断面の根拠を確認する。</li>
               </ol>
             </article>
 
@@ -1674,12 +1760,12 @@ export default function App() {
 
             <article className="manual-card">
               <span>STEP 2</span>
-              <h3>地平線を入力</h3>
-              <p><strong>3DCAD → 地平線</strong> を開き、方位角と高度角を入力します。現在は一次検討用として8方位を使います。</p>
+              <h3>地平線CSVを読み込む</h3>
+              <p><strong>3DCAD → 地平線</strong> を開き、このツールで出力した <strong>ObstructionElevations.csv</strong> を読み込みます。</p>
               <ul>
-                <li>0° / 45° / 90° / 135° / 180° / 225° / 270° / 315°を入力。</li>
-                <li>樹高20mを加算した保守的な概算値として扱う。</li>
-                <li>冬の太陽高度警告が出た場合は現地影を重点確認。</li>
+                <li>分析結果は1°間隔へ補間してCSV化。</li>
+                <li>SunEye実測値ではなく、DEM解析＋想定樹高の概算値。</li>
+                <li>読み込み後、Solar Pro側の地平線グラフで不自然な方位がないか確認。</li>
               </ul>
             </article>
 
@@ -1710,7 +1796,7 @@ export default function App() {
               <h3>簡易シミュレーション前の確認</h3>
               <div className="manual-check-list">
                 <label><input type="checkbox" /> 設置場所の緯度・経度・標高を入力した</label>
-                <label><input type="checkbox" /> 地平線8方位を入力または確認した</label>
+                <label><input type="checkbox" /> 地平線CSVを出力し、Solar Proで読み込んだ</label>
                 <label><input type="checkbox" /> 積雪補正係数を月別に入力した</label>
                 <label><input type="checkbox" /> 図面・航空写真・現地影メモを確認した</label>
                 <label><input type="checkbox" /> 結果が極端な場合は原典データを再確認した</label>
@@ -1726,7 +1812,7 @@ export default function App() {
             <div className="step-number">4</div>
             <div>
               <h2>情報・ダウンロード・リンク集</h2>
-              <p>Solar Pro入力前後に使うテンプレート、チェック項目、外部確認サイトをまとめます。</p>
+              <p>Solar Pro入力前後に使うテンプレート、標準機器メモ、外部確認サイトをまとめます。</p>
             </div>
           </div>
 
@@ -1760,7 +1846,7 @@ export default function App() {
               <div className="check-note-list">
                 <label><input type="checkbox" /> 設置場所：緯度・経度・標高を確認</label>
                 <label><input type="checkbox" /> 日射データベース：MONSOLA-11の地域を確認</label>
-                <label><input type="checkbox" /> 地平線：8方位の仰角を入力または確認</label>
+                <label><input type="checkbox" /> 地平線：CSVを読み込み、グラフを確認</label>
                 <label><input type="checkbox" /> 積雪補正：月別係数を入力</label>
                 <label><input type="checkbox" /> 現地影：近接障害物は別途メモ・写真確認</label>
               </div>
@@ -1775,6 +1861,44 @@ export default function App() {
                 <li>地図・NEDO取得はオンライン接続が必要です。現場では通信状態も確認してください。</li>
                 <li>検証版URLを使う場合、ngrokの確認画面が出たら「Visit Site」を押してください。</li>
               </ul>
+            </article>
+
+            <article className="knowledge-card knowledge-card--wide module-import-card">
+              <div className="module-import-card__header">
+                <div>
+                  <span className="knowledge-card__label">太陽電池DB</span>
+                  <h3>JINKO SOLAR モジュールデータ</h3>
+                  <p>Solar Proの太陽電池データベースへインポートして使う社内標準候補です。</p>
+                </div>
+                <div className="module-download-list" aria-label="JINKO SOLARモジュールデータをダウンロード">
+                  <div className="module-download-item">
+                    <span>JKM655N-66QL6-BDV-F1-JP</span>
+                    <button type="button" onClick={() => saveEquipmentFile('/equipment/JKM655N-66QL6-BDV-F1-JP.MD0W', 'JKM655N-66QL6-BDV-F1-JP.MD0W')}>
+                      保存
+                    </button>
+                  </div>
+                  <div className="module-download-item">
+                    <span>JKM720N-66HL5-BDV</span>
+                    <button type="button" onClick={() => saveEquipmentFile('/equipment/JKM720N-66HL5-BDV.MD0W', 'JKM720N-66HL5-BDV.MD0W')}>
+                      保存
+                    </button>
+                  </div>
+                </div>
+              </div>
+              {equipmentDownloadMessage && <p className="inline-message">{equipmentDownloadMessage}</p>}
+              <details className="module-import-guide">
+                <summary>
+                  <span>Solar Proへの取り込み方法</span>
+                  <em>開く / 閉じる</em>
+                </summary>
+                <ol>
+                  <li>Solar Pro上部メニューの <strong>その他 → 太陽電池データベース</strong> を開く。</li>
+                  <li><strong>メーカー名</strong> を <strong>JINKO SOLAR</strong> に変更する。</li>
+                  <li><strong>データのインポート</strong> を押し、ダウンロードした `.MD0W` ファイルを選択する。</li>
+                  <li>一覧に対象モジュールが追加されたことを確認して <strong>OK</strong> を押す。</li>
+                </ol>
+                <small>PCSデータはこのカードでは扱いません。PCS仕様は別途確認し、Solar Pro側のPCS設定で管理します。</small>
+              </details>
             </article>
 
             <details className="knowledge-card knowledge-card--wide knowledge-card--collapsible">

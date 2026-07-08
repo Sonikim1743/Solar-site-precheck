@@ -2,7 +2,7 @@
 cd /d "%~dp0"
 
 set "NODE_EXE=%USERPROFILE%\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe"
-set "VERSION=1.2"
+set "VERSION=1.21"
 set "BUILD_DATE="
 set "PACKAGE_DIR=outputs\SolarSitePrecheck_Release_Light"
 set "PACKAGE_ZIP=outputs\SolarSitePrecheck_v%VERSION%_release_light.zip"

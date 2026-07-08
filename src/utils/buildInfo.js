@@ -1,4 +1,4 @@
-export const APP_VERSION = '1.2'
+export const APP_VERSION = '1.21'
 export const BUILD_DATE = typeof __BUILD_DATE__ !== 'undefined' ? __BUILD_DATE__ : 'dev'
 export const BUILD_TARGET = typeof __BUILD_TARGET__ !== 'undefined' ? __BUILD_TARGET__ : 'local'
 export const PDF_LIMIT_MB = typeof __PDF_LIMIT_MB__ !== 'undefined' && __PDF_LIMIT_MB__ ? String(__PDF_LIMIT_MB__) : ''
