@@ -117,7 +117,9 @@ function parseRegistrySummary(excerpt) {
     .replace(/[┃│｜]/g, ' ')
     .replace(/[【】]/g, ' ')
     .replace(/\s+/g, ' ')
-  const receiptNumber = toHalfWidthDigits(flat.match(/第\s*([0-9０-９]+)\s*号/)?.[1] || '')
+  const receiptNumber = isReceiptHeaderLine(flat)
+    ? toHalfWidthDigits(flat.match(/第\s*([0-9０-９]+)\s*号/)?.[1] || '')
+    : ''
   const dateMatch = flat.match(/([0-9０-９]+)\s*月\s*([0-9０-９]+)\s*日\s*受付/)
   const receiptDate = dateMatch
     ? `${toHalfWidthDigits(dateMatch[1])}月${toHalfWidthDigits(dateMatch[2])}日`
@@ -146,6 +148,18 @@ function parseRegistrySummary(excerpt) {
 
 function lineReceiptNumber(line) {
   return toHalfWidthDigits(String(line || '').match(/第\s*([0-9０-９]+)\s*号/)?.[1] || '')
+}
+
+function isReceiptHeaderLine(line) {
+  const text = normalizeText(line)
+    .replace(/[┃│｜【】]/g, ' ')
+    .replace(/\s+/g, '')
+  if (!/第[0-9０-９]+号/.test(text)) return false
+  if (!/受付/.test(text)) return false
+  if (/(法律|法務省令|政令|省令|規則|告示|許可|認可|第[0-9０-９]+条|第[0-9０-９]+項)/.test(text)) return false
+  return /[0-9０-９]{1,2}月[0-9０-９]{1,2}日受付/.test(text) ||
+    /受付[（(]?(単独|共有|共同|連先)/.test(text) ||
+    /(所有権|相続|抹消|保存|移転|登記|土地|建物)/.test(text)
 }
 
 function textLinesFromPdfItems(items) {
@@ -182,7 +196,7 @@ function extractReceiptBlocks(pages) {
     const lines = normalizeText(page.text).split('\n').map((line) => line.trim()).filter(Boolean)
     const receiptIndexes = lines
       .map((line, index) => ({ line, index }))
-      .filter(({ line }) => /第\s*[0-9０-９]+\s*号/.test(line) && /受付/.test(line))
+      .filter(({ line }) => isReceiptHeaderLine(line))
       .map(({ index }) => index)
 
     receiptIndexes.forEach((startIndex, localIndex) => {
@@ -218,7 +232,7 @@ function summarizeInheritanceReceipts(pages) {
   pages.forEach((page) => {
     const lines = normalizeText(page.text).split('\n').map((line) => line.trim()).filter(Boolean)
     lines.forEach((line, index) => {
-      const number = lineReceiptNumber(line)
+      const number = isReceiptHeaderLine(line) ? lineReceiptNumber(line) : ''
       if (number) readNumbers.push(Number(number))
       if (/黒|■|□|取下|受付/.test(line)) {
         const nearby = compactExcerpt(lines, Math.max(0, index - 2), 5)
@@ -235,7 +249,7 @@ function summarizeInheritanceReceipts(pages) {
     })
   })
 
-  const uniqueNumbers = [...new Set(readNumbers)].sort((a, b) => a - b)
+  const uniqueNumbers = [...new Set(readNumbers.filter((number) => Number.isFinite(number) && number > 0))].sort((a, b) => a - b)
   const firstNumber = uniqueNumbers[0] || null
   const lastNumber = uniqueNumbers[uniqueNumbers.length - 1] || null
   const expectedCount = firstNumber && lastNumber ? lastNumber - firstNumber + 1 : 0

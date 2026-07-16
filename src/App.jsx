@@ -40,10 +40,34 @@ const MONTHS = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', 
 const initialElevation = { status: 'idle', value: null, source: '', message: '' }
 const initialSnow = { status: 'idle', station: null, message: '' }
 const initialPlaceInfo = { status: 'idle', data: null, message: '', positionKey: '' }
+const initialPlaceApiStatus = {
+  status: 'idle',
+  label: '待機',
+  message: '住所APIは地点選択時に必要な分だけ確認します。',
+  checkedAt: null,
+  cooldownUntil: null,
+}
 const DRAFT_KEY = 'solar-site-precheck-draft-v1'
+const PLACE_CACHE_KEY = 'solar-site-precheck-place-cache-v1'
+const PLACE_CACHE_LIMIT = 300
+const PLACE_CACHE_MAX_AGE = 30 * 24 * 60 * 60 * 1000
+const PLACE_REQUEST_DELAY_MS = 650
+const PLACE_API_COOLDOWN_MS = 5 * 60 * 1000
+const PLACE_API_FAILURE_THRESHOLD = 2
 const TERRAIN_ANALYSIS_VERSION = 2
 const GROUNDY_URL = 'https://www.app.groundy.net/map'
 const SOLAR_PRO_PORTAL_URL = 'https://laplaceid.energymntr.com/servicelist/solarpro/installer-related-info'
+const initialDrawingTextTool = { text: '', size: 28, annotations: {}, selected: null, editDrag: null }
+const initialDrawingImageTool = { src: '', name: '', aspectRatio: null, annotations: {}, drag: null, selected: null, editDrag: null }
+
+function isDynamicChunkLoadError(error) {
+  const message = String(error?.message || error || '')
+  return /dynamically imported module|Importing a module script failed|Failed to fetch module script|ChunkLoadError|Loading chunk/i.test(message)
+}
+
+function dynamicChunkRefreshMessage() {
+  return 'アプリ更新後の古い画面を参照しています。ページを再読み込みしてから、もう一度実行してください。'
+}
 
 function isSingleInheritanceLandTransfer(item) {
   return item?.ownershipMode === '単独' &&
@@ -61,12 +85,96 @@ function inheritanceRowText(item) {
   ].join('\t')
 }
 
+function ArrayLengthHelp({ className = '' }) {
+  return (
+    <span className={`help-tooltip help-tooltip--below ${className}`.trim()} tabIndex="0" aria-label="JKM655N-66QL6-BDV-F1-JPの配列長さ参考値。4列 9.528m、6列 14.292m、8列 19.056m、10列 23.820m。">
+      ?
+      <span className="help-tooltip__body" role="tooltip">
+        図面縮尺合わせ用メモ<br />
+        モデル：JKM655N-66QL6-BDV-F1-JP<br />
+        4列：9.528m / 6列：14.292m<br />
+        8列：19.056m / 10列：23.820m
+      </span>
+    </span>
+  )
+}
+
+function createRotatedPreviewUrl(src, rotation = 0) {
+  const angle = ((Number(rotation) % 360) + 360) % 360
+  if (!angle) return Promise.resolve(src)
+  return new Promise((resolve, reject) => {
+    const image = new Image()
+    image.onload = () => {
+      const canvas = document.createElement('canvas')
+      const swapped = angle === 90 || angle === 270
+      canvas.width = swapped ? image.naturalHeight || image.height : image.naturalWidth || image.width
+      canvas.height = swapped ? image.naturalWidth || image.width : image.naturalHeight || image.height
+      const context = canvas.getContext('2d')
+      context.fillStyle = '#fff'
+      context.fillRect(0, 0, canvas.width, canvas.height)
+      if (angle === 90) {
+        context.translate(canvas.width, 0)
+        context.rotate(Math.PI / 2)
+      } else if (angle === 180) {
+        context.translate(canvas.width, canvas.height)
+        context.rotate(Math.PI)
+      } else if (angle === 270) {
+        context.translate(0, canvas.height)
+        context.rotate(-Math.PI / 2)
+      }
+      context.drawImage(image, 0, 0)
+      resolve(canvas.toDataURL('image/jpeg', 0.86))
+    }
+    image.onerror = () => reject(new Error('回転プレビューを作成できませんでした。'))
+    image.src = src
+  })
+}
+
 function loadDraft() {
   try {
     return JSON.parse(window.localStorage.getItem(DRAFT_KEY)) || {}
   } catch {
     return {}
   }
+}
+
+function placePositionKey(point, digits = 6) {
+  return `${Number(point.lat).toFixed(digits)},${Number(point.lon).toFixed(digits)}`
+}
+
+function readPlaceCache() {
+  try {
+    return JSON.parse(window.localStorage.getItem(PLACE_CACHE_KEY)) || {}
+  } catch {
+    return {}
+  }
+}
+
+function writePlaceCache(cache) {
+  try {
+    const entries = Object.entries(cache)
+      .filter(([, value]) => value?.createdAt && Date.now() - value.createdAt < PLACE_CACHE_MAX_AGE)
+      .sort((a, b) => (b[1].createdAt || 0) - (a[1].createdAt || 0))
+      .slice(0, PLACE_CACHE_LIMIT)
+    window.localStorage.setItem(PLACE_CACHE_KEY, JSON.stringify(Object.fromEntries(entries)))
+  } catch {
+    // Address cache is only a convenience. The app can continue without it.
+  }
+}
+
+function cachedPlaceInfo(point) {
+  const cache = readPlaceCache()
+  const key = placePositionKey(point, 5)
+  const hit = cache[key]
+  if (!hit?.data || !hit.createdAt) return null
+  if (Date.now() - hit.createdAt > PLACE_CACHE_MAX_AGE) return null
+  return hit
+}
+
+function rememberPlaceInfo(point, data) {
+  const cache = readPlaceCache()
+  cache[placePositionKey(point, 5)] = { data, createdAt: Date.now() }
+  writePlaceCache(cache)
 }
 
 function emptyHorizonSamples(directions = HORIZON_DIRECTIONS) {
@@ -168,6 +276,7 @@ export default function App() {
   const [currentLocation, setCurrentLocation] = useState(null)
   const [locationStatus, setLocationStatus] = useState({ status: 'idle', message: '' })
   const [placeInfo, setPlaceInfo] = useState(initialPlaceInfo)
+  const [placeApiStatus, setPlaceApiStatus] = useState(initialPlaceApiStatus)
   const [parcelData, setParcelData] = useState(null)
   const [parcelQuery, setParcelQuery] = useState('')
   const [parcelStatus, setParcelStatus] = useState({ status: 'idle', message: '' })
@@ -186,16 +295,34 @@ export default function App() {
   const [drawingConvertStatus, setDrawingConvertStatus] = useState({ status: 'idle', message: '' })
   const [drawingJob, setDrawingJob] = useState(null)
   const [drawingSelectedPages, setDrawingSelectedPages] = useState([])
+  const [activeDrawingPageNumber, setActiveDrawingPageNumber] = useState(null)
+  const [pdfPreviewView, setPdfPreviewView] = useState({ zoom: 1, x: 0, y: 0, panMode: false, drag: null })
+  const activePdfPreviewRef = useRef(null)
+  const [activePdfPreviewSize, setActivePdfPreviewSize] = useState({ width: 0, height: 0 })
+  const [drawingPageRotations, setDrawingPageRotations] = useState({})
+  const [drawingRotatedPreviews, setDrawingRotatedPreviews] = useState({})
+  const [drawingTextTool, setDrawingTextTool] = useState(initialDrawingTextTool)
+  const [drawingImageTool, setDrawingImageTool] = useState(initialDrawingImageTool)
+  const [drawingMergeFiles, setDrawingMergeFiles] = useState([])
+  const [drawingMergePreview, setDrawingMergePreview] = useState(true)
+  const [drawingPanelOpen, setDrawingPanelOpen] = useState(false)
   const [templateFileName, setTemplateFileName] = useState('')
   const [equipmentDownloadMessage, setEquipmentDownloadMessage] = useState('')
   const [inheritanceStatus, setInheritanceStatus] = useState({ status: 'idle', message: '' })
   const [inheritanceJob, setInheritanceJob] = useState(null)
   const [inheritanceSort, setInheritanceSort] = useState('receipt')
   const [inheritanceCopyStatus, setInheritanceCopyStatus] = useState('')
-  const [activePage, setActivePage] = useState(() =>
-    typeof window !== 'undefined' && window.location.hash === '#inheritance-check' ? 'inheritance' : 'solar',
-  )
+  const [activePage, setActivePage] = useState(() => {
+    if (typeof window === 'undefined') return 'solar'
+    if (window.location.hash === '#inheritance-check') return 'inheritance'
+    if (window.location.hash === '#pdf-tools') return 'pdf'
+    return 'solar'
+  })
   const draftSaveTimer = useRef(null)
+  const placeRequestTimer = useRef(null)
+  const placeRequestSeq = useRef(0)
+  const placeApiFailureCount = useRef(0)
+  const placeApiCooldownUntil = useRef(0)
 
   useEffect(() => {
     window.clearTimeout(draftSaveTimer.current)
@@ -220,8 +347,10 @@ export default function App() {
   }, [position, elevation, terrain, obstructionHeight, detailedHorizon, snowData.station, snowBase])
 
   useEffect(() => {
-    if (position && placeInfo.status === 'idle') loadPlaceInfo(position)
+    if (position && placeInfo.status === 'idle') schedulePlaceInfo(position)
   }, [position, placeInfo.status])
+
+  useEffect(() => () => window.clearTimeout(placeRequestTimer.current), [])
 
   useEffect(() => {
     if (siteNameTouched) return
@@ -246,17 +375,98 @@ export default function App() {
     }
   }
 
-  async function loadPlaceInfo(nextPosition) {
-    const positionKey = `${nextPosition.lat.toFixed(6)},${nextPosition.lon.toFixed(6)}`
+  function schedulePlaceInfo(nextPosition) {
+    const requestId = placeRequestSeq.current + 1
+    placeRequestSeq.current = requestId
+    window.clearTimeout(placeRequestTimer.current)
+
+    const positionKey = placePositionKey(nextPosition)
+    const cached = cachedPlaceInfo(nextPosition)
+    if (cached) {
+      setPlaceInfo({ status: 'success', data: cached.data, message: '', positionKey })
+      setPlaceApiStatus({
+        status: 'cached',
+        label: 'キャッシュ',
+        message: '同じ地点の住所情報を前回取得値から表示しています。',
+        checkedAt: cached.createdAt,
+        cooldownUntil: null,
+      })
+      return
+    }
+
+    const now = Date.now()
+    if (placeApiCooldownUntil.current > now) {
+      setPlaceInfo({
+        status: 'error',
+        data: null,
+        message: '住所APIが一時的に不安定です。座標・3次メッシュで確認してください。',
+        positionKey,
+      })
+      setPlaceApiStatus({
+        status: 'cooldown',
+        label: '一時停止',
+        message: '住所APIの連続失敗を検知したため、短時間の再試行を控えています。',
+        checkedAt: now,
+        cooldownUntil: placeApiCooldownUntil.current,
+      })
+      return
+    }
+
     setPlaceInfo({ status: 'loading', data: null, message: '周辺住所を確認中…', positionKey })
+    setPlaceApiStatus({
+      status: 'loading',
+      label: '確認中',
+      message: '地理院住所APIに問い合わせています。',
+      checkedAt: null,
+      cooldownUntil: null,
+    })
+    placeRequestTimer.current = window.setTimeout(() => {
+      loadPlaceInfo(nextPosition, requestId)
+    }, PLACE_REQUEST_DELAY_MS)
+  }
+
+  async function loadPlaceInfo(nextPosition, requestId) {
+    const positionKey = placePositionKey(nextPosition)
     try {
-      const data = await reverseGeocode(nextPosition.lat, nextPosition.lon)
+      let data
+      try {
+        data = await reverseGeocode(nextPosition.lat, nextPosition.lon)
+      } catch {
+        await new Promise((resolve) => window.setTimeout(resolve, 500))
+        if (requestId !== placeRequestSeq.current) return
+        data = await reverseGeocode(nextPosition.lat, nextPosition.lon)
+      }
+      if (requestId !== placeRequestSeq.current) return
+      rememberPlaceInfo(nextPosition, data)
+      placeApiFailureCount.current = 0
+      placeApiCooldownUntil.current = 0
+      setPlaceApiStatus({
+        status: 'success',
+        label: '正常',
+        message: '住所APIから周辺住所を取得しました。',
+        checkedAt: Date.now(),
+        cooldownUntil: null,
+      })
       setPlaceInfo((current) => current.positionKey === positionKey
         ? { status: 'success', data, message: '', positionKey }
         : current)
     } catch {
+      if (requestId !== placeRequestSeq.current) return
+      const failures = placeApiFailureCount.current + 1
+      placeApiFailureCount.current = failures
+      const cooldownUntil = failures >= PLACE_API_FAILURE_THRESHOLD ? Date.now() + PLACE_API_COOLDOWN_MS : null
+      if (cooldownUntil) placeApiCooldownUntil.current = cooldownUntil
+      setPlaceApiStatus({
+        status: cooldownUntil ? 'cooldown' : 'error',
+        label: cooldownUntil ? '一時停止' : '取得失敗',
+        message: cooldownUntil
+          ? '住所APIの応答が不安定です。しばらく座標・3次メッシュで代替します。'
+          : '住所APIに接続できませんでした。次の地点選択時に再試行します。',
+        checkedAt: Date.now(),
+        cooldownUntil,
+      })
       setPlaceInfo((current) => current.positionKey === positionKey
-        ? { status: 'error', data: null, message: '周辺住所を取得できませんでした。', positionKey }
+        ? { status: 'error', data: null, message: '住所は自動取得できませんでした。座標・3次メッシュで確認してください。', positionKey }
         : current)
     }
   }
@@ -273,6 +483,35 @@ export default function App() {
     setAdjacentMeshCompare({ status: 'idle', stations: [], message: '' })
   }
 
+  function scrollToPageTop() {
+    if (typeof window === 'undefined') return
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function resetWorkTools() {
+    setDrawingJob(null)
+    setDrawingSelectedPages([])
+    setActiveDrawingPageNumber(null)
+    setPdfPreviewView({ zoom: 1, x: 0, y: 0, panMode: false, drag: null })
+    setDrawingPageRotations({})
+    setDrawingRotatedPreviews({})
+    setDrawingTextTool(initialDrawingTextTool)
+    setDrawingImageTool(initialDrawingImageTool)
+    setDrawingMergeFiles([])
+    setDrawingConvertStatus({ status: 'idle', message: 'PDF管理と地形解析の一時結果を初期化しました。' })
+    setInheritanceJob(null)
+    setInheritanceStatus({ status: 'idle', message: '' })
+    setInheritanceCopyStatus('')
+    setInheritanceSort('receipt')
+    setTerrain(null)
+    setTerrainStatus('idle')
+    setHorizonPanelOpen(false)
+    setHorizonExportMessage('')
+    setTerrainSection(null)
+    setTerrainSectionStatus('idle')
+    setTerrainSectionOpen(false)
+  }
+
   async function selectPosition(nextPosition, options = {}) {
     const { resetCandidate = true } = options
     if (resetCandidate) resetCandidateInputs()
@@ -285,7 +524,7 @@ export default function App() {
     setTerrainSectionStatus('idle')
     setTerrainSectionOpen(false)
     setElevation({ status: 'loading', value: null, source: '', message: '' })
-    loadPlaceInfo(nextPosition)
+    schedulePlaceInfo(nextPosition)
     loadNearestSnow(nextPosition)
 
     try {
@@ -500,7 +739,11 @@ export default function App() {
         setElevation({ status: 'success', value: station.elevation, source: 'NEDO MONSOLA-11 PDF', message: '' })
       }
     } catch (error) {
-      setSnowData({ status: 'error', station: null, message: error.message })
+      setSnowData({
+        status: 'error',
+        station: null,
+        message: isDynamicChunkLoadError(error) ? dynamicChunkRefreshMessage() : error.message,
+      })
     } finally {
       setPdfProgress('')
     }
@@ -526,10 +769,13 @@ export default function App() {
         setElevation({ status: 'success', value: station.elevation, source: 'NEDO MONSOLA-11 Web', message: '' })
       }
     } catch (error) {
+      const message = isDynamicChunkLoadError(error)
+        ? dynamicChunkRefreshMessage()
+        : `${error.message} RUN_APP.cmdで起動している場合はローカル中継で取得できます。`
       setSnowData({
         status: 'error',
         station: null,
-        message: `${error.message} RUN_APP.cmdで起動している場合はローカル中継で取得できます。`,
+        message,
       })
     } finally {
       setPdfProgress('')
@@ -557,7 +803,11 @@ export default function App() {
           : '隣接メッシュを取得できませんでした。NEDOページのリンクから手動確認してください。',
       })
     } catch (error) {
-      setAdjacentMeshCompare({ status: 'error', stations: [], message: error.message || '隣接メッシュ比較に失敗しました。' })
+      setAdjacentMeshCompare({
+        status: 'error',
+        stations: [],
+        message: isDynamicChunkLoadError(error) ? dynamicChunkRefreshMessage() : error.message || '隣接メッシュ比較に失敗しました。',
+      })
     }
   }
 
@@ -565,9 +815,16 @@ export default function App() {
     const file = event.target.files?.[0]
     event.target.value = ''
     if (!file) return
+    setDrawingPanelOpen(true)
     setDrawingConvertStatus({ status: 'loading', message: 'PDF図面を読み込んでいます…' })
     setDrawingJob(null)
     setDrawingSelectedPages([])
+    setActiveDrawingPageNumber(null)
+    setPdfPreviewView({ zoom: 1, x: 0, y: 0, panMode: false, drag: null })
+    setDrawingPageRotations({})
+    setDrawingRotatedPreviews({})
+    setDrawingMergeFiles([])
+    setDrawingImageTool(initialDrawingImageTool)
     try {
       const { preparePdfJpgPreview } = await import('./services/pdfToJpg.js')
       const job = await preparePdfJpgPreview(file, (message) => {
@@ -575,9 +832,119 @@ export default function App() {
       })
       setDrawingJob(job)
       setDrawingSelectedPages(job.pages.map((page) => page.pageNumber))
+      setActiveDrawingPageNumber(job.pages[0]?.pageNumber || null)
+      setPdfPreviewView({ zoom: 1, x: 0, y: 0, panMode: false, drag: null })
+      setDrawingPageRotations(Object.fromEntries(job.pages.map((page) => [page.pageNumber, 0])))
+      setDrawingRotatedPreviews({})
+      setDrawingTextTool(initialDrawingTextTool)
+      setDrawingImageTool(initialDrawingImageTool)
       setDrawingConvertStatus({ status: 'success', message: `${job.pageCount}ページを読み込みました。保存するページを選択してください。` })
     } catch (error) {
-      setDrawingConvertStatus({ status: 'error', message: error.message || 'PDFをJPGに変換できませんでした。' })
+      setDrawingConvertStatus({
+        status: 'error',
+        message: isDynamicChunkLoadError(error) ? dynamicChunkRefreshMessage() : error.message || 'PDFをJPGに変換できませんでした。',
+      })
+    }
+  }
+
+  async function handleMergePdfFiles(event) {
+    const files = Array.from(event.target.files || [])
+    event.target.value = ''
+    if (files.length < 2) {
+      setDrawingPanelOpen(true)
+      setDrawingConvertStatus({ status: 'error', message: 'まとめるPDFを2つ以上選択してください。' })
+      return
+    }
+    setDrawingPanelOpen(true)
+    setDrawingMergeFiles(files)
+    setDrawingTextTool(initialDrawingTextTool)
+    setDrawingImageTool(initialDrawingImageTool)
+    if (!drawingMergePreview) {
+      setDrawingJob(null)
+      setDrawingSelectedPages([])
+      setActiveDrawingPageNumber(null)
+      setPdfPreviewView({ zoom: 1, x: 0, y: 0, panMode: false, drag: null })
+      setDrawingPageRotations({})
+      setDrawingRotatedPreviews({})
+      setDrawingConvertStatus({ status: 'success', message: `${files.length}ファイルを選択しました。「PDFまとめ保存」を押すと全ページを保存します。` })
+      return
+    }
+    setDrawingConvertStatus({ status: 'loading', message: 'PDFまとめ用のプレビューを作成しています…' })
+    try {
+      const { preparePdfJpgPreview } = await import('./services/pdfToJpg.js')
+      const previewJobs = []
+      for (let fileIndex = 0; fileIndex < files.length; fileIndex += 1) {
+        const file = files[fileIndex]
+        const job = await preparePdfJpgPreview(file, (message) => {
+          setDrawingConvertStatus({ status: 'loading', message: `${fileIndex + 1}/${files.length}ファイル目：${message}` })
+        }, { previewScale: 0.55 })
+        previewJobs.push(job)
+      }
+      let pageNumber = 0
+      const pages = previewJobs.flatMap((job, fileIndex) => job.pages.map((page) => {
+        pageNumber += 1
+        return {
+          ...page,
+          pageNumber,
+          sourcePageNumber: page.pageNumber,
+          sourceFileIndex: fileIndex,
+          sourceName: job.baseName,
+          file: files[fileIndex],
+        }
+      }))
+      const baseName = files.length === 2
+        ? `${previewJobs[0].baseName}_${previewJobs[1].baseName}_まとめ`
+        : `PDFまとめ_${files.length}件`
+      setDrawingJob({ mode: 'multi', file: null, files, baseName, pageCount: pages.length, pages })
+      setDrawingSelectedPages(pages.map((page) => page.pageNumber))
+      setActiveDrawingPageNumber(pages[0]?.pageNumber || null)
+      setPdfPreviewView({ zoom: 1, x: 0, y: 0, panMode: false, drag: null })
+      setDrawingPageRotations(Object.fromEntries(pages.map((page) => [page.pageNumber, 0])))
+      setDrawingRotatedPreviews({})
+      setDrawingConvertStatus({ status: 'success', message: `${files.length}ファイル / ${pages.length}ページを読み込みました。必要なページだけ選んで保存できます。` })
+    } catch (error) {
+      setDrawingConvertStatus({
+        status: 'error',
+        message: isDynamicChunkLoadError(error) ? dynamicChunkRefreshMessage() : error.message || 'PDFまとめ用のプレビューを作成できませんでした。',
+      })
+    }
+  }
+
+  async function saveMergedDrawingPdfs() {
+    if (drawingMergeFiles.length < 2) {
+      setDrawingConvertStatus({ status: 'error', message: 'まとめるPDFを2つ以上選択してください。' })
+      return
+    }
+    let fileHandle = null
+    try {
+      if (window.showSaveFilePicker) {
+        fileHandle = await window.showSaveFilePicker({
+          suggestedName: `PDFまとめ_${new Date().toISOString().slice(0, 10).replaceAll('-', '')}.pdf`,
+          types: [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }],
+        })
+      }
+    } catch (error) {
+      if (error?.name === 'AbortError') {
+        setDrawingConvertStatus({ status: 'idle', message: 'PDFまとめをキャンセルしました。' })
+        return
+      }
+      setDrawingConvertStatus({ status: 'error', message: error.message || '保存先の選択に失敗しました。' })
+      return
+    }
+
+    setDrawingConvertStatus({ status: 'loading', message: 'PDFをまとめています…' })
+    try {
+      const { saveMergedPdfFilesAsPdf } = await import('./services/pdfToJpg.js')
+      const result = await saveMergedPdfFilesAsPdf(drawingMergeFiles, (message) => {
+        setDrawingConvertStatus({ status: 'loading', message })
+      }, { fileHandle, fileNameBase: 'PDFまとめ' })
+      setDrawingConvertStatus({ status: 'success', message: `${result.fileCount}ファイル / ${result.pageCount}ページを1つのPDFにまとめました。` })
+      setDrawingMergeFiles([])
+    } catch (error) {
+      setDrawingConvertStatus({
+        status: 'error',
+        message: isDynamicChunkLoadError(error) ? dynamicChunkRefreshMessage() : error.message || 'PDFまとめに失敗しました。',
+      })
     }
   }
 
@@ -591,6 +958,608 @@ export default function App() {
     setDrawingSelectedPages((current) => current.includes(pageNumber)
       ? current.filter((value) => value !== pageNumber)
       : [...current, pageNumber].sort((a, b) => a - b))
+  }
+
+  function rotateDrawingPage(pageNumber, delta) {
+    setDrawingPageRotations((current) => {
+      const next = ((current[pageNumber] || 0) + delta + 360) % 360
+      return { ...current, [pageNumber]: next }
+    })
+    const hadTextAnnotations = Boolean(drawingTextTool.annotations[pageNumber]?.length)
+    const hadImageAnnotations = Boolean(drawingImageTool.annotations[pageNumber]?.length)
+    if (hadTextAnnotations) {
+      setDrawingTextTool((current) => ({
+        ...current,
+        selected: current.selected?.pageNumber === pageNumber ? null : current.selected,
+        editDrag: current.editDrag?.pageNumber === pageNumber ? null : current.editDrag,
+        annotations: {
+          ...current.annotations,
+          [pageNumber]: [],
+        },
+      }))
+    }
+    if (hadImageAnnotations) {
+      setDrawingImageTool((current) => ({
+        ...current,
+        selected: current.selected?.pageNumber === pageNumber ? null : current.selected,
+        editDrag: current.editDrag?.pageNumber === pageNumber ? null : current.editDrag,
+        annotations: {
+          ...current.annotations,
+          [pageNumber]: [],
+        },
+      }))
+    }
+    if (hadTextAnnotations || hadImageAnnotations) {
+      setDrawingConvertStatus({
+        status: 'idle',
+        message: 'ページ向きを変更したため、このページの注記・貼り付け画像をクリアしました。向きを決めてから再配置してください。',
+      })
+    }
+  }
+
+  function textImageRectForPage(page, containerRect, rotation = 0, view = null) {
+    const normalizedRotation = ((Number(rotation) % 360) + 360) % 360
+    const swapped = normalizedRotation === 90 || normalizedRotation === 270
+    const visualWidth = swapped ? page.height : page.width
+    const visualHeight = swapped ? page.width : page.height
+    const scale = Math.min(containerRect.width / visualWidth, containerRect.height / visualHeight)
+    const zoom = view?.zoom || 1
+    const baseWidth = visualWidth * scale
+    const baseHeight = visualHeight * scale
+    const width = baseWidth * zoom
+    const height = baseHeight * zoom
+    return {
+      left: (containerRect.width - baseWidth) / 2 + (view?.x || 0) - ((width - baseWidth) / 2),
+      top: (containerRect.height - baseHeight) / 2 + (view?.y || 0) - ((height - baseHeight) / 2),
+      width,
+      height,
+    }
+  }
+
+  function activePreviewRectForPage(page) {
+    if (!activePdfPreviewSize.width || !activePdfPreviewSize.height) return null
+    const activePageNumber = activeDrawingPageNumber || drawingJob?.pages?.[0]?.pageNumber || page.pageNumber
+    return textImageRectForPage(
+      page,
+      activePdfPreviewSize,
+      drawingPageRotations[page.pageNumber] || 0,
+      page.pageNumber === activePageNumber ? pdfPreviewView : null,
+    )
+  }
+
+  function activePreviewPointStyle(page, point) {
+    const rect = activePreviewRectForPage(page)
+    if (!rect) {
+      return {
+        left: `${(point.x || 0) * 100}%`,
+        top: `${(point.y || 0) * 100}%`,
+      }
+    }
+    return {
+      left: `${rect.left + (point.x || 0) * rect.width}px`,
+      top: `${rect.top + (point.y || 0) * rect.height}px`,
+    }
+  }
+
+  function activePreviewBoxStyle(page, box) {
+    const rect = activePreviewRectForPage(page)
+    if (!rect) {
+      return {
+        left: `${(box.x || 0) * 100}%`,
+        top: `${(box.y || 0) * 100}%`,
+        width: `${(box.width || 0) * 100}%`,
+        height: `${(box.height || 0) * 100}%`,
+      }
+    }
+    return {
+      left: `${rect.left + (box.x || 0) * rect.width}px`,
+      top: `${rect.top + (box.y || 0) * rect.height}px`,
+      width: `${(box.width || 0) * rect.width}px`,
+      height: `${(box.height || 0) * rect.height}px`,
+    }
+  }
+
+  function activePreviewImageStyle(page) {
+    const rect = activePreviewRectForPage(page)
+    if (!rect) {
+      return {
+        left: '50%',
+        top: '50%',
+        width: 'auto',
+        height: 'auto',
+        maxWidth: '100%',
+        maxHeight: '100%',
+        transform: 'translate(-50%, -50%)',
+      }
+    }
+    return {
+      left: `${rect.left}px`,
+      top: `${rect.top}px`,
+      width: `${rect.width}px`,
+      height: `${rect.height}px`,
+      transform: 'none',
+    }
+  }
+
+  function previewUrlForPage(page) {
+    const rotation = normalizedPageRotation(page.pageNumber)
+    if (!rotation) return page.previewUrl
+    return drawingRotatedPreviews[`${page.pageNumber}:${rotation}`] || page.previewUrl
+  }
+
+  function isRotatedPreviewReady(page) {
+    const rotation = normalizedPageRotation(page.pageNumber)
+    return !rotation || Boolean(drawingRotatedPreviews[`${page.pageNumber}:${rotation}`])
+  }
+
+  function warnRotatedPreviewPreparing() {
+    setDrawingConvertStatus({
+      status: 'idle',
+      message: '回転後のプレビューを作成中です。表示が安定してから文字・画像を配置してください。',
+    })
+  }
+
+  function pointFromClientInPage(page, clientX, clientY, container) {
+    const rect = container.getBoundingClientRect()
+    const rotation = drawingPageRotations[page.pageNumber] || 0
+    const activePageNumber = activeDrawingPageNumber || drawingJob?.pages?.[0]?.pageNumber || page.pageNumber
+    const view = page.pageNumber === activePageNumber ? pdfPreviewView : null
+    const imageRect = textImageRectForPage(page, rect, rotation, view)
+    const x = (clientX - rect.left - imageRect.left) / imageRect.width
+    const y = (clientY - rect.top - imageRect.top) / imageRect.height
+    return {
+      x: Math.max(0, Math.min(1, x)),
+      y: Math.max(0, Math.min(1, y)),
+    }
+  }
+
+  function setDrawingTextPosition(page, event) {
+    event.preventDefault()
+    event.stopPropagation()
+    const pageNumber = page.pageNumber
+    if (!isRotatedPreviewReady(page)) {
+      warnRotatedPreviewPreparing()
+      return
+    }
+    if (!drawingTextTool.text.trim()) {
+      setDrawingConvertStatus({ status: 'idle', message: '先に挿入するテキストを入力してください。' })
+      return
+    }
+    const point = pointFromClientInPage(page, event.clientX, event.clientY, event.currentTarget)
+    const annotation = {
+      id: `${Date.now()}-${Math.round(Math.random() * 100000)}`,
+      text: drawingTextTool.text.trim(),
+      x: point.x,
+      y: point.y,
+      size: drawingTextTool.size,
+    }
+    setDrawingTextTool((current) => ({
+      ...current,
+      selected: { pageNumber, id: annotation.id },
+      editDrag: null,
+      annotations: {
+        ...current.annotations,
+        [pageNumber]: [annotation],
+      },
+    }))
+    setDrawingImageTool((current) => ({ ...current, selected: null, editDrag: null }))
+    setDrawingConvertStatus({ status: 'success', message: `${pageNumber}ページに「${annotation.text.slice(0, 12)}」を追加しました。PDF保存時に反映されます。` })
+  }
+
+  function startDrawingTextMove(page, annotation, event) {
+    event.preventDefault()
+    event.stopPropagation()
+    const point = pagePointFromEvent(page, event)
+    setDrawingTextTool((current) => ({
+      ...current,
+      selected: { pageNumber: page.pageNumber, id: annotation.id },
+      editDrag: {
+        pageNumber: page.pageNumber,
+        id: annotation.id,
+        offsetX: point.x - annotation.x,
+        offsetY: point.y - annotation.y,
+      },
+    }))
+    setDrawingImageTool((current) => ({ ...current, selected: null, editDrag: null }))
+  }
+
+  function pagePointFromEvent(page, event) {
+    const container = event.currentTarget.closest?.('.pdf-active-page__preview') || event.currentTarget
+    return pointFromClientInPage(page, event.clientX, event.clientY, container)
+  }
+
+  function normalizedPageRotation(pageNumber) {
+    const value = Number(drawingPageRotations[pageNumber] || 0) % 360
+    return ((value + 360) % 360)
+  }
+
+  function visualPageAspect(page) {
+    const rotation = normalizedPageRotation(page.pageNumber)
+    const width = Number(page.width) || 1
+    const height = Number(page.height) || 1
+    return rotation === 90 || rotation === 270 ? height / width : width / height
+  }
+
+  function fitNormalizedBoxToAspect(page, box, imageAspectRatio) {
+    const aspectRatio = Number.isFinite(imageAspectRatio) && imageAspectRatio > 0 ? imageAspectRatio : 1
+    const pageAspect = visualPageAspect(page)
+    let width = Math.max(0.02, Math.min(1, box.width))
+    let height = width * pageAspect / aspectRatio
+    if (height > box.height) {
+      height = Math.max(0.02, Math.min(1, box.height))
+      width = height * aspectRatio / pageAspect
+    }
+    width = Math.max(0.02, Math.min(1, width))
+    height = Math.max(0.02, Math.min(1, height))
+    return {
+      x: Math.max(0, Math.min(1 - width, box.x + (box.width - width) / 2)),
+      y: Math.max(0, Math.min(1 - height, box.y + (box.height - height) / 2)),
+      width,
+      height,
+    }
+  }
+
+  function readImageAspectRatio(src) {
+    return new Promise((resolve, reject) => {
+      const image = new Image()
+      image.onload = () => {
+        const width = image.naturalWidth || image.width
+        const height = image.naturalHeight || image.height
+        resolve(width && height ? width / height : 1)
+      }
+      image.onerror = () => reject(new Error('画像サイズを確認できませんでした。'))
+      image.src = src
+    })
+  }
+
+  async function loadClipboardImageForPdf() {
+    if (!navigator.clipboard?.read) {
+      setDrawingConvertStatus({ status: 'error', message: 'このブラウザではクリップボード画像の読込に対応していません。' })
+      return
+    }
+    try {
+      const items = await navigator.clipboard.read()
+      for (const item of items) {
+        const type = item.types.find((value) => value.startsWith('image/'))
+        if (!type) continue
+        const blob = await item.getType(type)
+        const dataUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve(reader.result)
+          reader.onerror = () => reject(new Error('画像を読み込めませんでした。'))
+          reader.readAsDataURL(blob)
+        })
+        const aspectRatio = await readImageAspectRatio(dataUrl)
+        setDrawingImageTool((current) => ({ ...current, src: dataUrl, name: 'クリップボード画像', aspectRatio }))
+        setDrawingConvertStatus({ status: 'success', message: 'クリップボード画像を読み込みました。PDFプレビュー上で貼り付け範囲をドラッグしてください。' })
+        return
+      }
+      setDrawingConvertStatus({ status: 'error', message: 'クリップボード内に画像が見つかりませんでした。' })
+    } catch (error) {
+      setDrawingConvertStatus({ status: 'error', message: error?.name === 'NotAllowedError' ? 'ブラウザでクリップボード読込が許可されませんでした。' : error.message || 'クリップボード画像を読み込めませんでした。' })
+    }
+  }
+
+  function beginDrawingImageArea(page, event) {
+    if (pdfPreviewView.panMode) {
+      event.preventDefault()
+      event.stopPropagation()
+      setPdfPreviewView((current) => ({
+        ...current,
+        drag: {
+          startClientX: event.clientX,
+          startClientY: event.clientY,
+          startX: current.x,
+          startY: current.y,
+        },
+      }))
+      return
+    }
+    if (!drawingImageTool.src) return
+    event.preventDefault()
+    event.stopPropagation()
+    if (!isRotatedPreviewReady(page)) {
+      warnRotatedPreviewPreparing()
+      return
+    }
+    const point = pagePointFromEvent(page, event)
+    setDrawingImageTool((current) => ({
+      ...current,
+      drag: { pageNumber: page.pageNumber, startX: point.x, startY: point.y, currentX: point.x, currentY: point.y },
+    }))
+  }
+
+  function updateDrawingImageArea(page, event) {
+    if (pdfPreviewView.drag) {
+      setPdfPreviewView((current) => current.drag
+        ? {
+            ...current,
+            x: current.drag.startX + event.clientX - current.drag.startClientX,
+            y: current.drag.startY + event.clientY - current.drag.startClientY,
+          }
+        : current)
+      return
+    }
+    if (drawingTextTool.editDrag?.pageNumber === page.pageNumber) {
+      const point = pagePointFromEvent(page, event)
+      const edit = drawingTextTool.editDrag
+      setDrawingTextTool((current) => ({
+        ...current,
+        annotations: {
+          ...current.annotations,
+          [page.pageNumber]: (current.annotations[page.pageNumber] || []).map((annotation) => annotation.id === edit.id
+            ? {
+                ...annotation,
+                x: Math.max(0, Math.min(1, point.x - edit.offsetX)),
+                y: Math.max(0, Math.min(1, point.y - edit.offsetY)),
+              }
+            : annotation),
+        },
+      }))
+      return
+    }
+    if (drawingImageTool.editDrag?.pageNumber === page.pageNumber) {
+      const point = pagePointFromEvent(page, event)
+      const edit = drawingImageTool.editDrag
+      setDrawingImageTool((current) => ({
+        ...current,
+        annotations: {
+          ...current.annotations,
+          [page.pageNumber]: (current.annotations[page.pageNumber] || []).map((annotation) => {
+            if (annotation.id !== edit.id) return annotation
+            const width = annotation.width || 0.1
+            const height = annotation.height || 0.1
+            return {
+              ...annotation,
+              x: Math.max(0, Math.min(1 - width, point.x - edit.offsetX)),
+              y: Math.max(0, Math.min(1 - height, point.y - edit.offsetY)),
+            }
+          }),
+        },
+      }))
+      return
+    }
+    if (!drawingImageTool.drag || drawingImageTool.drag.pageNumber !== page.pageNumber) return
+    const point = pagePointFromEvent(page, event)
+    setDrawingImageTool((current) => ({
+      ...current,
+      drag: current.drag ? { ...current.drag, currentX: point.x, currentY: point.y } : null,
+    }))
+  }
+
+  function finishDrawingImageArea(page, event) {
+    if (pdfPreviewView.drag) {
+      event.preventDefault()
+      event.stopPropagation()
+      setPdfPreviewView((current) => ({ ...current, drag: null }))
+      return
+    }
+    if (drawingTextTool.editDrag?.pageNumber === page.pageNumber) {
+      event.preventDefault()
+      event.stopPropagation()
+      setDrawingTextTool((current) => ({ ...current, editDrag: null }))
+      return
+    }
+    if (drawingImageTool.editDrag?.pageNumber === page.pageNumber) {
+      event.preventDefault()
+      event.stopPropagation()
+      setDrawingImageTool((current) => ({ ...current, editDrag: null }))
+      return
+    }
+    if (!drawingImageTool.drag || drawingImageTool.drag.pageNumber !== page.pageNumber) return
+    event.preventDefault()
+    event.stopPropagation()
+    const point = pagePointFromEvent(page, event)
+    const drag = { ...drawingImageTool.drag, currentX: point.x, currentY: point.y }
+    const x = Math.min(drag.startX, drag.currentX)
+    const y = Math.min(drag.startY, drag.currentY)
+    const width = Math.abs(drag.currentX - drag.startX)
+    const height = Math.abs(drag.currentY - drag.startY)
+    if (width < 0.02 || height < 0.02) {
+      setDrawingImageTool((current) => ({ ...current, drag: null }))
+      setDrawingConvertStatus({ status: 'idle', message: '貼り付け範囲が小さすぎます。画像を入れる範囲をドラッグしてください。' })
+      return
+    }
+    const fitted = fitNormalizedBoxToAspect(page, { x, y, width, height }, drawingImageTool.aspectRatio || 1)
+    const annotation = {
+      id: `${Date.now()}-${Math.round(Math.random() * 100000)}`,
+      src: drawingImageTool.src,
+      x: fitted.x,
+      y: fitted.y,
+      width: fitted.width,
+      height: fitted.height,
+      aspectRatio: drawingImageTool.aspectRatio || null,
+      rotation: 0,
+    }
+    setDrawingImageTool((current) => ({
+      ...current,
+      drag: null,
+      selected: { pageNumber: page.pageNumber, id: annotation.id },
+      annotations: {
+        ...current.annotations,
+        [page.pageNumber]: [...(current.annotations[page.pageNumber] || []), annotation],
+      },
+    }))
+    setDrawingTextTool((current) => ({ ...current, selected: null, editDrag: null }))
+    setDrawingConvertStatus({ status: 'success', message: `${page.pageNumber}ページに画像を配置しました。PDF保存時に反映されます。` })
+  }
+
+  function startDrawingImageMove(page, annotation, event) {
+    event.preventDefault()
+    event.stopPropagation()
+    const point = pagePointFromEvent(page, event)
+    setDrawingImageTool((current) => ({
+      ...current,
+      selected: { pageNumber: page.pageNumber, id: annotation.id },
+      editDrag: {
+        pageNumber: page.pageNumber,
+        id: annotation.id,
+        offsetX: point.x - annotation.x,
+        offsetY: point.y - annotation.y,
+      },
+    }))
+    setDrawingTextTool((current) => ({ ...current, selected: null, editDrag: null }))
+  }
+
+  function updateSelectedTextAnnotation(updater) {
+    const selected = drawingTextTool.selected
+    if (!selected) {
+      setDrawingConvertStatus({ status: 'idle', message: '先に編集する文字を選択してください。' })
+      return
+    }
+    setDrawingTextTool((current) => ({
+      ...current,
+      annotations: {
+        ...current.annotations,
+        [selected.pageNumber]: (current.annotations[selected.pageNumber] || [])
+          .map((annotation) => annotation.id === selected.id ? updater(annotation) : annotation)
+          .filter(Boolean),
+      },
+    }))
+  }
+
+  function scaleSelectedText(factor) {
+    updateSelectedTextAnnotation((annotation) => {
+      const nextSize = Math.round(Math.max(12, Math.min(96, (annotation.size || drawingTextTool.size || 28) * factor)))
+      return { ...annotation, size: nextSize }
+    })
+  }
+
+  function updateSelectedImageAnnotation(updater) {
+    const selected = drawingImageTool.selected
+    if (!selected) {
+      setDrawingConvertStatus({ status: 'idle', message: '先に編集する画像を選択してください。' })
+      return
+    }
+    setDrawingImageTool((current) => ({
+      ...current,
+      annotations: {
+        ...current.annotations,
+        [selected.pageNumber]: (current.annotations[selected.pageNumber] || [])
+          .map((annotation) => annotation.id === selected.id ? updater(annotation) : annotation)
+          .filter(Boolean),
+      },
+    }))
+  }
+
+  function rotateSelectedImage(delta) {
+    updateSelectedImageAnnotation((annotation) => ({
+      ...annotation,
+      rotation: (((annotation.rotation || 0) + delta) % 360 + 360) % 360,
+    }))
+  }
+
+  function scaleSelectedImage(factor) {
+    updateSelectedImageAnnotation((annotation) => {
+      const page = drawingJob?.pages?.find((item) => item.pageNumber === drawingImageTool.selected?.pageNumber)
+      const aspectRatio = annotation.aspectRatio || drawingImageTool.aspectRatio
+      let width = Math.max(0.03, Math.min(1, (annotation.width || 0.1) * factor))
+      let height = Math.max(0.03, Math.min(1, (annotation.height || 0.1) * factor))
+      if (page && Number.isFinite(aspectRatio) && aspectRatio > 0) {
+        height = width * visualPageAspect(page) / aspectRatio
+        if (height > 1) {
+          height = 1
+          width = height * aspectRatio / visualPageAspect(page)
+        }
+      }
+      width = Math.max(0.03, Math.min(1, width))
+      height = Math.max(0.03, Math.min(1, height))
+      return {
+        ...annotation,
+        width,
+        height,
+        x: Math.max(0, Math.min(1 - width, annotation.x || 0)),
+        y: Math.max(0, Math.min(1 - height, annotation.y || 0)),
+      }
+    })
+  }
+
+  function changeDrawingTextSize(size) {
+    setDrawingTextTool((current) => {
+      const selected = current.selected
+      const next = { ...current, size }
+      if (!selected) return next
+      return {
+        ...next,
+        annotations: {
+          ...current.annotations,
+          [selected.pageNumber]: (current.annotations[selected.pageNumber] || []).map((annotation) => annotation.id === selected.id
+            ? { ...annotation, size }
+            : annotation),
+        },
+      }
+    })
+  }
+
+  function deleteSelectedImage() {
+    const selected = drawingImageTool.selected
+    if (!selected) return
+    setDrawingImageTool((current) => ({
+      ...current,
+      selected: null,
+      editDrag: null,
+      annotations: {
+        ...current.annotations,
+        [selected.pageNumber]: (current.annotations[selected.pageNumber] || []).filter((annotation) => annotation.id !== selected.id),
+      },
+    }))
+  }
+
+  function deleteSelectedText() {
+    const selected = drawingTextTool.selected
+    if (!selected) return
+    setDrawingTextTool((current) => ({
+      ...current,
+      selected: null,
+      editDrag: null,
+      annotations: {
+        ...current.annotations,
+        [selected.pageNumber]: (current.annotations[selected.pageNumber] || []).filter((annotation) => annotation.id !== selected.id),
+      },
+    }))
+  }
+
+  async function handleImageFilesToPdf(event) {
+    const files = Array.from(event.target.files || [])
+    event.target.value = ''
+    if (!files.length) return
+    let fileHandle = null
+    try {
+      if (window.showSaveFilePicker) {
+        fileHandle = await window.showSaveFilePicker({
+          suggestedName: `画像PDF_${new Date().toISOString().slice(0, 10).replaceAll('-', '')}.pdf`,
+          types: [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }],
+        })
+      }
+    } catch (error) {
+      if (error?.name === 'AbortError') {
+        setDrawingConvertStatus({ status: 'idle', message: '画像PDF作成をキャンセルしました。' })
+        return
+      }
+      setDrawingConvertStatus({ status: 'error', message: error.message || '保存先の選択に失敗しました。' })
+      return
+    }
+    setDrawingConvertStatus({ status: 'loading', message: '画像からPDFを作成しています…' })
+    try {
+      const { saveImageFilesAsPdf } = await import('./services/pdfToJpg.js')
+      const count = await saveImageFilesAsPdf(files, (message) => {
+        setDrawingConvertStatus({ status: 'loading', message })
+      }, { fileHandle, fileNameBase: '画像PDF' })
+      setDrawingConvertStatus({ status: 'success', message: `${count}枚の画像をPDFに変換しました。` })
+    } catch (error) {
+      setDrawingConvertStatus({ status: 'error', message: isDynamicChunkLoadError(error) ? dynamicChunkRefreshMessage() : error.message || '画像PDF作成に失敗しました。' })
+    }
+  }
+
+  function changePdfPreviewZoom(delta) {
+    setPdfPreviewView((current) => ({
+      ...current,
+      zoom: Math.max(0.6, Math.min(4, Number((current.zoom + delta).toFixed(2)))),
+    }))
+  }
+
+  function resetPdfPreviewView() {
+    setPdfPreviewView({ zoom: 1, x: 0, y: 0, panMode: false, drag: null })
   }
 
   function sanitizeSuggestedFileName(name, fallback = 'output') {
@@ -662,6 +1631,72 @@ export default function App() {
       setDrawingConvertStatus({ status: 'success', message: `${count}ページをJPGとして保存しました。${chooseLocation ? '保存先を指定しました。' : ''}` })
     } catch (error) {
       setDrawingConvertStatus({ status: 'error', message: error.message || 'JPG保存に失敗しました。' })
+    }
+  }
+
+  async function saveSelectedDrawingPagesAsPdf({ chooseLocation = false } = {}) {
+    if (!drawingJob || !drawingSelectedPages.length) return
+    let fileHandle = null
+    let fileNameBase = drawingJob.baseName
+    if (chooseLocation) {
+      try {
+        if (window.showSaveFilePicker) {
+          fileHandle = await window.showSaveFilePicker({
+            suggestedName: `${drawingJob.baseName}_selected.pdf`,
+            types: [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }],
+          })
+          fileNameBase = drawingJob.baseName
+        } else {
+          setDrawingConvertStatus({ status: 'error', message: 'このブラウザでは保存先選択に対応していません。通常保存を使用してください。' })
+          return
+        }
+      } catch (error) {
+        if (error?.name === 'AbortError') {
+          setDrawingConvertStatus({ status: 'idle', message: '保存をキャンセルしました。' })
+          return
+        }
+        setDrawingConvertStatus({ status: 'error', message: error.message || '保存先の選択に失敗しました。' })
+        return
+      }
+    }
+    setDrawingConvertStatus({ status: 'loading', message: '選択ページを1つのPDFとして保存しています…' })
+    try {
+      const { savePdfPagesAsPdf, savePreparedPdfPagesAsPdf } = await import('./services/pdfToJpg.js')
+      const overlayOptions = {
+        textOverlay: Object.values(drawingTextTool.annotations).some((items) => items?.length)
+          ? {
+              annotations: drawingTextTool.annotations,
+            }
+          : null,
+        imageOverlay: Object.values(drawingImageTool.annotations).some((items) => items?.length)
+          ? {
+              annotations: drawingImageTool.annotations,
+            }
+          : null,
+      }
+      const count = drawingJob.mode === 'multi'
+        ? await savePreparedPdfPagesAsPdf(
+            drawingJob.pages.filter((page) => drawingSelectedPages.includes(page.pageNumber)),
+            drawingPageRotations,
+            (message) => {
+              setDrawingConvertStatus({ status: 'loading', message })
+            },
+            {
+              fileHandle,
+              fileNameBase,
+              ...overlayOptions,
+            },
+          )
+        : await savePdfPagesAsPdf(drawingJob.file, drawingSelectedPages, drawingPageRotations, (message) => {
+        setDrawingConvertStatus({ status: 'loading', message })
+      }, {
+        fileHandle,
+        fileNameBase,
+        ...overlayOptions,
+      })
+      setDrawingConvertStatus({ status: 'success', message: `${count}ページを1つのPDFとして保存しました。${chooseLocation ? '保存先を指定しました。' : ''}` })
+    } catch (error) {
+      setDrawingConvertStatus({ status: 'error', message: error.message || 'PDF保存に失敗しました。' })
     }
   }
 
@@ -991,6 +2026,56 @@ export default function App() {
   const snowStation = snowData.station
   const snowIsConfirmed = isConfirmedSnowStation(snowStation)
   const canChooseSaveLocation = typeof window !== 'undefined' && ('showSaveFilePicker' in window || 'showDirectoryPicker' in window)
+  const activeDrawingPage = useMemo(() => {
+    if (!drawingJob?.pages?.length) return null
+    return drawingJob.pages.find((page) => page.pageNumber === activeDrawingPageNumber) || drawingJob.pages[0]
+  }, [drawingJob, activeDrawingPageNumber])
+
+  useEffect(() => {
+    const element = activePdfPreviewRef.current
+    if (!element) return undefined
+    const update = () => {
+      const rect = element.getBoundingClientRect()
+      setActivePdfPreviewSize({
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+      })
+    }
+    update()
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', update)
+      return () => window.removeEventListener('resize', update)
+    }
+    const observer = new ResizeObserver(update)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [activeDrawingPage?.pageNumber, activePage])
+
+  useEffect(() => {
+    if (!drawingJob?.pages?.length) return undefined
+    let cancelled = false
+    drawingJob.pages.forEach((page) => {
+      const rotation = ((Number(drawingPageRotations[page.pageNumber] || 0) % 360) + 360) % 360
+      if (!rotation) return
+      const key = `${page.pageNumber}:${rotation}`
+      if (drawingRotatedPreviews[key]) return
+      createRotatedPreviewUrl(page.previewUrl, rotation)
+        .then((url) => {
+          if (cancelled) return
+          setDrawingRotatedPreviews((current) => current[key] ? current : { ...current, [key]: url })
+        })
+        .catch(() => {
+          if (cancelled) return
+          setDrawingConvertStatus((current) => current.status === 'loading'
+            ? current
+            : { status: 'idle', message: '回転プレビューを作成できませんでした。表示がずれる場合はページを再読み込みしてください。' })
+        })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [drawingJob, drawingPageRotations, drawingRotatedPreviews])
+
   const parcelResults = useMemo(
     () => searchParcels(parcelData, parcelQuery),
     [parcelData, parcelQuery],
@@ -999,7 +2084,12 @@ export default function App() {
   function switchPage(nextPage) {
     setActivePage(nextPage)
     if (typeof window !== 'undefined') {
-      window.history.replaceState(null, '', nextPage === 'inheritance' ? '#inheritance-check' : '#site-select')
+      const hash = nextPage === 'inheritance'
+        ? '#inheritance-check'
+        : nextPage === 'pdf'
+          ? '#pdf-tools'
+          : '#site-select'
+      window.history.replaceState(null, '', hash)
       window.scrollTo({ top: 0, behavior: 'smooth' })
     }
   }
@@ -1008,7 +2098,9 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <div className="brand">
-          <div className="brand-mark" aria-hidden="true"><span>☀</span></div>
+          <button type="button" className="brand-mark" onClick={scrollToPageTop} aria-label="ページの先頭へ戻る">
+            <span aria-hidden="true">☀</span>
+          </button>
           <div>
             <div className="brand-name">Solar Site <strong>Precheck</strong></div>
             <div className="brand-subtitle">太陽光候補地・入力準備ツール</div>
@@ -1028,9 +2120,19 @@ export default function App() {
               className={activePage === 'inheritance' ? 'page-switcher__button page-switcher__button--active' : 'page-switcher__button'}
               onClick={() => switchPage('inheritance')}
             >
-              相続登記チェック
+              登記チェック
+            </button>
+            <button
+              type="button"
+              className={activePage === 'pdf' ? 'page-switcher__button page-switcher__button--active' : 'page-switcher__button'}
+              onClick={() => switchPage('pdf')}
+            >
+              PDFツール
             </button>
           </nav>
+          <button type="button" className="reset-work-button" onClick={resetWorkTools}>
+            初期化
+          </button>
           <div className="status-pill"><span></span>作業補助ツール</div>
         </div>
       </header>
@@ -1060,47 +2162,60 @@ export default function App() {
                 <strong>Solar Pro</strong>
                 <small>管理・DL</small>
               </a>
+              <a href="#solar-manual">
+                <span className="hero-service-links__icon">📘</span>
+                <strong>入力マニュアル</strong>
+                <small>手順を見る</small>
+              </a>
             </div>
           </div>
         </section>
 
-        <section className="utility-panel no-print">
+        <section className={`utility-panel no-print ${drawingPanelOpen ? 'utility-panel--open' : 'utility-panel--collapsed'}`}>
           <div>
-            <strong>補助ツール：図面PDF → JPG変換</strong>
-            <span>PDF図面をプレビューし、必要なページだけJPG保存します。ファイルはブラウザ内で処理されます。</span>
+            <div className="utility-title-with-help">
+              <strong>補助ツール：図面PDF→JPG</strong>
+              <ArrayLengthHelp />
+            </div>
+            <span>図面PDFをプレビューし、必要なページだけJPG保存します。PDF編集は上部の「PDFツール」で行えます。</span>
           </div>
-          <a className="utility-link-button utility-link-button--manual" href="#solar-manual">📘 Solar Pro入力マニュアル</a>
-          <label className="utility-button">
-            PDF図面を選択
-            <input type="file" accept="application/pdf,.pdf" onChange={handleDrawingPdfToJpg} />
-          </label>
-          {drawingConvertStatus.message && (
+          <button type="button" className="utility-button" onClick={() => setDrawingPanelOpen((open) => !open)}>
+            {drawingPanelOpen ? 'JPG変換を閉じる' : 'JPG変換を開く'}
+          </button>
+          {drawingPanelOpen && (
+            <label className="utility-button utility-button--compact">
+              PDF図面を選択
+              <input type="file" accept="application/pdf,.pdf" onChange={handleDrawingPdfToJpg} />
+            </label>
+          )}
+          {drawingPanelOpen && drawingConvertStatus.message && (
             <p className={`utility-message utility-message--${drawingConvertStatus.status}`}>
               {drawingConvertStatus.message}
             </p>
           )}
-          {drawingJob && (
+          {drawingPanelOpen && drawingJob && (
             <div className="drawing-converter">
               <div className="drawing-converter__toolbar">
                 <strong>{drawingJob.baseName}</strong>
                 <span>{drawingSelectedPages.length}/{drawingJob.pageCount}ページ選択中</span>
-                <button type="button" onClick={() => setDrawingSelectedPages(drawingJob.pages.map((page) => page.pageNumber))}>全選択</button>
+                <button type="button" onClick={() => setDrawingSelectedPages(drawingJob.pages.map((page) => page.pageNumber))}>選択</button>
                 <button type="button" onClick={() => setDrawingSelectedPages([])}>選択解除</button>
-                <button type="button" disabled={!drawingSelectedPages.length || drawingConvertStatus.status === 'loading'} onClick={() => saveSelectedDrawingPages()}>
-                  選択ページを保存
+                <button type="button" disabled={!drawingSelectedPages.length || drawingConvertStatus.status === 'loading'} onClick={() => saveSelectedDrawingPages({ chooseLocation: canChooseSaveLocation })}>
+                  JPG保存
                 </button>
-                {canChooseSaveLocation && (
-                  <button type="button" disabled={!drawingSelectedPages.length || drawingConvertStatus.status === 'loading'} onClick={() => saveSelectedDrawingPages({ chooseLocation: true })}>
-                    保存先・ファイル名を選んで保存
-                  </button>
-                )}
               </div>
               <div className="drawing-page-grid">
                 {drawingJob.pages.map((page) => (
                   <label className={`drawing-page-card ${drawingSelectedPages.includes(page.pageNumber) ? 'drawing-page-card--selected' : ''}`} key={page.pageNumber}>
                     <input type="checkbox" checked={drawingSelectedPages.includes(page.pageNumber)} onChange={() => toggleDrawingPage(page.pageNumber)} />
-                    <span>{page.pageNumber}ページ</span>
-                    <img src={page.previewUrl} alt={`${page.pageNumber}ページのプレビュー`} />
+                    <span>{page.pageNumber}ページ / 回転 {drawingPageRotations[page.pageNumber] || 0}°</span>
+                    <div className="drawing-page-card__preview">
+                      <img
+                        src={page.previewUrl}
+                        alt={`${page.pageNumber}ページのプレビュー`}
+                        style={{ transform: `rotate(${drawingPageRotations[page.pageNumber] || 0}deg)` }}
+                      />
+                    </div>
                   </label>
                 ))}
               </div>
@@ -1318,7 +2433,7 @@ export default function App() {
                 }} placeholder="未入力（必要に応じて手入力）" />
                 <small>
                   {position
-                    ? `現在の選択地点: ${selectedPlaceLabel || (placeInfo.status === 'loading' ? '確認中…' : '住所未取得')}`
+                    ? `現在の選択地点: ${selectedPlaceLabel || (placeInfo.status === 'loading' ? '確認中…' : '座標で確認')}`
                     : '地点を選択すると周辺住所を表示します。'}
                 </small>
               </label>
@@ -1487,7 +2602,7 @@ export default function App() {
                       <dl className="mesh-place-pair">
                         <div>
                           <dt>選択地点住所</dt>
-                          <dd>{selectedPlaceLabel || (placeInfo.status === 'loading' ? '確認中…' : '未取得')}</dd>
+                          <dd>{selectedPlaceLabel || (placeInfo.status === 'loading' ? '確認中…' : '座標・3次メッシュで確認')}</dd>
                         </div>
                         <div>
                           <dt>NEDO地点名</dt>
@@ -1940,6 +3055,271 @@ export default function App() {
           </>
         )}
 
+        {activePage === 'pdf' && (
+          <section className="inheritance-section panel inheritance-section--standalone pdf-tool-page" id="pdf-tools">
+            <div className="inheritance-page-heading">
+              <div className="section-heading">
+                <div className="step-number">PDF</div>
+                <div>
+                  <div className="heading-with-help">
+                    <h2>PDFツール</h2>
+                    <ArrayLengthHelp />
+                  </div>
+                  <p>複数PDFのページ選択、1つのPDFへの保存、ページ回転、注記・クリップボード画像の貼り付けを行います。</p>
+                </div>
+              </div>
+              <button type="button" className="secondary-button" onClick={() => switchPage('solar')}>
+                太陽光チェックへ戻る
+              </button>
+            </div>
+
+            <div className="pdf-tool-panel">
+              <div className="privacy-note">
+                <strong>PDF作業はブラウザ内で処理</strong>
+                <span>図面や社内資料を外部サイトへ送らず、選択ページだけをまとめて保存できます。大容量PDFでは処理に時間がかかる場合があります。</span>
+              </div>
+
+              <div className="pdf-tool-actions">
+                <label className="utility-button">
+                  PDFを開く
+                  <input type="file" accept="application/pdf,.pdf" onChange={handleDrawingPdfToJpg} />
+                </label>
+                <label className="utility-button utility-button--soft">
+                  PDFをまとめる
+                  <input type="file" accept="application/pdf,.pdf" multiple onChange={handleMergePdfFiles} />
+                </label>
+                <label className="utility-button utility-button--soft">
+                  画像→PDF
+                  <input type="file" accept="image/*,.jpg,.jpeg,.png,.webp" multiple onChange={handleImageFilesToPdf} />
+                </label>
+                <label className="pdf-tool-toggle">
+                  <input
+                    type="checkbox"
+                    checked={drawingMergePreview}
+                    onChange={(event) => setDrawingMergePreview(event.target.checked)}
+                  />
+                  <span>複数PDFもプレビューして必要ページだけ選ぶ</span>
+                </label>
+                {drawingMergeFiles.length >= 2 && !drawingMergePreview && (
+                  <button
+                    type="button"
+                    className="utility-button"
+                    disabled={drawingConvertStatus.status === 'loading'}
+                    onClick={saveMergedDrawingPdfs}
+                  >
+                    PDFまとめ保存
+                  </button>
+                )}
+              </div>
+
+              {drawingConvertStatus.message && (
+                <p className={`utility-message utility-message--${drawingConvertStatus.status}`}>
+                  {drawingConvertStatus.message}
+                </p>
+              )}
+
+              {drawingJob ? (
+                <div className="drawing-converter drawing-converter--pdf-tool">
+                  <div className="drawing-converter__toolbar">
+                    <strong>{drawingJob.baseName}</strong>
+                    <span>{drawingSelectedPages.length}/{drawingJob.pageCount}ページ選択中</span>
+                    <button type="button" onClick={() => setDrawingSelectedPages(drawingJob.pages.map((page) => page.pageNumber))}>選択</button>
+                    <button type="button" onClick={() => setDrawingSelectedPages([])}>選択解除</button>
+                    <button type="button" disabled={!drawingSelectedPages.length || drawingConvertStatus.status === 'loading'} onClick={() => saveSelectedDrawingPages({ chooseLocation: canChooseSaveLocation })}>
+                      JPG保存
+                    </button>
+                    <button type="button" disabled={!drawingSelectedPages.length || drawingConvertStatus.status === 'loading'} onClick={() => saveSelectedDrawingPagesAsPdf({ chooseLocation: canChooseSaveLocation })}>
+                      選択ページPDF保存
+                    </button>
+                  </div>
+
+                  <div className="pdf-workbench">
+                    <div className="pdf-workbench__main">
+                      {activeDrawingPage && (() => {
+                        const page = activeDrawingPage
+                        const drag = drawingImageTool.drag?.pageNumber === page.pageNumber ? drawingImageTool.drag : null
+                        const dragStyle = drag
+                          ? activePreviewBoxStyle(page, {
+                              x: Math.min(drag.startX, drag.currentX),
+                              y: Math.min(drag.startY, drag.currentY),
+                              width: Math.abs(drag.currentX - drag.startX),
+                              height: Math.abs(drag.currentY - drag.startY),
+                            })
+                          : null
+                        return (
+                          <div className="pdf-active-page">
+                            <div className="pdf-active-page__head">
+                              <div>
+                                <strong>{page.sourceName ? `${page.sourceName} / ` : ''}{page.sourcePageNumber || page.pageNumber}ページ</strong>
+                                <span>先にページ向きを決めてから、文字・画像を配置してください。回転するとこのページの注記はクリアされます。</span>
+                              </div>
+                              <label className="pdf-active-page__check">
+                                <input type="checkbox" checked={drawingSelectedPages.includes(page.pageNumber)} onChange={() => toggleDrawingPage(page.pageNumber)} />
+                                保存対象
+                              </label>
+                            </div>
+                            <div
+                              ref={activePdfPreviewRef}
+                              className={`pdf-active-page__preview drawing-page-card__preview ${drawingImageTool.src ? 'drawing-page-card__preview--image-mode' : ''} ${pdfPreviewView.panMode ? 'pdf-active-page__preview--pan' : ''}`}
+                              onClick={(event) => { if (!drawingImageTool.src) setDrawingTextPosition(page, event) }}
+                              onMouseDown={(event) => beginDrawingImageArea(page, event)}
+                              onMouseMove={(event) => updateDrawingImageArea(page, event)}
+                              onMouseUp={(event) => finishDrawingImageArea(page, event)}
+                              onMouseLeave={(event) => {
+                                if (
+                                  drawingImageTool.drag?.pageNumber === page.pageNumber ||
+                                  drawingImageTool.editDrag?.pageNumber === page.pageNumber ||
+                                  drawingTextTool.editDrag?.pageNumber === page.pageNumber ||
+                                  pdfPreviewView.drag
+                                ) finishDrawingImageArea(page, event)
+                              }}
+                            >
+                              <img
+                                className="pdf-active-page__image"
+                                src={previewUrlForPage(page)}
+                                alt={`${page.pageNumber}ページの大きいプレビュー`}
+                                style={activePreviewImageStyle(page)}
+                              />
+                              {!isRotatedPreviewReady(page) && (
+                                <div className="pdf-active-page__preparing">
+                                  回転プレビューを作成中…
+                                </div>
+                              )}
+                              {(drawingImageTool.annotations[page.pageNumber] || []).map((annotation) => (
+                                <img
+                                  key={annotation.id}
+                                  className={`drawing-page-card__image-marker ${drawingImageTool.selected?.pageNumber === page.pageNumber && drawingImageTool.selected?.id === annotation.id ? 'drawing-page-card__image-marker--selected' : ''}`}
+                                  src={annotation.src}
+                                  alt=""
+                                  onMouseDown={(event) => startDrawingImageMove(page, annotation, event)}
+                                  onClick={(event) => {
+                                    event.preventDefault()
+                                    event.stopPropagation()
+                                    setDrawingImageTool((current) => ({ ...current, selected: { pageNumber: page.pageNumber, id: annotation.id } }))
+                                    setDrawingTextTool((current) => ({ ...current, selected: null, editDrag: null }))
+                                  }}
+                                  style={{
+                                    ...activePreviewBoxStyle(page, annotation),
+                                    transform: `rotate(${annotation.rotation || 0}deg)`,
+                                  }}
+                                />
+                              ))}
+                              {(drawingTextTool.annotations[page.pageNumber] || []).map((annotation) => (
+                                <span
+                                  key={annotation.id}
+                                  className={`drawing-page-card__text-marker ${drawingTextTool.selected?.pageNumber === page.pageNumber && drawingTextTool.selected?.id === annotation.id ? 'drawing-page-card__text-marker--selected' : ''}`}
+                                  onMouseDown={(event) => startDrawingTextMove(page, annotation, event)}
+                                  onClick={(event) => {
+                                    event.preventDefault()
+                                    event.stopPropagation()
+                                    setDrawingTextTool((current) => ({ ...current, selected: { pageNumber: page.pageNumber, id: annotation.id } }))
+                                    setDrawingImageTool((current) => ({ ...current, selected: null, editDrag: null }))
+                                  }}
+                                  style={{
+                                    ...activePreviewPointStyle(page, annotation),
+                                    '--text-marker-scale': `${Math.max(1, Math.min(2.3, (annotation.size ?? drawingTextTool.size) / 28))}`,
+                                  }}
+                                >
+                                  {annotation.text}
+                                </span>
+                              ))}
+                              {dragStyle && <span className="drawing-page-card__drag-rect" style={dragStyle}></span>}
+                            </div>
+                            <div className="pdf-active-page__controls">
+                              <button type="button" onClick={() => changePdfPreviewZoom(-0.2)}>−</button>
+                              <span className="pdf-active-page__zoom">{Math.round(pdfPreviewView.zoom * 100)}%</span>
+                              <button type="button" onClick={() => changePdfPreviewZoom(0.2)}>＋</button>
+                              <button type="button" className={pdfPreviewView.panMode ? 'is-active' : ''} onClick={() => setPdfPreviewView((current) => ({ ...current, panMode: !current.panMode, drag: null }))}>移動</button>
+                              <button type="button" onClick={resetPdfPreviewView}>表示リセット</button>
+                              <button type="button" onClick={() => rotateDrawingPage(page.pageNumber, -90)}>↺ 左90°</button>
+                              <button type="button" onClick={() => rotateDrawingPage(page.pageNumber, 90)}>↻ 右90°</button>
+                            </div>
+                          </div>
+                        )
+                      })()}
+                    </div>
+
+                    <div className="pdf-workbench__side">
+                      <div className="pdf-workbench__side-title">
+                        <strong>ページ一覧</strong>
+                        <span>クリックで左に表示</span>
+                      </div>
+                      <div className="drawing-page-grid drawing-page-grid--wide">
+                        {drawingJob.pages.map((page) => (
+                        <label className={`drawing-page-card ${drawingSelectedPages.includes(page.pageNumber) ? 'drawing-page-card--selected' : ''} ${activeDrawingPage?.pageNumber === page.pageNumber ? 'drawing-page-card--active' : ''}`} key={page.pageNumber} onClick={() => setActiveDrawingPageNumber(page.pageNumber)}>
+                          <input type="checkbox" checked={drawingSelectedPages.includes(page.pageNumber)} onChange={() => toggleDrawingPage(page.pageNumber)} />
+                          <span>{page.sourceName ? `${page.sourceName} / ` : ''}{page.sourcePageNumber || page.pageNumber}ページ / 回転 {drawingPageRotations[page.pageNumber] || 0}°</span>
+                          <div className="drawing-page-card__preview">
+                            <img
+                              src={previewUrlForPage(page)}
+                              alt={`${page.pageNumber}ページのプレビュー`}
+                            />
+                          </div>
+                          <div className="drawing-page-card__rotate">
+                            <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); rotateDrawingPage(page.pageNumber, -90) }}>↺ 左90°</button>
+                            <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); rotateDrawingPage(page.pageNumber, 90) }}>↻ 右90°</button>
+                          </div>
+                        </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="drawing-text-tool drawing-text-tool--pdf">
+                    <div>
+                      <strong>注記・画像貼り付け</strong>
+                      <span>文字は入力後にページをクリック。画像はクリップボードから読み込み、貼り付けたい範囲をドラッグします。</span>
+                    </div>
+                    <textarea
+                      value={drawingTextTool.text}
+                      onChange={(event) => setDrawingTextTool((current) => ({ ...current, text: event.target.value }))}
+                      placeholder={'例：確認済 / 要差替 / 2026.07.15\n複数行も入力できます'}
+                      rows="2"
+                    />
+                    <label>
+                      文字サイズ
+                      <select
+                        value={drawingTextTool.size}
+                        onChange={(event) => changeDrawingTextSize(Number(event.target.value))}
+                      >
+                        <option value="20">小</option>
+                        <option value="28">標準</option>
+                        <option value="38">大</option>
+                        <option value="52">特大</option>
+                      </select>
+                    </label>
+                    <button type="button" onClick={loadClipboardImageForPdf}>画像読込</button>
+                    <button type="button" onClick={() => setDrawingTextTool(initialDrawingTextTool)}>文字クリア</button>
+                    <button type="button" onClick={() => setDrawingImageTool(initialDrawingImageTool)}>画像クリア</button>
+                  </div>
+                  <div className="drawing-image-edit-tool drawing-text-edit-tool">
+                    <div>
+                      <strong>選択文字の調整</strong>
+                      <span>配置した文字をクリックして選択。文字をドラッグすると位置を動かせます。</span>
+                    </div>
+                    <button type="button" onClick={() => scaleSelectedText(0.88)} disabled={!drawingTextTool.selected}>縮小</button>
+                    <button type="button" onClick={() => scaleSelectedText(1.14)} disabled={!drawingTextTool.selected}>拡大</button>
+                    <button type="button" onClick={deleteSelectedText} disabled={!drawingTextTool.selected}>削除</button>
+                  </div>
+                  <div className="drawing-image-edit-tool">
+                    <div>
+                      <strong>選択画像の調整</strong>
+                      <span>貼り付けた画像をクリックして選択。画像をドラッグすると位置を動かせます。</span>
+                    </div>
+                    <button type="button" onClick={() => rotateSelectedImage(-90)}>↺ 90°</button>
+                    <button type="button" onClick={() => rotateSelectedImage(90)}>↻ 90°</button>
+                    <button type="button" onClick={() => scaleSelectedImage(0.9)}>縮小</button>
+                    <button type="button" onClick={() => scaleSelectedImage(1.1)}>拡大</button>
+                    <button type="button" onClick={deleteSelectedImage}>削除</button>
+                  </div>
+                </div>
+              ) : (
+                <p className="inline-message">PDFを開くか、複数PDFを選択するとページプレビューが表示されます。</p>
+              )}
+            </div>
+          </section>
+        )}
+
         {activePage === 'inheritance' && (
         <section className="inheritance-section panel inheritance-section--standalone" id="inheritance-check">
             <div className="inheritance-page-heading">
@@ -2100,7 +3480,7 @@ export default function App() {
           <span>Solar Site Precheck — 入力内容はこのブラウザに自動保存</span>
           <span>Version {APP_VERSION} / Build {BUILD_DATE} / 地図・標高：国土地理院 / 積雪出現率：NEDO MONSOLA-11</span>
         </div>
-        <DiagnosticPanel />
+        <DiagnosticPanel placeApiStatus={placeApiStatus} />
       </footer>
     </div>
   )

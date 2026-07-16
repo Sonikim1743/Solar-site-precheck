@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ソーラー実務ポータル — v2プレビュー</title>
+<style>
+  :root{
+    --ink:#1b2a38;
+    --ink-soft:#44586b;
+    --paper:#fafbf9;
+    --panel:#ffffff;
+    --line:#dde3e0;
+    --sun:#e89b1c;
+    --sun-deep:#c77f0a;
+    --sky:#2e5e8c;
+    --ok:#2e7d4f;
+    --warn:#c25e1e;
+    --mono:"SFMono-Regular",Consolas,"Courier New",monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  @media (prefers-reduced-motion: reduce){html{scroll-behavior:auto;}}
+  body{
+    font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic",Meiryo,sans-serif;
+    background:var(--paper);color:var(--ink);
+    font-size:16px;line-height:1.75;
+  }
+  a{color:var(--sky);text-decoration:none;}
+  a:hover{text-decoration:underline;}
+  a:focus-visible,button:focus-visible{outline:2px solid var(--sun-deep);outline-offset:2px;}
+
+  /* ------- preview ribbon ------- */
+  .ribbon{
+    background:var(--ink);color:#fff;text-align:center;
+    font-size:12px;letter-spacing:.12em;padding:6px 12px;
+  }
+  .ribbon b{color:var(--sun);}
+
+  /* ------- header ------- */
+  header{
+    position:sticky;top:0;z-index:50;
+    background:rgba(250,251,249,.94);backdrop-filter:blur(6px);
+    border-bottom:1px solid var(--line);
+  }
+  .head-inner{
+    max-width:1080px;margin:0 auto;padding:14px 20px;
+    display:flex;align-items:center;gap:28px;flex-wrap:wrap;
+  }
+  .brand{display:flex;align-items:baseline;gap:10px;}
+  .brand .mark{
+    font-weight:800;font-size:19px;letter-spacing:.02em;
+  }
+  .brand .mark span{color:var(--sun-deep);}
+  .brand .sub{font-size:11px;color:var(--ink-soft);letter-spacing:.08em;}
+  nav{display:flex;gap:4px;flex-wrap:wrap;}
+  nav a{
+    color:var(--ink-soft);font-size:13px;font-weight:600;
+    padding:6px 10px;border-radius:6px;
+  }
+  nav a:hover{background:#eef1ee;color:var(--ink);text-decoration:none;}
+  nav a.lab{color:var(--warn);}
+
+  /* ------- hero ------- */
+  .hero{
+    max-width:1080px;margin:0 auto;padding:56px 20px 30px;
+    display:grid;grid-template-columns:1.05fr .95fr;gap:36px;align-items:center;
+  }
+  .hero h1{
+    font-size:clamp(24px,3.4vw,34px);line-height:1.45;font-weight:800;
+    letter-spacing:.01em;
+  }
+  .hero h1 em{font-style:normal;color:var(--sun-deep);}
+  .hero p.lede{margin-top:14px;color:var(--ink-soft);max-width:49ch;}
+  .hero-cta{margin-top:22px;display:flex;gap:10px;flex-wrap:wrap;}
+  .btn{
+    display:inline-block;padding:10px 18px;border-radius:8px;
+    font-size:13.5px;font-weight:700;border:1px solid transparent;cursor:pointer;
+  }
+  .btn.primary{background:var(--ink);color:#fff;}
+  .btn.primary:hover{background:#2a3f52;text-decoration:none;}
+  .btn.ghost{border-color:var(--line);color:var(--ink);background:var(--panel);}
+  .btn.ghost:hover{border-color:var(--ink-soft);text-decoration:none;}
+  .hero-note{margin-top:14px;font-size:12px;color:var(--ink-soft);}
+
+  /* horizon diagram = signature */
+  .horizon-card{
+    background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:18px 18px 10px;
+  }
+  .horizon-card .cap{
+    display:flex;justify-content:space-between;align-items:baseline;
+    font-size:11px;color:var(--ink-soft);letter-spacing:.06em;margin-bottom:4px;
+  }
+  .horizon-card .cap b{font-family:var(--mono);color:var(--ink);}
+  .horizon-card svg{width:100%;height:auto;display:block;}
+
+  /* ------- section scaffolding ------- */
+  section{max-width:1080px;margin:0 auto;padding:42px 20px 10px;}
+  .sec-head{display:flex;align-items:baseline;gap:14px;margin-bottom:18px;flex-wrap:wrap;}
+  .sec-head h2{font-size:20px;font-weight:800;letter-spacing:.02em;}
+  .sec-head .en{
+    font-family:var(--mono);font-size:11px;color:var(--sun-deep);
+    letter-spacing:.18em;text-transform:uppercase;
+  }
+  .sec-head p{font-size:13px;color:var(--ink-soft);flex-basis:100%;margin-top:-6px;}
+
+  .grid{display:grid;gap:14px;}
+  .grid.c3{grid-template-columns:repeat(3,1fr);}
+  .grid.c2{grid-template-columns:repeat(2,1fr);}
+  .card{
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    padding:18px;display:flex;flex-direction:column;gap:8px;
+  }
+  .card h3{font-size:16px;font-weight:700;}
+  .card p{font-size:14px;color:var(--ink-soft);}
+  .card .foot{margin-top:auto;font-size:12px;}
+  .card.primary-tool{border-left:4px solid var(--sun);grid-column:span 2;}
+  .feature-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 12px;margin-top:4px;}
+  .feature-list span{font-size:13px;color:var(--ink-soft);}
+  .feature-list span::before{content:"✓ ";color:var(--ok);font-weight:800;}
+  .action-line{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px;}
+  .action-line small{font-size:12px;color:var(--ink-soft);}
+  .tag{
+    display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.08em;
+    padding:2px 8px;border-radius:20px;border:1px solid var(--line);color:var(--ink-soft);
+  }
+  .tag.live{border-color:var(--ok);color:var(--ok);}
+  .tag.beta{border-color:var(--sun-deep);color:var(--sun-deep);}
+  .tag.plan{border-color:var(--line);color:var(--ink-soft);}
+  .tag.lab{border-color:var(--warn);color:var(--warn);}
+
+  /* ------- module db ------- */
+  .mod-card{
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;
+  }
+  #modules{background:#f4f6f2;border-radius:16px;margin-top:24px;padding-top:34px;padding-bottom:34px;}
+  .mod-card .maker{font-size:11px;letter-spacing:.14em;color:var(--ink-soft);font-weight:700;}
+  .mod-card .model{
+    font-family:var(--mono);font-size:15.5px;font-weight:700;margin:2px 0 6px;
+    word-break:break-all;
+  }
+  .spec{display:flex;gap:14px;font-size:12.5px;color:var(--ink-soft);flex-wrap:wrap;}
+  .spec b{color:var(--ink);font-weight:700;}
+  .trust{
+    margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);
+    font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);
+    display:grid;gap:3px;
+  }
+  .trust .v{color:var(--ok);font-weight:700;}
+  .mod-card .dl{margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  .btn.dl-btn{padding:7px 14px;font-size:12.5px;background:var(--sky);color:#fff;}
+  .btn.dl-btn:hover{background:#254c72;text-decoration:none;}
+  .btn.dl-btn[aria-disabled="true"]{background:#b9c4cd;cursor:default;}
+  .mod-note{
+    margin-top:16px;font-size:12px;color:var(--ink-soft);
+    background:#f2f4f1;border-radius:8px;padding:10px 14px;
+  }
+
+  /* ------- guides ------- */
+  .guide-list{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
+  .guide{
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    padding:14px 16px;display:flex;gap:12px;align-items:flex-start;
+  }
+  .guide .cat{
+    flex:0 0 auto;font-family:var(--mono);font-size:10px;letter-spacing:.1em;
+    color:var(--sun-deep);border:1px solid currentColor;border-radius:4px;
+    padding:2px 6px;margin-top:3px;
+  }
+  .guide h3{font-size:14.5px;font-weight:700;}
+  .guide p{font-size:13.5px;color:var(--ink-soft);}
+
+  /* ------- regions ------- */
+  .region-row{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+  .region{
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;
+  }
+  .region h3{font-size:15.5px;font-weight:800;}
+  .region .facts{
+    margin-top:8px;font-size:12.5px;color:var(--ink-soft);
+    display:grid;gap:4px;
+  }
+  .region .facts b{color:var(--ink);}
+  .region .facts .sn{color:var(--warn);font-weight:700;}
+
+  /* ------- cases ------- */
+  #cases{background:#fffaf2;border-radius:16px;margin-top:24px;padding-top:34px;padding-bottom:28px;}
+  .case{
+    background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--sun);
+    border-radius:8px;padding:14px 18px;margin-bottom:10px;
+  }
+  .case h3{font-size:15px;font-weight:700;}
+  .case p{font-size:13.5px;color:var(--ink-soft);}
+  .case .meta{font-family:var(--mono);font-size:10.5px;color:var(--ink-soft);margin-top:4px;}
+  .case-points{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
+  .case-points span{font-size:11.5px;border:1px solid var(--line);border-radius:999px;padding:2px 8px;background:#fff;}
+
+  /* ------- lab ------- */
+  .lab-wrap{
+    border:1px dashed var(--warn);border-radius:10px;padding:18px;
+    background:#fdf8f3;
+  }
+  .lab-wrap h3{font-size:14px;font-weight:700;}
+  .lab-wrap p{font-size:12.5px;color:var(--ink-soft);}
+
+  /* ------- footer ------- */
+  footer{
+    margin-top:56px;border-top:1px solid var(--line);background:var(--panel);
+  }
+  .foot-inner{
+    max-width:1080px;margin:0 auto;padding:26px 20px 34px;
+    font-size:12.5px;color:var(--ink-soft);display:grid;gap:6px;
+  }
+
+  @media(max-width:840px){
+    .hero{grid-template-columns:1fr;padding-top:36px;}
+    .grid.c3,.region-row{grid-template-columns:1fr 1fr;}
+    .guide-list{grid-template-columns:1fr;}
+    .card.primary-tool{grid-column:span 1;}
+    .feature-list{grid-template-columns:1fr;}
+  }
+  @media(max-width:560px){
+    .grid.c3,.grid.c2,.region-row{grid-template-columns:1fr;}
+    nav{gap:0;}
+    nav a{padding:6px 7px;font-size:12px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="ribbon">V2 PREVIEW — <b>実務ポータル構成案</b>（公開前の確認用モックアップ）</div>
+
+<header>
+  <div class="head-inner">
+    <div class="brand">
+      <div class="mark">Solar<span>実務</span>Portal</div>
+      <div class="sub">現場データと作業ツールを、シミュレーション前に。</div>
+    </div>
+    <nav aria-label="サイト内メニュー">
+      <a href="#tools">ツール</a>
+      <a href="#modules">モジュールDB</a>
+      <a href="#guides">ガイド</a>
+      <a href="#cases">検証事例</a>
+      <a href="#regions">地域情報</a>
+      <a href="#lab" class="lab">Lab</a>
+    </nav>
+  </div>
+</header>
+
+<!-- ================= HERO ================= -->
+<div class="hero">
+  <div>
+    <h1>太陽光シミュレーション実務者のための<br><em>現場データ</em>と作業ツール</h1>
+    <p class="lede">候補地の事前チェック、Solar Pro用CSV、最新モジュールの取込データ。シミュレーションの前に確認すべきことを、実務の流れに沿ってひとつの場所にまとめます。</p>
+    <div class="hero-cta">
+      <a class="btn primary" href="#tools">候補地をチェックする</a>
+      <a class="btn ghost" href="#modules">モジュールデータを探す</a>
+    </div>
+    <p class="hero-note">Solar Site Precheckを使用。Laplace Systems・各メーカー非公式の実務者向け参考サイトです。全データに出典・更新日・検証状態を明記します。</p>
+  </div>
+
+  <div class="horizon-card" aria-hidden="true">
+    <div class="cap"><span>地平線プロファイル（冬至 10–14時 確認）</span><b>MESH 52321668</b></div>
+    <svg viewBox="0 0 520 240" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="地平線と冬至太陽軌道の概念図">
+      <!-- sky grid -->
+      <g stroke="#e8ecea" stroke-width="1">
+        <line x1="30" y1="40" x2="500" y2="40"/>
+        <line x1="30" y1="85" x2="500" y2="85"/>
+        <line x1="30" y1="130" x2="500" y2="130"/>
+      </g>
+      <g font-family="Consolas,monospace" font-size="9" fill="#8a99a6">
+        <text x="6" y="43">40°</text>
+        <text x="6" y="88">25°</text>
+        <text x="6" y="133">10°</text>
+        <text x="30" y="230">東 90°</text>
+        <text x="245" y="230">南 180°</text>
+        <text x="470" y="230">西 270°</text>
+      </g>
+      <!-- winter sun arc -->
+      <path d="M 40 190 Q 265 20 490 190" fill="none" stroke="#e89b1c" stroke-width="2.5" stroke-dasharray="1 0"/>
+      <!-- 10-14h check points -->
+      <g fill="#c77f0a">
+        <circle cx="172" cy="97" r="4"/>
+        <circle cx="218" cy="78" r="4"/>
+        <circle cx="265" cy="72" r="4.5"/>
+        <circle cx="312" cy="78" r="4"/>
+        <circle cx="358" cy="97" r="4"/>
+      </g>
+      <text x="242" y="58" font-family="Consolas,monospace" font-size="9.5" fill="#c77f0a">10–14時</text>
+      <!-- terrain + tree horizon -->
+      <path d="M 30 205 L 80 195 L 120 175 L 160 185 L 210 168 L 260 178 L 305 160 L 350 172 L 400 150 L 450 168 L 500 160 L 500 240 L 30 240 Z"
+            fill="#dfe7e2" stroke="none"/>
+      <path d="M 30 205 L 80 195 L 120 175 L 160 185 L 210 168 L 260 178 L 305 160 L 350 172 L 400 150 L 450 168 L 500 160"
+            fill="none" stroke="#44586b" stroke-width="2"/>
+      <!-- assumed tree line -->
+      <path d="M 30 193 L 80 183 L 120 163 L 160 173 L 210 156 L 260 166 L 305 148 L 350 160 L 400 138 L 450 156 L 500 148"
+            fill="none" stroke="#2e7d4f" stroke-width="1.5" stroke-dasharray="4 3"/>
+      <text x="404" y="132" font-family="Consolas,monospace" font-size="9" fill="#2e7d4f">+想定樹高</text>
+      <text x="60" y="218" font-family="Consolas,monospace" font-size="9" fill="#44586b">地形地平線（DEM）</text>
+    </svg>
+  </div>
+</div>
+
+<!-- ================= TOOLS ================= -->
+<section id="tools">
+  <div class="sec-head">
+    <h2>ツール</h2><span class="en">Tools</span>
+    <p>ブラウザだけで動く実務ツール。候補地の一次確認からSolar Pro読込用ファイルの作成までを、ひとつの流れで扱います。</p>
+  </div>
+  <div class="grid c3">
+    <div class="card primary-tool">
+      <h3>Solar Site Precheck</h3>
+      <p>候補地の位置確認、3次メッシュ判定、NEDO積雪10cm以上出現率、地形断面、地平線分析、Solar Pro用CSV出力までをまとめて確認します。</p>
+      <div class="feature-list" aria-label="Solar Site Precheckの主な機能">
+        <span>候補地確認</span>
+        <span>地形断面</span>
+        <span>地平線分析</span>
+        <span>ObstructionElevations.csv 出力</span>
+        <span>積雪補正メモ</span>
+        <span>簡易分析レポート</span>
+      </div>
+      <div class="action-line">
+        <span class="tag live">公開中</span>
+        <small>地平線CSV作成は本ツール内の機能です。</small>
+      </div>
+    </div>
+    <div class="card">
+      <h3>モジュールデータ確認</h3>
+      <p>Solar Pro太陽電池データベースへ取り込む .MD0W を、型番・出典・検証状態つきで管理します。取込前の確認用ビューを準備中です。</p>
+      <div class="foot"><span class="tag beta">準備中</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= MODULE DB ================= -->
+<section id="modules">
+  <div class="sec-head">
+    <h2>モジュールデータベース</h2><span class="en">Module Database</span>
+    <p>市場で使われる最新モジュールのSolar Pro用データ（.MD0W）。出典・作成日・更新日・SHA-256・Solar Pro読込確認状態をセットで管理します。</p>
+  </div>
+  <div class="grid c2">
+    <div class="mod-card">
+      <div class="maker">JINKO SOLAR</div>
+      <div class="model">JKM720N-66HL5-BDV</div>
+      <div class="spec"><span>定格 <b>720 W</b></span><span>両面 N型 TOPCon</span><span>変換効率 <b>23.2 %</b></span></div>
+      <div class="trust">
+        <span>出典: Datasheet JKM720N-66HL5-BDV (2025-11版)</span>
+        <span>作成: 2026-07-01 ／ 更新: 2026-07-05</span>
+        <span>sha256: 4f8a…e21c　<span class="v">Verified: Solar Pro読込確認済</span></span>
+      </div>
+      <div class="dl">
+        <a class="btn dl-btn" href="#" aria-label="JKM720NのSolar Pro用データを保存">.MD0W 保存</a>
+        <a href="#" style="font-size:12px;">データシートを見る →</a>
+      </div>
+    </div>
+    <div class="mod-card">
+      <div class="maker">JINKO SOLAR</div>
+      <div class="model">JKM655N-66QL6-BDV-F1-JP</div>
+      <div class="spec"><span>定格 <b>655 W</b></span><span>両面 N型</span><span>国内向け仕様</span></div>
+      <div class="trust">
+        <span>出典: Datasheet JKM655N-66QL6 (2025-08版)</span>
+        <span>作成: 2026-06-28 ／ 更新: 2026-07-05</span>
+        <span>sha256: 9b31…77d0　<span class="v">Verified: Solar Pro読込確認済</span></span>
+      </div>
+      <div class="dl">
+        <a class="btn dl-btn" href="#" aria-label="JKM655NのSolar Pro用データを保存">.MD0W 保存</a>
+        <a href="#" style="font-size:12px;">データシートを見る →</a>
+      </div>
+    </div>
+    <div class="mod-card">
+      <div class="maker">JA SOLAR</div>
+      <div class="model">JAM66D45-BDB シリーズ</div>
+      <div class="spec"><span>定格 <b>700 W級</b></span><span>両面 N型</span></div>
+      <div class="trust">
+        <span>出典: 確認中</span>
+        <span>公開予定: 2026-07</span>
+        <span>sha256: —　Draft: 未検証</span>
+      </div>
+      <div class="dl">
+        <a class="btn dl-btn" aria-disabled="true" role="link" aria-label="準備中">準備中</a>
+      </div>
+    </div>
+    <div class="mod-card">
+      <div class="maker">LONGi / TRINA ほか</div>
+      <div class="model">リクエスト受付</div>
+      <div class="spec"><span>掲載してほしい型番を募集しています</span></div>
+      <div class="trust">
+        <span>優先順位: 国内流通量・リクエスト数順</span>
+        <span>作成基準: 公開データシートの数値のみ使用</span>
+      </div>
+      <div class="dl">
+        <a class="btn dl-btn" href="#" aria-label="型番の掲載をリクエスト">型番をリクエスト</a>
+      </div>
+    </div>
+  </div>
+  <p class="mod-note">本データベースの .MD0W はメーカー公式ファイルではなく、公開データシートの数値をもとに当サイトが作成した参考データです。ステータスは Verified / Checked / Draft で表示し、融資・契約用の最終シミュレーションでは必ずメーカー正規データと照合してください。</p>
+</section>
+
+<!-- ================= GUIDES ================= -->
+<section id="guides">
+  <div class="sec-head">
+    <h2>ガイド</h2><span class="en">Guides</span>
+    <p>Solar Proの操作だけでなく、その手前の「正しい入力値のつくり方」を短い実務手順として整理します。</p>
+  </div>
+  <div class="guide-list">
+    <div class="guide">
+      <span class="cat">SOLAR PRO</span>
+      <div><h3>太陽電池データベースへの .MD0W 取込手順</h3>
+      <p>ダウンロードしたモジュールデータをSolar Proに登録し、機種選択に表示させるまで。</p></div>
+    </div>
+    <div class="guide">
+      <span class="cat">地平線</span>
+      <div><h3>ObstructionElevations.csv をSolar Proで読み込む</h3>
+      <p>手入力をやめて、DEM分析結果をそのまま読み込む手順と注意点（元データは8/36方位の補間値）。</p></div>
+    </div>
+    <div class="guide">
+      <span class="cat">NEDO</span>
+      <div><h3>3次メッシュ境界に注意すべき候補地とは</h3>
+      <p>境界100m以内で起きる日射量メッシュのずれと、隣接メッシュ比較での確認方法。</p></div>
+    </div>
+    <div class="guide">
+      <span class="cat">NEDO</span>
+      <div><h3>積雪10cm以上出現率と発電量補正のかけ方</h3>
+      <p>MONSOLA-11の出現率を発電量係数へ反映するときの考え方と、雪の多い地点での限界。</p></div>
+    </div>
+    <div class="guide">
+      <span class="cat">シミュレーション</span>
+      <div><h3>両面（バイフェイシャル）モジュールとアルベド設定</h3>
+      <p>積雪期の反射を含め、裏面発電をどこまで見込むか。過大評価を避ける設定の目安。</p></div>
+    </div>
+    <div class="guide">
+      <span class="cat">シミュレーション</span>
+      <div><h3>冬至10〜14時チェック — 数字より先に見るべき影</h3>
+      <p>南中高度だけでは見落とす午前・午後の山影を、太陽軌道と地平線の重なりで確認する。</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CASES ================= -->
+<section id="cases">
+  <div class="sec-head">
+    <h2>検証事例</h2><span class="en">Cases</span>
+    <p>ツールと実データで確認した事例。地名・案件情報は匿名化し、数値は確認済みのものだけを掲載します。</p>
+  </div>
+  <div class="case">
+    <h3>西側山地の影響で1,000kWh/kWpを下回った高原候補地</h3>
+    <p>南中高度では問題なしと見えたが、冬至14時前後の太陽方位で山地仰角が上回り、積雪補正と合わせて閾値未達と判定した事例。</p>
+    <div class="case-points"><span>地平線36方位</span><span>冬至10〜14時</span><span>積雪補正</span></div>
+    <div class="meta">TOOL: 地平線36方位分析 ＋ NEDO PDF照合 ／ 2026-06</div>
+  </div>
+  <div class="case">
+    <h3>3次メッシュ境界60mの候補地で隣接メッシュの日射量を比較</h3>
+    <p>境界近接バッジが点灯した地点で、隣接8メッシュの値を比較し採用メッシュを確定。座標丸めによる取り違えを防止した事例。</p>
+    <div class="case-points"><span>3次メッシュ境界</span><span>隣接メッシュ比較</span><span>座標丸め確認</span></div>
+    <div class="meta">TOOL: メッシュ境界判定 ＋ 隣接メッシュ比較 ／ 2026-07</div>
+  </div>
+  <div class="case">
+    <h3>NEDO帳票58件からOCR読取精度を反復検証</h3>
+    <p>印刷位置・地域が異なる9件を抽出し、罫線検出＋3方式OCR＋年季節照合の全件合格を確認。既知の正解帳票1件の完全再現を確認。</p>
+    <div class="case-points"><span>罫線検出</span><span>OCR投票</span><span>年・季節照合</span></div>
+    <div class="meta">METHOD: 精度検証メモ公開 ／ 2026-06</div>
+  </div>
+</section>
+
+<!-- ================= REGIONS ================= -->
+<section id="regions">
+  <div class="sec-head">
+    <h2>地域情報</h2><span class="en">Regions</span>
+    <p>地域を一括で評価するのではなく、その地域で候補地ごとに確認すべき項目を整理します。</p>
+  </div>
+  <div class="region-row">
+    <div class="region">
+      <h3>広島県北部で確認したい項目</h3>
+      <div class="facts">
+        <span>地形: <b>谷部では東西方向の地平線を確認</b></span>
+        <span class="sn">❄ 積雪10cm以上出現率と冬季補正を確認</span>
+        <span>データ: NEDO 3次メッシュ境界・GSI標高・ハザード情報</span>
+      </div>
+    </div>
+    <div class="region">
+      <h3>岡山県北部で確認したい項目</h3>
+      <div class="facts">
+        <span>地形: <b>高原・谷部の地形断面を候補地ごとに確認</b></span>
+        <span class="sn">❄ 蒜山周辺は積雪と山影の複合影響を確認</span>
+        <span>データ: 岡山県GIS・NEDO・地理院地図</span>
+      </div>
+    </div>
+    <div class="region">
+      <h3>山口県・島根県で確認したい項目</h3>
+      <div class="facts">
+        <span>地形: <b>沿岸部・内陸部で日射条件を分けて確認</b></span>
+        <span>❄ 日本海側は冬季日射と積雪統計を確認</span>
+        <span>記事: 準備中</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= LAB ================= -->
+<section id="lab">
+  <div class="sec-head">
+    <h2>Lab / 内部ツール</h2><span class="en">Lab</span>
+    <p>実験段階の機能。動作・出力の保証はありません。</p>
+  </div>
+  <div class="lab-wrap">
+    <h3>相続資料PDFチェック <span class="tag lab">実験機能</span></h3>
+    <p>法務局・相続関連PDFから土地の単独相続候補を抽出するプロトタイプ。<b>個人情報を含むため、処理はローカル環境のみで行い、本ポータルの公開版には搭載しません。</b>配布版の取り扱い条件はガイドを参照してください。</p>
+  </div>
+</section>
+
+<!-- ================= POLICY ================= -->
+<section id="policy">
+  <div class="sec-head">
+    <h2>公開運用の前提</h2><span class="en">Policy</span>
+    <p>実務で使うために、公式性・出典・検証範囲を明確にします。</p>
+  </div>
+  <div class="grid c3">
+    <div class="card">
+      <h3>非公式の作業支援サイト</h3>
+      <p>本ポータルはLaplace Systems・各メーカーの公式サービスではありません。Solar Pro入力前の確認と作業補助を目的とします。</p>
+      <div class="foot"><span class="tag plan">Disclaimer</span></div>
+    </div>
+    <div class="card">
+      <h3>出典と検証状態を表示</h3>
+      <p>標高・NEDO・メーカー資料・作成ファイルには、出典、更新日、検証状態、必要に応じてSHA-256を表示します。</p>
+      <div class="foot"><span class="tag live">Data Policy</span></div>
+    </div>
+    <div class="card">
+      <h3>公開機能と内部機能を分離</h3>
+      <p>候補地・モジュール・ガイドは公開対象、個人情報を含むPDF処理はLabまたはローカル限定として扱います。</p>
+      <div class="foot"><span class="tag lab">Privacy</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= FOOTER ================= -->
+<footer>
+  <div class="foot-inner">
+    <div><b>Solar実務Portal</b>（v2プレビュー版） — 太陽光発電の候補地検討・Solar Pro入力準備を支援する実務者向け参考サイト</div>
+    <div>本サイトは Laplace Systems 及び各モジュールメーカーの公式サイトではありません。Solar Proは株式会社ラプラス・システムの製品です。</div>
+    <div>データ出典: 国土地理院（標高・地図タイル）／ NEDO MONSOLA-11（日射量・積雪統計）／ 各メーカー公開データシート。各データの利用条件に従って運用します。</div>
+    <div>掲載データは参考値です。最終判断は必ず一次資料・正規データで確認してください。</div>
+  </div>
+</footer>
+
+</body>
+</html>

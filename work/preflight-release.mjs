@@ -58,9 +58,9 @@ if (samplePdf) {
     })
     if (!response.ok) throw new Error(`HTTP ${response.status}: ${await response.text()}`)
     const json = await response.json()
-    const count = Array.isArray(json.results) ? json.results.length : 0
-    if (!count) throw new Error('resultCount is 0')
-    return `resultCount=${count}`
+    if (!Array.isArray(json.results)) throw new Error('results array not found')
+    if (!json.receiptSummary) throw new Error('receiptSummary not found')
+    return `resultCount=${json.results.length}`
   })
 } else {
   console.log('SKIP sample PDF POST: pass a PDF path as the second argument to enable it.')

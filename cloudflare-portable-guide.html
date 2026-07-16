@@ -29,12 +29,12 @@
 
   <h2>Cloudflare Pagesへ反映する場合</h2>
   <p>ZIPを展開したフォルダで、Wranglerを使って以下を実行します。</p>
-  <pre>npx wrangler pages deploy dist --project-name=solar-site-precheck --functions=functions</pre>
-  <p class="note">Cloudflare Pagesのドラッグ&ドロップ配布では <code>functions</code> が反映されません。NEDO Web取得を使う場合はWrangler配布を使ってください。</p>
+  <pre>npx wrangler pages deploy dist --project-name=solar-site-precheck</pre>
+  <p class="note">Cloudflare Pagesのドラッグ&ドロップ配布では <code>functions</code> が反映されません。ZIP展開後のフォルダ直下に <code>dist</code> と <code>functions</code> がある状態でWrangler配布を使ってください。Wrangler 4系では <code>--functions=functions</code> は不要です。</p>
 
   <h2>機能差の目安</h2>
   <ul>
-    <li>Cloudflare Pages: HTTPSで安定公開。NEDO APIはFunctionsで利用可能。相続PDFサーバー解析は別APIが無い限り利用不可。</li>
+    <li>Cloudflare Pages: HTTPSで安定公開。NEDO APIはFunctionsで利用可能。相続PDFサーバー解析はPortable / Local版を使用してください（Cloudflare側の <code>/api/inheritance-pdf</code> は誤ってHTMLへフォールバックしないための明示的な未対応応答です）。</li>
     <li>Portable / Local: NEDO APIと相続PDFサーバー解析をローカルNodeで利用可能。PDF目安サイズは80MB。</li>
   </ul>
 </main>

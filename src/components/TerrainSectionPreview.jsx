@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 const graphWidth = 620
 const graphHeight = 210
 const padding = { left: 42, right: 18, top: 20, bottom: 34 }
@@ -34,6 +36,74 @@ function heightDiffNotice(line) {
   return `${from}→${to}で${diff > 0 ? '+' : ''}${diff.toFixed(1)}m`
 }
 
+function pointToChart(point, minElevation, maxElevation, rangeMeters) {
+  const span = Math.max(1, maxElevation - minElevation)
+  return {
+    x: padding.left + ((point.distance + rangeMeters) / (rangeMeters * 2)) * plotWidth,
+    y: padding.top + plotHeight - ((point.elevation - minElevation) / span) * plotHeight,
+  }
+}
+
+function steepestSegment(line) {
+  const valid = (line.points || []).filter((point) => Number.isFinite(point.elevation))
+  let best = null
+  for (let index = 1; index < valid.length; index += 1) {
+    const start = valid[index - 1]
+    const end = valid[index]
+    const distance = Math.abs(end.distance - start.distance)
+    if (!distance) continue
+    const elevationDelta = end.elevation - start.elevation
+    const slopePercent = Math.abs(elevationDelta / distance) * 100
+    const angle = (Math.atan2(Math.abs(elevationDelta), distance) * 180) / Math.PI
+    if (!best || slopePercent > best.slopePercent) {
+      best = {
+        start,
+        end,
+        slopePercent,
+        angle,
+        elevationDelta,
+      }
+    }
+  }
+  return best
+}
+
+function slopeSegments(line) {
+  const valid = (line.points || []).filter((point) => Number.isFinite(point.elevation))
+  const segments = []
+  for (let index = 1; index < valid.length; index += 1) {
+    const start = valid[index - 1]
+    const end = valid[index]
+    const distance = Math.abs(end.distance - start.distance)
+    if (!distance) continue
+    const elevationDelta = end.elevation - start.elevation
+    const slopePercent = Math.abs(elevationDelta / distance) * 100
+    const angle = (Math.atan2(Math.abs(elevationDelta), distance) * 180) / Math.PI
+    segments.push({
+      start,
+      end,
+      slopePercent,
+      angle,
+      direction: elevationDelta >= 0 ? '上り' : '下り',
+    })
+  }
+  return segments
+}
+
+function slopeLevel(segment) {
+  if (!segment || !Number.isFinite(segment.angle)) return 'low'
+  if (segment.angle >= 8) return 'high'
+  if (segment.angle >= 4) return 'medium'
+  return 'low'
+}
+
+function steepestSegmentText(line) {
+  const segment = steepestSegment(line)
+  if (!segment) return '最大10m勾配 —'
+  const direction = segment.elevationDelta >= 0 ? '上り' : '下り'
+  return `最大10m勾配 ${segment.slopePercent.toFixed(1)}%（約${segment.angle.toFixed(1)}°・${direction}）`
+}
+
 function makePath(points, minElevation, maxElevation, rangeMeters) {
   const span = Math.max(1, maxElevation - minElevation)
   return points
@@ -55,7 +125,7 @@ function makeArea(points, minElevation, maxElevation, rangeMeters) {
   return `${path} L ${lastX.toFixed(1)} ${baseY.toFixed(1)} L ${firstX.toFixed(1)} ${baseY.toFixed(1)} Z`
 }
 
-function TerrainProfileChart({ line, minElevation, maxElevation }) {
+function TerrainProfileChart({ line, minElevation, maxElevation, showSlopeDetails }) {
   const range = line.rangeMeters || 100
   const interval = line.intervalMeters || 10
   const diffNotice = heightDiffNotice(line)
@@ -65,14 +135,24 @@ function TerrainProfileChart({ line, minElevation, maxElevation }) {
   )
   const path = makePath(line.points, minElevation, maxElevation, range)
   const area = makeArea(line.points, minElevation, maxElevation, range)
+  const steepest = steepestSegment(line)
+  const segments = slopeSegments(line)
   const span = Math.max(1, maxElevation - minElevation)
+  const steepestStart = steepest ? pointToChart(steepest.start, minElevation, maxElevation, range) : null
+  const steepestEnd = steepest ? pointToChart(steepest.end, minElevation, maxElevation, range) : null
+  const steepestLabel = steepest && steepestStart && steepestEnd
+    ? {
+        x: (steepestStart.x + steepestEnd.x) / 2,
+        y: Math.min(steepestStart.y, steepestEnd.y) - 8,
+      }
+    : null
 
   return (
     <div className={`terrain-section-chart ${diffNotice ? 'terrain-section-chart--height-watch' : ''}`}>
       <div className="terrain-section-chart__title">
         <strong>{line.label} <small>（{slopeDirectionText(line)}）</small></strong>
         {diffNotice && <em className="terrain-section-chart__height-alert">高低差あり：{diffNotice}</em>}
-        <span>{profileStats(line)}</span>
+        <span>{profileStats(line)} / {steepestSegmentText(line)}</span>
       </div>
       <svg viewBox={`0 0 ${graphWidth} ${graphHeight}`} role="img">
         <title>{line.label} 標高断面</title>
@@ -116,6 +196,37 @@ function TerrainProfileChart({ line, minElevation, maxElevation }) {
         })}
         <path className="terrain-section-chart__area" d={area} />
         <path className="terrain-section-chart__line" d={path} />
+        {showSlopeDetails && segments.map((segment) => {
+          const start = pointToChart(segment.start, minElevation, maxElevation, range)
+          const end = pointToChart(segment.end, minElevation, maxElevation, range)
+          return (
+            <line
+              key={`${segment.start.distance}-${segment.end.distance}`}
+              className={`terrain-section-chart__segment terrain-section-chart__segment--${slopeLevel(segment)}`}
+              x1={start.x}
+              y1={start.y}
+              x2={end.x}
+              y2={end.y}
+            />
+          )
+        })}
+        {steepestStart && steepestEnd && (
+          <g>
+            <title>10mごとの取得点の中で、最も勾配が大きい区間です。</title>
+            <line
+              className="terrain-section-chart__steepest"
+              x1={steepestStart.x}
+              y1={steepestStart.y}
+              x2={steepestEnd.x}
+              y2={steepestEnd.y}
+            />
+            {steepestLabel && (
+              <text className="terrain-section-chart__steepest-label" x={steepestLabel.x} y={steepestLabel.y} textAnchor="middle">
+                最大 {steepest.angle.toFixed(1)}°
+              </text>
+            )}
+          </g>
+        )}
         {line.points
           .filter((point) => Number.isFinite(point.elevation))
           .map((point) => {
@@ -126,11 +237,26 @@ function TerrainProfileChart({ line, minElevation, maxElevation }) {
         <line className="terrain-section-chart__center" x1={padding.left + plotWidth / 2} x2={padding.left + plotWidth / 2} y1={padding.top} y2={padding.top + plotHeight} />
         <text className="terrain-section-chart__interval" x={padding.left + plotWidth - 4} y={padding.top + 14} textAnchor="end">10m刻み</text>
       </svg>
+      {showSlopeDetails && (
+        <div className="terrain-section-chart__segment-list" aria-label={`${line.label} 10m区間別勾配`}>
+          {segments.map((segment) => (
+            <span
+              key={`${segment.start.distance}-${segment.end.distance}`}
+              className={`terrain-section-chart__segment-chip terrain-section-chart__segment-chip--${slopeLevel(segment)}`}
+            >
+              {segment.start.distance}→{segment.end.distance}m
+              <strong>{segment.angle.toFixed(1)}°</strong>
+              <em>{segment.direction}</em>
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
 
 export default function TerrainSectionPreview({ analysis }) {
+  const [showSlopeDetails, setShowSlopeDetails] = useState(false)
   if (!analysis?.lines?.length) return null
   const minElevation = analysis.summary?.minElevation
   const maxElevation = analysis.summary?.maxElevation
@@ -141,8 +267,15 @@ export default function TerrainSectionPreview({ analysis }) {
       <div className="terrain-section-preview__heading">
         <div>
           <strong>候補地周辺{analysis.rangeMeters || 100}m 断面プレビュー</strong>
-          <span>候補地点を中心に、東西・南北方向を10m間隔で標高取得した簡易断面です。端点差が±5mを超える場合は高低差として強調します。</span>
+          <span>候補地点を中心に、東西・南北方向を10m間隔で標高取得した簡易断面です。勾配角度は、読みやすさを優先して最も急な10m区間だけ橙色で表示します。</span>
         </div>
+        <button
+          type="button"
+          className={`terrain-section-preview__detail-toggle ${showSlopeDetails ? 'terrain-section-preview__detail-toggle--active' : ''}`}
+          onClick={() => setShowSlopeDetails((value) => !value)}
+        >
+          勾配詳細 {showSlopeDetails ? 'ON' : 'OFF'}
+        </button>
       </div>
       <div className="terrain-section-preview__charts">
         {analysis.lines.map((line) => (
@@ -151,6 +284,7 @@ export default function TerrainSectionPreview({ analysis }) {
             line={line}
             minElevation={minElevation}
             maxElevation={maxElevation}
+            showSlopeDetails={showSlopeDetails}
           />
         ))}
       </div>

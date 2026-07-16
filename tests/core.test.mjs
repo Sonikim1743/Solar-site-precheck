@@ -284,6 +284,25 @@ test('inheritance receipt summary explains missing numbers by black-box or withd
   assert.equal(summary.missingDetails[0].label, '黒塗り・取下')
 })
 
+test('inheritance receipt summary ignores legal article numbers in ordinary registry PDFs', () => {
+  const summary = summarizeInheritanceReceipts([{
+    pageNumber: 1,
+    text: [
+      '不動産登記法（平成１６年法律第１２３号）第１４条第１項',
+      '不動産登記規則（平成１７年法務省令第１８号）',
+      '昭和６３年法務省令第３７号',
+      '受付年月日 令和８年３月２日',
+      '順位番号 13917 所有権移転',
+      '土地 庄原市高野町南',
+    ].join('\n'),
+  }])
+  assert.equal(summary.firstNumber, null)
+  assert.equal(summary.lastNumber, null)
+  assert.equal(summary.expectedCount, 0)
+  assert.equal(summary.readCount, 0)
+  assert.equal(summary.missingCount, 0)
+})
+
 test('solar window check compares winter peak sun height against horizon direction', () => {
   const noon = solarPositionAtHour(35, 12)
   assert.ok(noon.altitude > 30)

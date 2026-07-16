@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import { Circle, CircleMarker, GeoJSON, LayersControl, MapContainer, Marker, Polyline, Popup, Rectangle, ScaleControl, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet'
 import { parcelInfo } from '../services/cadastre.js'
@@ -36,6 +36,27 @@ function MapController({ position }) {
   return null
 }
 
+function MapInteractionController({ locked }) {
+  const map = useMap()
+
+  useEffect(() => {
+    const handlers = [
+      map.dragging,
+      map.touchZoom,
+      map.doubleClickZoom,
+      map.boxZoom,
+      map.keyboard,
+      map.scrollWheelZoom,
+    ].filter(Boolean)
+    handlers.forEach((handler) => {
+      if (locked) handler.disable()
+      else handler.enable()
+    })
+  }, [map, locked])
+
+  return null
+}
+
 function SiteMarker({ position, placeInfo, suppressPopup = false }) {
   const markerRef = useRef(null)
 
@@ -64,7 +85,7 @@ function SiteMarker({ position, placeInfo, suppressPopup = false }) {
           )}
           {placeInfo?.status === 'error' && (
             <>
-              <strong>住所情報未取得</strong>
+              <strong>住所確認は座標で代替</strong>
               <small>{placeInfo.message}</small>
             </>
           )}
@@ -341,6 +362,18 @@ export default function MapPanel({
   terrainSection,
 }) {
   const hasTerrainOverlay = !!terrainSection?.lines?.length
+  const [isCompactMap, setIsCompactMap] = useState(false)
+  const [mapInteractionEnabled, setMapInteractionEnabled] = useState(false)
+  const mapLocked = isCompactMap && !mapInteractionEnabled
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return undefined
+    const query = window.matchMedia('(max-width: 640px)')
+    const sync = () => setIsCompactMap(query.matches)
+    sync()
+    query.addEventListener?.('change', sync)
+    return () => query.removeEventListener?.('change', sync)
+  }, [])
 
   return (
     <div className="map-shell">
@@ -369,6 +402,7 @@ export default function MapPanel({
         <ScaleControl position="bottomleft" metric imperial={false} />
         <ClickHandler onSelect={onSelect} />
         <MapController position={position} />
+        <MapInteractionController locked={mapLocked} />
         <ParcelLayer
           data={parcelData}
           selectedParcelId={selectedParcelId}
@@ -380,6 +414,16 @@ export default function MapPanel({
         <SiteMarker position={position} placeInfo={placeInfo} suppressPopup={hasTerrainOverlay} />
       </MapContainer>
       <div className="map-hint">地図をクリックして候補地点を指定</div>
+      {isCompactMap && (
+        <button
+          type="button"
+          className={`map-touch-toggle ${mapInteractionEnabled ? 'map-touch-toggle--active' : ''}`}
+          onClick={() => setMapInteractionEnabled((value) => !value)}
+          aria-pressed={mapInteractionEnabled}
+        >
+          {mapInteractionEnabled ? '地図操作ON' : '地図操作を有効化'}
+        </button>
+      )}
       <div className="map-location-control">
         <button type="button" onClick={onUseCurrentLocation} disabled={locationStatus?.status === 'loading'}>
           {locationStatus?.status === 'loading' ? '現在地を取得中…' : '◎ 現在地を取得'}

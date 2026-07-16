@@ -190,6 +190,7 @@ private repositoryの場合は、アプリフォルダー直下に `github-token
 - NEDO積雪値は3次メッシュ単位です。境界付近では隣接メッシュ確認が必要です。
 - Solar Proへの直接入力は行いません。現時点では画面確認、Solar Pro地平線CSV出力、積雪補正値の入力支援が基本です。
 - 相続登記PDFチェックは、テキスト抽出可能なPDFを対象にした業務補助です。最終判断は原本PDFと登記情報提供サービスの画面で確認してください。
+- Cloudflare Pages版ではNEDO Web取得はFunctionsで利用できますが、相続PDFのサーバー解析はPortable / Local版を使用してください。Cloudflare側の `/api/inheritance-pdf` は、未対応であることを明示してHTMLフォールバックを防ぐためのエンドポイントです。
 - 内部用Solar Proテンプレート `.spt` は配布物に含めません。必要な場合は利用者がローカルファイルとして選択します。
 
 ## 運用上の注意

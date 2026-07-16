@@ -42,6 +42,8 @@ function fileForUrl(url) {
   const candidate = resolve(join(root, requested))
   if (candidate !== root && !candidate.startsWith(`${root}\\`) && !candidate.startsWith(`${root}/`)) return null
   if (existsSync(candidate) && statSync(candidate).isFile()) return candidate
+  const chunkMatch = pathname.match(/^\/assets\/(index|nedoWeb|nedoPdf|nedoValidation|pdfToJpg|inheritancePdf|pdfCompat)-[A-Za-z0-9_-]+\.(?:js|jsf|mjs)$/)
+  if (chunkMatch) return findCurrentChunk(`${chunkMatch[1]}-`)
   if (/^\/assets\/pdfToJpg-[A-Za-z0-9_-]+\.jsf?$/.test(pathname)) return findCurrentChunk('pdfToJpg-')
   if (/^\/(?:assets|data|icons|screenshots|templates)\//.test(pathname)) return null
   return join(root, 'index.html')

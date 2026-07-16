@@ -1,4 +1,4 @@
-const CACHE_NAME = 'solar-site-precheck-v3'
+const CACHE_NAME = 'solar-site-precheck-v5'
 const APP_SHELL = [
   '/',
   '/manifest.json',
