@@ -7,8 +7,27 @@ const MUNICIPALITY_DATA_URL = 'https://maps.gsi.go.jp/js/muni.js'
 const tileCache = new Map()
 let municipalityDataPromise
 const ELEVATION_CACHE_KEY = 'solar-site-elevation-points-v1'
+const ELEVATION_REQUEST_CONCURRENCY = 8
 let pointCache
 let cacheSaveTimer
+
+async function mapWithConcurrency(items, limit, worker) {
+  const source = Array.from(items || [])
+  const safeLimit = Math.max(1, Math.min(source.length || 1, Math.floor(limit || 1)))
+  const results = new Array(source.length)
+  let nextIndex = 0
+
+  async function runWorker() {
+    while (nextIndex < source.length) {
+      const currentIndex = nextIndex
+      nextIndex += 1
+      results[currentIndex] = await worker(source[currentIndex], currentIndex)
+    }
+  }
+
+  await Promise.all(Array.from({ length: safeLimit }, runWorker))
+  return results
+}
 
 function loadPointCache() {
   if (pointCache) return pointCache
@@ -273,7 +292,7 @@ async function buildCrossSectionLine(lat, lon, label, negativeBearing, positiveB
     distances.push(distance)
   }
 
-  const points = await Promise.all(distances.map(async (distance) => {
+  const points = await mapWithConcurrency(distances, ELEVATION_REQUEST_CONCURRENCY, async (distance) => {
     const bearing = distance < 0 ? negativeBearing : positiveBearing
     const point = distance === 0
       ? { lat, lon }
@@ -286,7 +305,7 @@ async function buildCrossSectionLine(lat, lon, label, negativeBearing, positiveB
       elevation: result.value,
       source: result.dataSource,
     }
-  }))
+  })
 
   return {
     label,
@@ -302,10 +321,11 @@ async function buildCrossSectionLine(lat, lon, label, negativeBearing, positiveB
 export async function analyzeTerrainCrossSection(lat, lon, options = {}) {
   const rangeMeters = options.rangeMeters ?? 100
   const intervalMeters = options.intervalMeters ?? 10
-  const [eastWest, northSouth] = await Promise.all([
-    buildCrossSectionLine(lat, lon, '東西断面', 270, 90, rangeMeters, intervalMeters, '西', '東'),
-    buildCrossSectionLine(lat, lon, '南北断面', 180, 0, rangeMeters, intervalMeters, '南', '北'),
-  ])
+  const [eastWest, northSouth] = await mapWithConcurrency([
+    ['東西断面', 270, 90, '西', '東'],
+    ['南北断面', 180, 0, '南', '北'],
+  ], 1, ([label, negativeBearing, positiveBearing, negativeDirection, positiveDirection]) =>
+    buildCrossSectionLine(lat, lon, label, negativeBearing, positiveBearing, rangeMeters, intervalMeters, negativeDirection, positiveDirection))
 
   const allElevations = [...eastWest.points, ...northSouth.points]
     .map((point) => point.elevation)
@@ -428,9 +448,11 @@ export async function analyzeSurroundingTerrain(
   directions = HORIZON_DIRECTIONS,
 ) {
   const distances = [250, 375, 500, 750, 1000, 1500, 2000, 3000, 4000, 5000]
-  const samples = await Promise.all(
-    directions.map(async ({ direction, bearing }) => {
-      const profile = await Promise.all(distances.map(async (distance) => {
+  const samples = await mapWithConcurrency(
+    directions,
+    2,
+    async ({ direction, bearing }) => {
+      const profile = await mapWithConcurrency(distances, 4, async (distance) => {
         const point = pointAtDistance(lat, lon, distance, bearing)
         const result = await fetchElevation(point.lat, point.lon)
         const curvatureDrop = distance ** 2 / (2 * 6371000)
@@ -447,7 +469,7 @@ export async function analyzeSurroundingTerrain(
           terrainAngle: Math.max(0, terrainAngle),
           angle: Math.max(0, angle),
         }
-      }))
+      })
       const highest = profile.reduce((max, item) => item.angle > max.angle ? item : max)
       const terrainHighest = profile.reduce((max, item) => item.terrainAngle > max.terrainAngle ? item : max)
       return {
@@ -460,7 +482,7 @@ export async function analyzeSurroundingTerrain(
         terrainDistance: terrainHighest.distance,
         profile,
       }
-    }),
+    },
   )
 
   return summarizeTerrainSamples(samples, '250m〜5km・各方位10点', obstructionHeight)

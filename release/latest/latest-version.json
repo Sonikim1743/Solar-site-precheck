@@ -2,13 +2,13 @@
     "app":  "Solar Site Precheck",
     "version":  "1.21",
     "buildDate":  "2026-07-17",
-    "buildId":  "1.21-2026-07-17-75fb9acd6b3f",
+    "buildId":  "1.21-2026-07-17-cd2bf46bd2e3",
     "packageName":  "SolarSitePrecheck_v1.21_release_light.zip",
     "zipUrl":  "https://raw.githubusercontent.com/Sonikim1743/Solar-site-precheck/main/release/latest/SolarSitePrecheck_v1.21_release_light.zip",
-    "sha256":  "75fb9acd6b3fb6886a3351405d1bf4a8bcf5c1227067c2b47a5b4f9bbc27eaa6",
-    "etag":  "75fb9acd6b3fb688",
-    "bundleName":  "index-B09Qfwn9.js",
+    "sha256":  "cd2bf46bd2e364b4265a7c7efd6fbbafac06fe4349628cf90cd494cb14788c5b",
+    "etag":  "cd2bf46bd2e364b4",
+    "bundleName":  "index-BoV-Isdk.js",
     "minRequiredRuntime":  "1.2",
     "notes":  "Light update package. Keep existing runtime/node.exe on desktop.",
-    "sizeBytes":  2037657
+    "sizeBytes":  2037779
 }
