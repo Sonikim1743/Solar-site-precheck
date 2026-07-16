@@ -244,7 +244,7 @@ async function writeBlobToFileHandle(fileHandle, blob) {
   await writable.close()
 }
 
-export async function savePdfPagesAsJpg(file, pageNumbers, onProgress = () => {}, options = {}) {
+export async function savePdfPagesAsJpg(file, pageNumbers, pageRotations = {}, onProgress = () => {}, options = {}) {
   await configurePdfJs()
   const scale = options.scale ?? 2.4
   const quality = options.quality ?? 0.92
@@ -255,8 +255,15 @@ export async function savePdfPagesAsJpg(file, pageNumbers, onProgress = () => {}
 
   for (let index = 0; index < selected.length; index += 1) {
     const pageNumber = selected[index]
+    const rotation = normalizeRotation(pageRotations[pageNumber] || 0)
     onProgress(`${index + 1}/${selected.length}ページをJPGに保存中…`)
-    const canvas = await renderPageToCanvas(pdf, pageNumber, scale)
+    const canvas = await renderPageToCanvas(pdf, pageNumber, scale, rotation)
+    const imageAnnotations = options.imageOverlay?.annotations?.[pageNumber] || []
+    for (const annotation of imageAnnotations) {
+      await drawImageOverlay(canvas, annotation)
+    }
+    const annotations = options.textOverlay?.annotations?.[pageNumber] || []
+    annotations.forEach((annotation) => drawTextOverlay(canvas, annotation))
     const blob = await canvasToJpegBlob(canvas, quality)
     const suffix = pdf.numPages > 1 ? `_p${String(pageNumber).padStart(2, '0')}` : ''
     const fileName = `${baseName}${suffix}.jpg`

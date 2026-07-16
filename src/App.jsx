@@ -1625,9 +1625,21 @@ export default function App() {
     setDrawingConvertStatus({ status: 'loading', message: '選択ページをJPGとして保存しています…' })
     try {
       const { savePdfPagesAsJpg } = await import('./services/pdfToJpg.js')
-      const count = await savePdfPagesAsJpg(drawingJob.file, drawingSelectedPages, (message) => {
+      const overlayOptions = {
+        textOverlay: Object.values(drawingTextTool.annotations).some((items) => items?.length)
+          ? {
+              annotations: drawingTextTool.annotations,
+            }
+          : null,
+        imageOverlay: Object.values(drawingImageTool.annotations).some((items) => items?.length)
+          ? {
+              annotations: drawingImageTool.annotations,
+            }
+          : null,
+      }
+      const count = await savePdfPagesAsJpg(drawingJob.file, drawingSelectedPages, drawingPageRotations, (message) => {
         setDrawingConvertStatus({ status: 'loading', message })
-      }, { directoryHandle, fileHandle, fileNameBase })
+      }, { directoryHandle, fileHandle, fileNameBase, ...overlayOptions })
       setDrawingConvertStatus({ status: 'success', message: `${count}ページをJPGとして保存しました。${chooseLocation ? '保存先を指定しました。' : ''}` })
     } catch (error) {
       setDrawingConvertStatus({ status: 'error', message: error.message || 'JPG保存に失敗しました。' })
