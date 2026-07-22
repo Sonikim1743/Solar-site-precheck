@@ -1,5 +1,5 @@
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
-import { configurePdfJs, pdfLoadOptions } from './pdfCompat.js'
+import { configurePdfJs, isMobileSafari, pdfLoadOptions } from './pdfCompat.js'
 import { analyzeInheritanceText, normalizeInheritanceText, summarizeInheritanceReceipts } from '../utils/inheritance.js'
 
 function textLinesFromPdfItems(items) {
@@ -27,10 +27,10 @@ function textLinesFromPdfItems(items) {
     .join('\n')
 }
 
-export async function readInheritancePdf(file, onProgress = () => {}) {
+async function extractInheritancePdf(file, onProgress, options = {}) {
   await configurePdfJs()
-  const data = await file.arrayBuffer()
-  const pdf = await getDocument(pdfLoadOptions(data)).promise
+  const data = new Uint8Array(await file.arrayBuffer())
+  const pdf = await getDocument(pdfLoadOptions(data, options.pdfOptions)).promise
   const pages = []
 
   for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
@@ -53,6 +53,35 @@ export async function readInheritancePdf(file, onProgress = () => {}) {
     pages,
     receiptSummary: summarizeInheritanceReceipts(pages),
     results: analyzeInheritanceText(pages),
+  }
+}
+
+export async function readInheritancePdf(file, onProgress = () => {}) {
+  try {
+    return await extractInheritancePdf(file, onProgress)
+  } catch (error) {
+    if (!isMobileSafari()) throw error
+
+    onProgress('iPhone Safari互換モードで再解析しています…')
+    try {
+      return await extractInheritancePdf(file, onProgress, {
+        pdfOptions: {
+          disableRange: true,
+          disableStream: true,
+          disableAutoFetch: true,
+          isImageDecoderSupported: false,
+          useWasm: false,
+          stopAtErrors: false,
+        },
+      })
+    } catch (safeError) {
+      throw new Error([
+        'iPhone Safariのブラウザ内解析でPDFを読み取れませんでした。',
+        '可能であればPortable / Local版、またはPCブラウザで再試行してください。',
+        `通常解析: ${error.message || '失敗'}`,
+        `Safari互換解析: ${safeError.message || '失敗'}`,
+      ].join(' '))
+    }
   }
 }
 

@@ -14,6 +14,7 @@ import {
 } from '../src/utils/obstructionElevations.js'
 import { snowRateLevel } from '../src/utils/snowRates.js'
 import { interpolateHorizonAngle, peakSolarWindowReference, solarPositionAtHour } from '../src/utils/solarWindow.js'
+import { evaluateSiteVerdict, primaryVerdictReasons } from '../src/utils/verdict.js'
 import { DETAILED_HORIZON_DIRECTIONS, HORIZON_DIRECTIONS, createHorizonDirections, recalculateTerrainObstruction } from '../src/services/gsi.js'
 import { adjacentThirdMeshes, productionFactor, thirdMeshBoundaryDistance, thirdMeshCenter, thirdMeshCode } from '../src/services/nedo.js'
 import { selectConsistentRates, validateRateSummaries } from '../src/services/nedoValidation.js'
@@ -321,7 +322,7 @@ test('solar window check compares winter peak sun height against horizon directi
     { samples },
   )
   assert.ok(result)
-  assert.equal(result.points.length, 5)
+  assert.equal(result.points.length, 7)
   assert.ok(['ok', 'watch', 'danger'].includes(result.status))
   assert.ok(Number.isFinite(result.tightest.margin))
 })
@@ -348,6 +349,45 @@ test('tree height changes recalculate horizon angles without dropping terrain re
   assert.equal(recalculated.samples[0].profile[0].obstructionHeight, 30)
   assert.equal(recalculated.samples[0].profile[0].effectiveElevation, 130)
   assert.ok(Number.isFinite(recalculated.maxAngle))
+})
+
+test('site verdict stays data-missing until core precheck data exists', () => {
+  const verdict = evaluateSiteVerdict({})
+  assert.equal(verdict.status, 'missing')
+  assert.equal(verdict.label, 'データ不足')
+  assert.ok(verdict.flags.some((flag) => flag.title === '地平線未分析'))
+})
+
+test('site verdict flags horizon, mesh boundary and snow risks without deciding project feasibility', () => {
+  const verdict = evaluateSiteVerdict({
+    position: { lat: 35, lon: 135 },
+    terrain: { maxAngle: 6, samples: [{ bearing: 180, angle: 6 }] },
+    snowStation: { snow10cm: { monthly: [0, 0.02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] } },
+    meshBoundary: { isNearBoundary: true, minDistanceMeters: 72 },
+    demSummary: { level: 'high', shouldWarn: false },
+    terrainSection: { lines: [{ summary: { elevationDiff: 1 } }] },
+  })
+  assert.equal(verdict.status, 'watch')
+  assert.equal(verdict.label, '要確認')
+  assert.ok(verdict.flags.some((flag) => flag.title === '地平線確認'))
+  assert.ok(verdict.flags.some((flag) => flag.title === '3次メッシュ境界'))
+  assert.ok(primaryVerdictReasons(verdict).length <= 3)
+})
+
+test('site verdict escalates to caution when winter sun or snow is critical', () => {
+  const verdict = evaluateSiteVerdict({
+    position: { lat: 35, lon: 135 },
+    terrain: { maxAngle: 1, samples: [{ bearing: 180, angle: 1 }] },
+    solarReference: { status: 'danger', message: '冬至9〜15時に干渉可能性があります。' },
+    snowStation: { snow10cm: { monthly: [0, 0.5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] } },
+    meshBoundary: { isNearBoundary: false, minDistanceMeters: 180 },
+    demSummary: { level: 'high', shouldWarn: false },
+    terrainSection: { lines: [{ summary: { elevationDiff: 0 } }] },
+  })
+  assert.equal(verdict.status, 'danger')
+  assert.equal(verdict.label, '要注意')
+  assert.ok(verdict.flags.some((flag) => flag.title === '冬季太陽高度'))
+  assert.ok(verdict.flags.some((flag) => flag.title === '積雪注意'))
 })
 
 test('Solar Pro obstruction CSV interpolates horizon values every 1 degree', () => {

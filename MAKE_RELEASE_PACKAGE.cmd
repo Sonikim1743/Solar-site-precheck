@@ -2,7 +2,7 @@
 cd /d "%~dp0"
 
 set "NODE_EXE=%USERPROFILE%\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe"
-set "VERSION=1.21"
+set "VERSION=1.22"
 set "BUILD_DATE="
 set "PACKAGE_DIR=outputs\SolarSitePrecheck_Release_Light"
 set "PACKAGE_ZIP=outputs\SolarSitePrecheck_v%VERSION%_release_light.zip"
@@ -23,6 +23,15 @@ if not exist "node_modules\vite\bin\vite.js" (
   echo node_modules was not found.
   echo Please run npm install first in this project folder.
   echo.
+  pause
+  exit /b 1
+)
+
+echo Checking source tree...
+"%NODE_EXE%" "work\assert-clean-tree.mjs"
+if errorlevel 1 (
+  echo.
+  echo Release packaging stopped.
   pause
   exit /b 1
 )

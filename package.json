@@ -1,7 +1,7 @@
 {
   "name": "solar-site-precheck",
   "private": true,
-  "version": "1.21.0",
+  "version": "1.22.0",
   "type": "module",
   "scripts": {
     "dev": "vite build --configLoader runner && vite preview --configLoader runner --host 127.0.0.1 --port 5173",

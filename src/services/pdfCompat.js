@@ -1,7 +1,7 @@
 import { GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import pdfWorkerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url'
 
-function isMobileSafari() {
+export function isMobileSafari() {
   if (typeof navigator === 'undefined') return false
   const ua = navigator.userAgent || ''
   const vendor = navigator.vendor || ''
@@ -11,12 +11,15 @@ function isMobileSafari() {
 }
 
 export function pdfLoadOptions(data, options = {}) {
+  const mobileSafari = isMobileSafari()
   return {
     data,
     isOffscreenCanvasSupported: false,
     useWorkerFetch: false,
-    disableFontFace: isMobileSafari(),
-    useSystemFonts: !isMobileSafari(),
+    isImageDecoderSupported: false,
+    useWasm: !mobileSafari,
+    disableFontFace: mobileSafari,
+    useSystemFonts: !mobileSafari,
     ...options,
   }
 }

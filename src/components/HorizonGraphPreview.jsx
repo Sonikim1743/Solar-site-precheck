@@ -71,11 +71,61 @@ function buildSolarPath(lat, declination) {
   return points.sort((a, b) => a.bearing - b.bearing)
 }
 
+function solarDeclinationForDay(dayOfYear) {
+  const gamma = (2 * Math.PI * (dayOfYear - 1)) / 365
+  return (180 / Math.PI) * (
+    0.006918
+    - 0.399912 * Math.cos(gamma)
+    + 0.070257 * Math.sin(gamma)
+    - 0.006758 * Math.cos(2 * gamma)
+    + 0.000907 * Math.sin(2 * gamma)
+    - 0.002697 * Math.cos(3 * gamma)
+    + 0.00148 * Math.sin(3 * gamma)
+  )
+}
+
+function equationOfTimeMinutes(dayOfYear) {
+  const gamma = (2 * Math.PI * (dayOfYear - 1)) / 365
+  return 229.18 * (
+    0.000075
+    + 0.001868 * Math.cos(gamma)
+    - 0.032077 * Math.sin(gamma)
+    - 0.014615 * Math.cos(2 * gamma)
+    - 0.040849 * Math.sin(2 * gamma)
+  )
+}
+
+function buildSolarHourGuide(position, hour) {
+  const standardMeridian = 135
+  const lonCorrectionMinutes = Number.isFinite(position?.lon) ? 4 * (position.lon - standardMeridian) : 0
+  const points = []
+  for (let day = 1; day <= 365; day += 3) {
+    const declination = solarDeclinationForDay(day)
+    const solarTime = hour + (equationOfTimeMinutes(day) + lonCorrectionMinutes) / 60
+    const solar = solarPositionAtHour(position.lat, solarTime, declination)
+    if (solar.altitude > 0.2 && solar.azimuth >= 0 && solar.azimuth <= 360) {
+      points.push({ bearing: solar.azimuth, angle: solar.altitude, hour, day })
+    }
+  }
+  return points
+}
+
+function guideLabelPoint(points) {
+  if (!points?.length) return null
+  return points.reduce((best, point) => point.angle > best.angle ? point : best, points[0])
+}
+
 function formatPeakPoint(point) {
   return `${point.hour}時 太陽${point.altitude.toFixed(1)}° / 山・木${Number.isFinite(point.horizonAngle) ? point.horizonAngle.toFixed(1) : '—'}°`
 }
 
-export default function HorizonGraphPreview({ position, terrain, solarReference }) {
+function pointTooltip(point) {
+  const horizon = Number.isFinite(point.horizonAngle) ? ` / 山・木 ${point.horizonAngle.toFixed(1)}°` : ''
+  const margin = Number.isFinite(point.margin) ? ` / 余裕 ${point.margin.toFixed(1)}°` : ''
+  return `${point.hour}時：太陽高度 ${point.altitude.toFixed(1)}° / 方位 ${point.azimuth.toFixed(0)}°${horizon}${margin}`
+}
+
+export default function HorizonGraphPreview({ position, terrain, solarReference, reportMode = false }) {
   const samples = terrain?.samples || []
   if (!position || !samples.length) return null
 
@@ -85,10 +135,14 @@ export default function HorizonGraphPreview({ position, terrain, solarReference 
   const equinoxPath = buildSolarPath(position.lat, 0)
   const winterPath = buildSolarPath(position.lat, -23.44)
   const peakPoints = solarReference?.peakWindow?.points || []
+  const reportPeakPoints = peakPoints.filter((point) => [9, 10, 12, 14, 15].includes(Number(point.hour)))
   const tightest = solarReference?.peakWindow?.tightest
+  const guideHours = reportMode
+    ? [8, 10, 11, 12, 13, 14, 16]
+    : [10, 12, 14]
 
   return (
-    <section className="horizon-graph-card" aria-label="地平線グラフプレビュー">
+    <section className={`horizon-graph-card ${reportMode ? 'horizon-graph-card--report' : ''}`} aria-label="地平線グラフプレビュー">
       <div className="horizon-graph-card__heading">
         <div>
           <strong>地平線グラフプレビュー</strong>
@@ -131,10 +185,25 @@ export default function HorizonGraphPreview({ position, terrain, solarReference 
           <polyline className="horizon-graph__sun horizon-graph__sun--equinox" points={pointsToPolyline(equinoxPath)} />
           <polyline className="horizon-graph__sun horizon-graph__sun--winter" points={pointsToPolyline(winterPath)} />
 
+          {reportMode && guideHours.map((hour) => {
+            const guide = buildSolarHourGuide(position, hour)
+            if (guide.length < 2) return null
+            const labelPoint = guideLabelPoint(guide)
+            return (
+              <g key={`guide-${hour}`} className="horizon-graph__hour-guide">
+                <polyline points={pointsToPolyline(guide)} />
+                {labelPoint && (
+                  <text x={xForBearing(labelPoint.bearing) + 5} y={yForAltitude(labelPoint.angle) + 3}>{hour}h</text>
+                )}
+              </g>
+            )
+          })}
+
           {peakPoints.map((point) => {
             const isTightest = tightest?.hour === point.hour
             return (
               <g key={point.hour} className={`horizon-graph__peak ${isTightest ? 'horizon-graph__peak--tightest' : ''}`}>
+                <title>{pointTooltip(point)}</title>
                 <circle cx={xForBearing(point.azimuth)} cy={yForAltitude(point.altitude)} r={isTightest ? 5 : 3.5} />
                 <text x={xForBearing(point.azimuth)} y={yForAltitude(point.altitude) - 9} textAnchor="middle">{point.hour}h</text>
               </g>
@@ -159,8 +228,8 @@ export default function HorizonGraphPreview({ position, terrain, solarReference 
 
       {peakPoints.length > 0 && (
         <div className={`horizon-graph-peak horizon-graph-peak--${solarReference?.peakWindow?.status || 'ok'}`}>
-          <strong>冬至10〜14時チェック</strong>
-          <span>{peakPoints.map(formatPeakPoint).join(' / ')}</span>
+          <strong>冬至9〜15時チェック</strong>
+          <span>{(reportMode ? reportPeakPoints : peakPoints).map(formatPeakPoint).join(' / ')}</span>
         </div>
       )}
     </section>

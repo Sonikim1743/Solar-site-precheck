@@ -1,5 +1,5 @@
 const WINTER_SOLSTICE_DECLINATION = -23.44
-const PEAK_HOURS = [10, 11, 12, 13, 14]
+const PEAK_HOURS = [9, 10, 11, 12, 13, 14, 15]
 
 export function toRad(value) {
   return (value * Math.PI) / 180
@@ -71,10 +71,10 @@ export function peakSolarWindowReference(position, terrain, hours = PEAK_HOURS) 
   const status = tightest.margin <= 0 ? 'danger' : tightest.margin <= 3 ? 'watch' : 'ok'
   const label = status === 'danger' ? '干渉可能性あり' : status === 'watch' ? '接近' : '余裕あり'
   const message = status === 'danger'
-    ? `冬至10〜14時のうち${tightest.hour}時頃、太陽の高さ 約${tightest.altitude.toFixed(1)}°に対して、その方向の山・木の見かけ高さが約${tightest.horizonAngle.toFixed(1)}°です。発電量の多い時間帯でも影の影響確認が必要です。`
+    ? `冬至9〜15時のうち${tightest.hour}時頃、太陽の高さ 約${tightest.altitude.toFixed(1)}°に対して、その方向の山・木の見かけ高さが約${tightest.horizonAngle.toFixed(1)}°です。発電量の多い時間帯でも影の影響確認が必要です。`
     : status === 'watch'
-      ? `冬至10〜14時で一番厳しいのは${tightest.hour}時頃です。太陽と山・木の高さ差は約${tightest.margin.toFixed(1)}°なので、周辺樹木・建物を現地確認してください。`
-      : `冬至10〜14時で一番厳しい${tightest.hour}時頃でも、太陽は山・木より約${tightest.margin.toFixed(1)}°高く見えます。`
+      ? `冬至9〜15時で一番厳しいのは${tightest.hour}時頃です。太陽と山・木の高さ差は約${tightest.margin.toFixed(1)}°なので、周辺樹木・建物を現地確認してください。`
+      : `冬至9〜15時で一番厳しい${tightest.hour}時頃でも、太陽は山・木より約${tightest.margin.toFixed(1)}°高く見えます。`
   return { status, label, message, points, tightest }
 }
 

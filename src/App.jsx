@@ -5,6 +5,7 @@ import HorizonGraphPreview from './components/HorizonGraphPreview.jsx'
 import TerrainSectionPreview from './components/TerrainSectionPreview.jsx'
 import SolarProPreviewButton from './components/SolarProPreviewButton.jsx'
 import DiagnosticPanel from './components/DiagnosticPanel.jsx'
+import PdfToolsPage, { clearPendingImagePlacement } from './components/PdfToolsPage.jsx'
 import {
   DETAILED_HORIZON_DIRECTIONS,
   HORIZON_DIRECTIONS,
@@ -57,8 +58,15 @@ const PLACE_API_FAILURE_THRESHOLD = 2
 const TERRAIN_ANALYSIS_VERSION = 2
 const GROUNDY_URL = 'https://www.app.groundy.net/map'
 const SOLAR_PRO_PORTAL_URL = 'https://laplaceid.energymntr.com/servicelist/solarpro/installer-related-info'
-const initialDrawingTextTool = { text: '', size: 28, annotations: {}, selected: null, editDrag: null }
-const initialDrawingImageTool = { src: '', name: '', aspectRatio: null, annotations: {}, drag: null, selected: null, editDrag: null }
+const initialDrawingTextTool = { text: '', size: 28, opacity: 1, annotations: {}, selected: null, editDrag: null }
+const initialDrawingImageTool = { src: '', name: '', aspectRatio: null, opacity: 1, annotations: {}, drag: null, selected: null, editDrag: null }
+const initialSolarProMemo = {
+  reportName: '',
+  annualYield: '',
+  capacity: '',
+  module: '',
+  checkedAt: '',
+}
 
 function isDynamicChunkLoadError(error) {
   const message = String(error?.message || error || '')
@@ -292,6 +300,10 @@ export default function App() {
   const [pdfProgress, setPdfProgress] = useState('')
   const [memo, setMemo] = useState('')
   const [fieldMemo, setFieldMemo] = useState('')
+  const [solarProMemo, setSolarProMemo] = useState(() => ({
+    ...initialSolarProMemo,
+    ...(draftSeed.solarProMemo || {}),
+  }))
   const [drawingConvertStatus, setDrawingConvertStatus] = useState({ status: 'idle', message: '' })
   const [drawingJob, setDrawingJob] = useState(null)
   const [drawingSelectedPages, setDrawingSelectedPages] = useState([])
@@ -337,6 +349,7 @@ export default function App() {
           detailedHorizon,
           snowStation: snowData.station,
           snowBase,
+          solarProMemo,
         }))
       } catch {
         // Storage can be unavailable or full; the app should continue to work without draft persistence.
@@ -344,7 +357,7 @@ export default function App() {
     }, 200)
 
     return () => window.clearTimeout(draftSaveTimer.current)
-  }, [position, elevation, terrain, obstructionHeight, detailedHorizon, snowData.station, snowBase])
+  }, [position, elevation, terrain, obstructionHeight, detailedHorizon, snowData.station, snowBase, solarProMemo])
 
   useEffect(() => {
     if (position && placeInfo.status === 'idle') schedulePlaceInfo(position)
@@ -1132,6 +1145,7 @@ export default function App() {
       x: point.x,
       y: point.y,
       size: drawingTextTool.size,
+      opacity: Number.isFinite(drawingTextTool.opacity) ? Math.max(0.1, Math.min(1, drawingTextTool.opacity)) : 1,
     }
     setDrawingTextTool((current) => ({
       ...current,
@@ -1307,6 +1321,28 @@ export default function App() {
           ...current.annotations,
           [page.pageNumber]: (current.annotations[page.pageNumber] || []).map((annotation) => {
             if (annotation.id !== edit.id) return annotation
+            if (edit.type === 'resize') {
+              const pageAspect = visualPageAspect(page)
+              const aspectRatio = edit.aspectRatio || annotation.aspectRatio || drawingImageTool.aspectRatio || 1
+              const rawWidth = Math.max(0.03, point.x - annotation.x)
+              const rawHeight = Math.max(0.03, point.y - annotation.y)
+              const widthByHeight = rawHeight * aspectRatio / pageAspect
+              let width = Math.max(rawWidth, widthByHeight)
+              let height = width * pageAspect / aspectRatio
+              if (annotation.x + width > 1) {
+                width = Math.max(0.03, 1 - annotation.x)
+                height = width * pageAspect / aspectRatio
+              }
+              if (annotation.y + height > 1) {
+                height = Math.max(0.03, 1 - annotation.y)
+                width = height * aspectRatio / pageAspect
+              }
+              return {
+                ...annotation,
+                width: Math.max(0.03, Math.min(1 - annotation.x, width)),
+                height: Math.max(0.03, Math.min(1 - annotation.y, height)),
+              }
+            }
             const width = annotation.width || 0.1
             const height = annotation.height || 0.1
             return {
@@ -1370,6 +1406,7 @@ export default function App() {
       height: fitted.height,
       aspectRatio: drawingImageTool.aspectRatio || null,
       rotation: 0,
+      opacity: Number.isFinite(drawingImageTool.opacity) ? Math.max(0.1, Math.min(1, drawingImageTool.opacity)) : 1,
     }
     setDrawingImageTool((current) => ({
       ...current,
@@ -1392,10 +1429,31 @@ export default function App() {
       ...current,
       selected: { pageNumber: page.pageNumber, id: annotation.id },
       editDrag: {
+        type: 'move',
         pageNumber: page.pageNumber,
         id: annotation.id,
         offsetX: point.x - annotation.x,
         offsetY: point.y - annotation.y,
+      },
+    }))
+    setDrawingTextTool((current) => ({ ...current, selected: null, editDrag: null }))
+  }
+
+  function startDrawingImageResize(page, annotation, event) {
+    event.preventDefault()
+    event.stopPropagation()
+    if (!isRotatedPreviewReady(page)) {
+      warnRotatedPreviewPreparing()
+      return
+    }
+    setDrawingImageTool((current) => ({
+      ...current,
+      selected: { pageNumber: page.pageNumber, id: annotation.id },
+      editDrag: {
+        type: 'resize',
+        pageNumber: page.pageNumber,
+        id: annotation.id,
+        aspectRatio: annotation.aspectRatio || current.aspectRatio || 1,
       },
     }))
     setDrawingTextTool((current) => ({ ...current, selected: null, editDrag: null }))
@@ -1491,6 +1549,42 @@ export default function App() {
     })
   }
 
+  function changeSelectedTextOpacity(opacity) {
+    const nextOpacity = Math.max(0.1, Math.min(1, Number(opacity) || 1))
+    setDrawingTextTool((current) => {
+      const selected = current.selected
+      const next = { ...current, opacity: nextOpacity }
+      if (!selected) return next
+      return {
+        ...next,
+        annotations: {
+          ...current.annotations,
+          [selected.pageNumber]: (current.annotations[selected.pageNumber] || []).map((annotation) => annotation.id === selected.id
+            ? { ...annotation, opacity: nextOpacity }
+            : annotation),
+        },
+      }
+    })
+  }
+
+  function changeSelectedImageOpacity(opacity) {
+    const nextOpacity = Math.max(0.1, Math.min(1, Number(opacity) || 1))
+    setDrawingImageTool((current) => {
+      const selected = current.selected
+      const next = { ...current, opacity: nextOpacity }
+      if (!selected) return next
+      return {
+        ...next,
+        annotations: {
+          ...current.annotations,
+          [selected.pageNumber]: (current.annotations[selected.pageNumber] || []).map((annotation) => annotation.id === selected.id
+            ? { ...annotation, opacity: nextOpacity }
+            : annotation),
+        },
+      }
+    })
+  }
+
   function deleteSelectedImage() {
     const selected = drawingImageTool.selected
     if (!selected) return
@@ -1523,31 +1617,31 @@ export default function App() {
     const files = Array.from(event.target.files || [])
     event.target.value = ''
     if (!files.length) return
-    let fileHandle = null
+    setDrawingPanelOpen(true)
+    setDrawingConvertStatus({ status: 'loading', message: '画像をPDFページとして読み込んでいます…' })
+    setDrawingJob(null)
+    setDrawingSelectedPages([])
+    setActiveDrawingPageNumber(null)
+    setPdfPreviewView({ zoom: 1, x: 0, y: 0, panMode: false, drag: null })
+    setDrawingPageRotations({})
+    setDrawingRotatedPreviews({})
+    setDrawingMergeFiles([])
+    setDrawingTextTool(initialDrawingTextTool)
+    setDrawingImageTool(initialDrawingImageTool)
     try {
-      if (window.showSaveFilePicker) {
-        fileHandle = await window.showSaveFilePicker({
-          suggestedName: `画像PDF_${new Date().toISOString().slice(0, 10).replaceAll('-', '')}.pdf`,
-          types: [{ description: 'PDF', accept: { 'application/pdf': ['.pdf'] } }],
-        })
-      }
-    } catch (error) {
-      if (error?.name === 'AbortError') {
-        setDrawingConvertStatus({ status: 'idle', message: '画像PDF作成をキャンセルしました。' })
-        return
-      }
-      setDrawingConvertStatus({ status: 'error', message: error.message || '保存先の選択に失敗しました。' })
-      return
-    }
-    setDrawingConvertStatus({ status: 'loading', message: '画像からPDFを作成しています…' })
-    try {
-      const { saveImageFilesAsPdf } = await import('./services/pdfToJpg.js')
-      const count = await saveImageFilesAsPdf(files, (message) => {
+      const { prepareImageFilesPdfPreview } = await import('./services/pdfToJpg.js')
+      const job = await prepareImageFilesPdfPreview(files, (message) => {
         setDrawingConvertStatus({ status: 'loading', message })
-      }, { fileHandle, fileNameBase: '画像PDF' })
-      setDrawingConvertStatus({ status: 'success', message: `${count}枚の画像をPDFに変換しました。` })
+      })
+      setDrawingJob(job)
+      setDrawingSelectedPages(job.pages.map((page) => page.pageNumber))
+      setActiveDrawingPageNumber(job.pages[0]?.pageNumber || null)
+      setPdfPreviewView({ zoom: 1, x: 0, y: 0, panMode: false, drag: null })
+      setDrawingPageRotations(Object.fromEntries(job.pages.map((page) => [page.pageNumber, 0])))
+      setDrawingRotatedPreviews({})
+      setDrawingConvertStatus({ status: 'success', message: `${job.pageCount}枚の画像を読み込みました。注記を配置してから、選択ページPDF保存で保存先を指定できます。` })
     } catch (error) {
-      setDrawingConvertStatus({ status: 'error', message: isDynamicChunkLoadError(error) ? dynamicChunkRefreshMessage() : error.message || '画像PDF作成に失敗しました。' })
+      setDrawingConvertStatus({ status: 'error', message: isDynamicChunkLoadError(error) ? dynamicChunkRefreshMessage() : error.message || '画像を読み込めませんでした。' })
     }
   }
 
@@ -1624,7 +1718,7 @@ export default function App() {
     }
     setDrawingConvertStatus({ status: 'loading', message: '選択ページをJPGとして保存しています…' })
     try {
-      const { savePdfPagesAsJpg } = await import('./services/pdfToJpg.js')
+      const { savePdfPagesAsJpg, savePreparedImagePagesAsJpg } = await import('./services/pdfToJpg.js')
       const overlayOptions = {
         textOverlay: Object.values(drawingTextTool.annotations).some((items) => items?.length)
           ? {
@@ -1637,9 +1731,18 @@ export default function App() {
             }
           : null,
       }
-      const count = await savePdfPagesAsJpg(drawingJob.file, drawingSelectedPages, drawingPageRotations, (message) => {
-        setDrawingConvertStatus({ status: 'loading', message })
-      }, { directoryHandle, fileHandle, fileNameBase, ...overlayOptions })
+      const count = drawingJob.mode === 'images'
+        ? await savePreparedImagePagesAsJpg(
+            drawingJob.pages.filter((page) => drawingSelectedPages.includes(page.pageNumber)),
+            drawingPageRotations,
+            (message) => {
+              setDrawingConvertStatus({ status: 'loading', message })
+            },
+            { directoryHandle, fileHandle, fileNameBase, ...overlayOptions },
+          )
+        : await savePdfPagesAsJpg(drawingJob.file, drawingSelectedPages, drawingPageRotations, (message) => {
+            setDrawingConvertStatus({ status: 'loading', message })
+          }, { directoryHandle, fileHandle, fileNameBase, ...overlayOptions })
       setDrawingConvertStatus({ status: 'success', message: `${count}ページをJPGとして保存しました。${chooseLocation ? '保存先を指定しました。' : ''}` })
     } catch (error) {
       setDrawingConvertStatus({ status: 'error', message: error.message || 'JPG保存に失敗しました。' })
@@ -1673,7 +1776,7 @@ export default function App() {
     }
     setDrawingConvertStatus({ status: 'loading', message: '選択ページを1つのPDFとして保存しています…' })
     try {
-      const { savePdfPagesAsPdf, savePreparedPdfPagesAsPdf } = await import('./services/pdfToJpg.js')
+      const { savePdfPagesAsPdf, savePreparedPdfPagesAsPdf, savePreparedImagePagesAsPdf } = await import('./services/pdfToJpg.js')
       const overlayOptions = {
         textOverlay: Object.values(drawingTextTool.annotations).some((items) => items?.length)
           ? {
@@ -1686,8 +1789,8 @@ export default function App() {
             }
           : null,
       }
-      const count = drawingJob.mode === 'multi'
-        ? await savePreparedPdfPagesAsPdf(
+      const count = drawingJob.mode === 'images'
+        ? await savePreparedImagePagesAsPdf(
             drawingJob.pages.filter((page) => drawingSelectedPages.includes(page.pageNumber)),
             drawingPageRotations,
             (message) => {
@@ -1699,13 +1802,26 @@ export default function App() {
               ...overlayOptions,
             },
           )
-        : await savePdfPagesAsPdf(drawingJob.file, drawingSelectedPages, drawingPageRotations, (message) => {
-        setDrawingConvertStatus({ status: 'loading', message })
-      }, {
-        fileHandle,
-        fileNameBase,
-        ...overlayOptions,
-      })
+        : drawingJob.mode === 'multi'
+          ? await savePreparedPdfPagesAsPdf(
+              drawingJob.pages.filter((page) => drawingSelectedPages.includes(page.pageNumber)),
+              drawingPageRotations,
+              (message) => {
+                setDrawingConvertStatus({ status: 'loading', message })
+              },
+              {
+                fileHandle,
+                fileNameBase,
+                ...overlayOptions,
+              },
+            )
+          : await savePdfPagesAsPdf(drawingJob.file, drawingSelectedPages, drawingPageRotations, (message) => {
+              setDrawingConvertStatus({ status: 'loading', message })
+            }, {
+              fileHandle,
+              fileNameBase,
+              ...overlayOptions,
+            })
       setDrawingConvertStatus({ status: 'success', message: `${count}ページを1つのPDFとして保存しました。${chooseLocation ? '保存先を指定しました。' : ''}` })
     } catch (error) {
       setDrawingConvertStatus({ status: 'error', message: error.message || 'PDF保存に失敗しました。' })
@@ -1900,14 +2016,15 @@ export default function App() {
     buildDate: BUILD_DATE,
     memo,
     fieldMemo,
-  }), [position, elevation, terrain, terrainSection, siteName, selectedParcel, confirmedSnowStation, expectedSnowMesh, meshBoundary, snowBase, obstructionHeight, solarReference, selectedPlaceLabel, memo, fieldMemo])
+    solarProMemo,
+  }), [position, elevation, terrain, terrainSection, siteName, selectedParcel, confirmedSnowStation, expectedSnowMesh, meshBoundary, snowBase, obstructionHeight, solarReference, selectedPlaceLabel, memo, fieldMemo, solarProMemo])
 
   function downloadCsv() {
     const rows = [
       ['項目', '値'],
       ['候補地名', siteName],
       ['地番', selectedParcel?.number || ''],
-      ['地番区域', [selectedParcel?.municipality, selectedParcel?.area].filter(Boolean).join(' ')],
+      ['地番所在地', [selectedParcel?.municipality, selectedParcel?.area].filter(Boolean).join(' ')],
       ['緯度（度分）', position ? toDegreeMinutes(position.lat, 'lat') : ''],
       ['経度（度分）', position ? toDegreeMinutes(position.lon, 'lon') : ''],
       ['緯度（10進）', position?.lat?.toFixed(6) || ''],
@@ -1917,7 +2034,7 @@ export default function App() {
       ['地平線の想定樹高(m)', obstructionHeight.toFixed(1)],
       ['冬至南中太陽高度', solarReference ? `${solarReference.winterSolsticeNoon.toFixed(1)}°` : ''],
       ['太陽高度比較', solarReference ? `${solarReference.label} / ${solarReference.message}` : ''],
-      ['冬至10〜14時ピーク時間帯確認', solarReference?.peakWindow ? `${solarReference.peakWindow.label} / ${solarReference.peakWindow.message}` : ''],
+      ['冬至9〜15時ピーク時間帯確認', solarReference?.peakWindow ? `${solarReference.peakWindow.label} / ${solarReference.peakWindow.message}` : ''],
       ...(terrain?.samples || HORIZON_DIRECTIONS).map(({ bearing, direction }) => [
         `地平線仰角 ${bearing}° ${direction}`,
         terrain?.samples?.find((sample) => sample.bearing === bearing)?.angle?.toFixed(1) || '',
@@ -1935,6 +2052,11 @@ export default function App() {
       ]),
       ['候補地メモ', memo],
       ['現地確認メモ', fieldMemo],
+      ['Solar Proレポート名', solarProMemo.reportName],
+      ['Solar Pro年間発電量', solarProMemo.annualYield],
+      ['Solar Pro設備容量', solarProMemo.capacity],
+      ['Solar Pro使用モジュール', solarProMemo.module],
+      ['Solar Pro確認日', solarProMemo.checkedAt],
     ]
     const csv = `\uFEFF${rows.map((row) => row.map(escapeCsv).join(',')).join('\r\n')}`
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
@@ -2042,6 +2164,18 @@ export default function App() {
     if (!drawingJob?.pages?.length) return null
     return drawingJob.pages.find((page) => page.pageNumber === activeDrawingPageNumber) || drawingJob.pages[0]
   }, [drawingJob, activeDrawingPageNumber])
+  const selectedImageOpacity = useMemo(() => {
+    const selected = drawingImageTool.selected
+    if (!selected) return Number.isFinite(drawingImageTool.opacity) ? drawingImageTool.opacity : 1
+    const annotation = (drawingImageTool.annotations[selected.pageNumber] || []).find((item) => item.id === selected.id)
+    return Number.isFinite(annotation?.opacity) ? annotation.opacity : 1
+  }, [drawingImageTool])
+  const selectedTextOpacity = useMemo(() => {
+    const selected = drawingTextTool.selected
+    if (!selected) return Number.isFinite(drawingTextTool.opacity) ? drawingTextTool.opacity : 1
+    const annotation = (drawingTextTool.annotations[selected.pageNumber] || []).find((item) => item.id === selected.id)
+    return Number.isFinite(annotation?.opacity) ? annotation.opacity : 1
+  }, [drawingTextTool])
 
   useEffect(() => {
     const element = activePdfPreviewRef.current
@@ -2242,12 +2376,23 @@ export default function App() {
               <div>
                 <div className="heading-with-help">
                   <h2>候補地点を選択</h2>
-                  <span className="help-tooltip" tabIndex="0" aria-label="GroundyやGoogleマップで現地情報と位置を確認してから入力すると、候補地点の指定精度が上がります。">
-                    ?
-                    <span className="help-tooltip__body" role="tooltip">
-                      GroundyやGoogleマップで現地情報・周辺道路・区画を確認してから住所や座標を入力すると、位置指定の精度が上がります。
-                    </span>
-                  </span>
+                  <details className="workflow-help no-print">
+                    <summary aria-label="候補地点選択のヒントと基本作業順を確認">?</summary>
+                    <div className="workflow-help__body">
+                      <strong>候補地点選択のヒント</strong>
+                      <p className="workflow-help__lead">
+                        GroundyやGoogleマップで現地情報・周辺道路・区画を確認してから住所や座標を入力すると、位置指定の精度が上がります。
+                      </p>
+                      <strong>基本作業順</strong>
+                      <ol>
+                        <li><b>地点を選択</b><span>住所・座標・地図クリックで候補地点を決める</span></li>
+                        <li><b>地平線分析</b><span>DEMと想定樹高からCSV用の地平線値を作る</span></li>
+                        <li><b>NEDO積雪取得</b><span>同一3次メッシュの積雪値だけを採用する</span></li>
+                        <li><b>レポート確認</b><span>一次確認レポートとSolar Pro用CSVへ進む</span></li>
+                      </ol>
+                      <p className="workflow-help__note">※ 事業可否の最終判定ではなく、Solar Pro入力前の根拠整理です。</p>
+                    </div>
+                  </details>
                 </div>
                 <p>住所・地名・緯度経度をまとめて検索、または航空写真を直接クリック</p>
               </div>
@@ -2314,7 +2459,7 @@ export default function App() {
                       value={parcelQuery}
                       onChange={(event) => setParcelQuery(event.target.value)}
                       disabled={!parcelData}
-                      placeholder={parcelData ? '地番・地番区域を検索' : '先に地番ファイルを読み込む'}
+                      placeholder={parcelData ? '地番・所在地を検索' : '先に地番ファイルを読み込む'}
                       aria-label="地番検索"
                     />
                     {parcelQuery && parcelData && (
@@ -2326,7 +2471,7 @@ export default function App() {
                               setParcelQuery('')
                             }}>
                               <strong>{info.number}</strong>
-                              <span>{[info.municipality, info.area].filter(Boolean).join(' ') || '地番区域情報なし'}</span>
+                              <span>{[info.municipality, info.area].filter(Boolean).join(' ') || '所在地情報なし'}</span>
                             </button>
                           </li>
                         ))}
@@ -2535,7 +2680,7 @@ export default function App() {
                         <span>{solarReference.message}</span>
                         {solarReference.peakWindow && (
                           <div className={`solar-peak-check solar-peak-check--${solarReference.peakWindow.status}`}>
-                            <strong>発電ピーク時間帯（冬至10〜14時）：{solarReference.peakWindow.label}</strong>
+                            <strong>発電ピーク時間帯（冬至9〜15時）：{solarReference.peakWindow.label}</strong>
                             <span>{solarReference.peakWindow.message}</span>
                           </div>
                         )}
@@ -2841,6 +2986,54 @@ export default function App() {
               <button type="button" className="secondary-button" onClick={downloadCsv}>チェックCSV出力</button>
               <button type="button" className="primary-button" onClick={() => window.print()}>PDF印刷</button>
             </div>
+            <details className="solarpro-memo-panel no-print">
+              <summary>
+                <span>Solar Pro照合メモ</span>
+                <small>発電量レポートと突き合わせる時だけ入力</small>
+              </summary>
+              <div className="solarpro-memo-grid">
+                <label>
+                  <span>Solar Proレポート名</span>
+                  <input
+                    value={solarProMemo.reportName}
+                    onChange={(event) => setSolarProMemo((current) => ({ ...current, reportName: event.target.value }))}
+                    placeholder="例：庄原市永末町①発電所"
+                  />
+                </label>
+                <label>
+                  <span>年間発電量</span>
+                  <input
+                    value={solarProMemo.annualYield}
+                    onChange={(event) => setSolarProMemo((current) => ({ ...current, annualYield: event.target.value }))}
+                    placeholder="例：1,234,567 kWh/年"
+                  />
+                </label>
+                <label>
+                  <span>設備容量</span>
+                  <input
+                    value={solarProMemo.capacity}
+                    onChange={(event) => setSolarProMemo((current) => ({ ...current, capacity: event.target.value }))}
+                    placeholder="例：999.9 kW"
+                  />
+                </label>
+                <label>
+                  <span>使用モジュール</span>
+                  <input
+                    value={solarProMemo.module}
+                    onChange={(event) => setSolarProMemo((current) => ({ ...current, module: event.target.value }))}
+                    placeholder="例：JKM655N-66QL6-BDV-F1-JP"
+                  />
+                </label>
+                <label>
+                  <span>確認日</span>
+                  <input
+                    value={solarProMemo.checkedAt}
+                    onChange={(event) => setSolarProMemo((current) => ({ ...current, checkedAt: event.target.value }))}
+                    placeholder="例：2026.07.21"
+                  />
+                </label>
+              </div>
+            </details>
             <ReportPreview report={report} />
             </div>
           </details>
@@ -3068,268 +3261,74 @@ export default function App() {
         )}
 
         {activePage === 'pdf' && (
-          <section className="inheritance-section panel inheritance-section--standalone pdf-tool-page" id="pdf-tools">
-            <div className="inheritance-page-heading">
-              <div className="section-heading">
-                <div className="step-number">PDF</div>
-                <div>
-                  <div className="heading-with-help">
-                    <h2>PDFツール</h2>
-                    <ArrayLengthHelp />
-                  </div>
-                  <p>複数PDFのページ選択、1つのPDFへの保存、ページ回転、注記・クリップボード画像の貼り付けを行います。</p>
-                </div>
-              </div>
-              <button type="button" className="secondary-button" onClick={() => switchPage('solar')}>
-                太陽光チェックへ戻る
-              </button>
-            </div>
-
-            <div className="pdf-tool-panel">
-              <div className="privacy-note">
-                <strong>PDF作業はブラウザ内で処理</strong>
-                <span>図面や社内資料を外部サイトへ送らず、選択ページだけをまとめて保存できます。大容量PDFでは処理に時間がかかる場合があります。</span>
-              </div>
-
-              <div className="pdf-tool-actions">
-                <label className="utility-button">
-                  PDFを開く
-                  <input type="file" accept="application/pdf,.pdf" onChange={handleDrawingPdfToJpg} />
-                </label>
-                <label className="utility-button utility-button--soft">
-                  PDFをまとめる
-                  <input type="file" accept="application/pdf,.pdf" multiple onChange={handleMergePdfFiles} />
-                </label>
-                <label className="utility-button utility-button--soft">
-                  画像→PDF
-                  <input type="file" accept="image/*,.jpg,.jpeg,.png,.webp" multiple onChange={handleImageFilesToPdf} />
-                </label>
-                <label className="pdf-tool-toggle">
-                  <input
-                    type="checkbox"
-                    checked={drawingMergePreview}
-                    onChange={(event) => setDrawingMergePreview(event.target.checked)}
-                  />
-                  <span>複数PDFもプレビューして必要ページだけ選ぶ</span>
-                </label>
-                {drawingMergeFiles.length >= 2 && !drawingMergePreview && (
-                  <button
-                    type="button"
-                    className="utility-button"
-                    disabled={drawingConvertStatus.status === 'loading'}
-                    onClick={saveMergedDrawingPdfs}
-                  >
-                    PDFまとめ保存
-                  </button>
-                )}
-              </div>
-
-              {drawingConvertStatus.message && (
-                <p className={`utility-message utility-message--${drawingConvertStatus.status}`}>
-                  {drawingConvertStatus.message}
-                </p>
-              )}
-
-              {drawingJob ? (
-                <div className="drawing-converter drawing-converter--pdf-tool">
-                  <div className="drawing-converter__toolbar">
-                    <strong>{drawingJob.baseName}</strong>
-                    <span>{drawingSelectedPages.length}/{drawingJob.pageCount}ページ選択中</span>
-                    <button type="button" onClick={() => setDrawingSelectedPages(drawingJob.pages.map((page) => page.pageNumber))}>選択</button>
-                    <button type="button" onClick={() => setDrawingSelectedPages([])}>選択解除</button>
-                    <button type="button" disabled={!drawingSelectedPages.length || drawingConvertStatus.status === 'loading'} onClick={() => saveSelectedDrawingPages({ chooseLocation: canChooseSaveLocation })}>
-                      JPG保存
-                    </button>
-                    <button type="button" disabled={!drawingSelectedPages.length || drawingConvertStatus.status === 'loading'} onClick={() => saveSelectedDrawingPagesAsPdf({ chooseLocation: canChooseSaveLocation })}>
-                      選択ページPDF保存
-                    </button>
-                  </div>
-
-                  <div className="pdf-workbench">
-                    <div className="pdf-workbench__main">
-                      {activeDrawingPage && (() => {
-                        const page = activeDrawingPage
-                        const drag = drawingImageTool.drag?.pageNumber === page.pageNumber ? drawingImageTool.drag : null
-                        const dragStyle = drag
-                          ? activePreviewBoxStyle(page, {
-                              x: Math.min(drag.startX, drag.currentX),
-                              y: Math.min(drag.startY, drag.currentY),
-                              width: Math.abs(drag.currentX - drag.startX),
-                              height: Math.abs(drag.currentY - drag.startY),
-                            })
-                          : null
-                        return (
-                          <div className="pdf-active-page">
-                            <div className="pdf-active-page__head">
-                              <div>
-                                <strong>{page.sourceName ? `${page.sourceName} / ` : ''}{page.sourcePageNumber || page.pageNumber}ページ</strong>
-                                <span>先にページ向きを決めてから、文字・画像を配置してください。回転するとこのページの注記はクリアされます。</span>
-                              </div>
-                              <label className="pdf-active-page__check">
-                                <input type="checkbox" checked={drawingSelectedPages.includes(page.pageNumber)} onChange={() => toggleDrawingPage(page.pageNumber)} />
-                                保存対象
-                              </label>
-                            </div>
-                            <div
-                              ref={activePdfPreviewRef}
-                              className={`pdf-active-page__preview drawing-page-card__preview ${drawingImageTool.src ? 'drawing-page-card__preview--image-mode' : ''} ${pdfPreviewView.panMode ? 'pdf-active-page__preview--pan' : ''}`}
-                              onClick={(event) => { if (!drawingImageTool.src) setDrawingTextPosition(page, event) }}
-                              onMouseDown={(event) => beginDrawingImageArea(page, event)}
-                              onMouseMove={(event) => updateDrawingImageArea(page, event)}
-                              onMouseUp={(event) => finishDrawingImageArea(page, event)}
-                              onMouseLeave={(event) => {
-                                if (
-                                  drawingImageTool.drag?.pageNumber === page.pageNumber ||
-                                  drawingImageTool.editDrag?.pageNumber === page.pageNumber ||
-                                  drawingTextTool.editDrag?.pageNumber === page.pageNumber ||
-                                  pdfPreviewView.drag
-                                ) finishDrawingImageArea(page, event)
-                              }}
-                            >
-                              <img
-                                className="pdf-active-page__image"
-                                src={previewUrlForPage(page)}
-                                alt={`${page.pageNumber}ページの大きいプレビュー`}
-                                style={activePreviewImageStyle(page)}
-                              />
-                              {!isRotatedPreviewReady(page) && (
-                                <div className="pdf-active-page__preparing">
-                                  回転プレビューを作成中…
-                                </div>
-                              )}
-                              {(drawingImageTool.annotations[page.pageNumber] || []).map((annotation) => (
-                                <img
-                                  key={annotation.id}
-                                  className={`drawing-page-card__image-marker ${drawingImageTool.selected?.pageNumber === page.pageNumber && drawingImageTool.selected?.id === annotation.id ? 'drawing-page-card__image-marker--selected' : ''}`}
-                                  src={annotation.src}
-                                  alt=""
-                                  onMouseDown={(event) => startDrawingImageMove(page, annotation, event)}
-                                  onClick={(event) => {
-                                    event.preventDefault()
-                                    event.stopPropagation()
-                                    setDrawingImageTool((current) => ({ ...current, selected: { pageNumber: page.pageNumber, id: annotation.id } }))
-                                    setDrawingTextTool((current) => ({ ...current, selected: null, editDrag: null }))
-                                  }}
-                                  style={{
-                                    ...activePreviewBoxStyle(page, annotation),
-                                    transform: `rotate(${annotation.rotation || 0}deg)`,
-                                  }}
-                                />
-                              ))}
-                              {(drawingTextTool.annotations[page.pageNumber] || []).map((annotation) => (
-                                <span
-                                  key={annotation.id}
-                                  className={`drawing-page-card__text-marker ${drawingTextTool.selected?.pageNumber === page.pageNumber && drawingTextTool.selected?.id === annotation.id ? 'drawing-page-card__text-marker--selected' : ''}`}
-                                  onMouseDown={(event) => startDrawingTextMove(page, annotation, event)}
-                                  onClick={(event) => {
-                                    event.preventDefault()
-                                    event.stopPropagation()
-                                    setDrawingTextTool((current) => ({ ...current, selected: { pageNumber: page.pageNumber, id: annotation.id } }))
-                                    setDrawingImageTool((current) => ({ ...current, selected: null, editDrag: null }))
-                                  }}
-                                  style={{
-                                    ...activePreviewPointStyle(page, annotation),
-                                    '--text-marker-scale': `${Math.max(1, Math.min(2.3, (annotation.size ?? drawingTextTool.size) / 28))}`,
-                                  }}
-                                >
-                                  {annotation.text}
-                                </span>
-                              ))}
-                              {dragStyle && <span className="drawing-page-card__drag-rect" style={dragStyle}></span>}
-                            </div>
-                            <div className="pdf-active-page__controls">
-                              <button type="button" onClick={() => changePdfPreviewZoom(-0.2)}>−</button>
-                              <span className="pdf-active-page__zoom">{Math.round(pdfPreviewView.zoom * 100)}%</span>
-                              <button type="button" onClick={() => changePdfPreviewZoom(0.2)}>＋</button>
-                              <button type="button" className={pdfPreviewView.panMode ? 'is-active' : ''} onClick={() => setPdfPreviewView((current) => ({ ...current, panMode: !current.panMode, drag: null }))}>移動</button>
-                              <button type="button" onClick={resetPdfPreviewView}>表示リセット</button>
-                              <button type="button" onClick={() => rotateDrawingPage(page.pageNumber, -90)}>↺ 左90°</button>
-                              <button type="button" onClick={() => rotateDrawingPage(page.pageNumber, 90)}>↻ 右90°</button>
-                            </div>
-                          </div>
-                        )
-                      })()}
-                    </div>
-
-                    <div className="pdf-workbench__side">
-                      <div className="pdf-workbench__side-title">
-                        <strong>ページ一覧</strong>
-                        <span>クリックで左に表示</span>
-                      </div>
-                      <div className="drawing-page-grid drawing-page-grid--wide">
-                        {drawingJob.pages.map((page) => (
-                        <label className={`drawing-page-card ${drawingSelectedPages.includes(page.pageNumber) ? 'drawing-page-card--selected' : ''} ${activeDrawingPage?.pageNumber === page.pageNumber ? 'drawing-page-card--active' : ''}`} key={page.pageNumber} onClick={() => setActiveDrawingPageNumber(page.pageNumber)}>
-                          <input type="checkbox" checked={drawingSelectedPages.includes(page.pageNumber)} onChange={() => toggleDrawingPage(page.pageNumber)} />
-                          <span>{page.sourceName ? `${page.sourceName} / ` : ''}{page.sourcePageNumber || page.pageNumber}ページ / 回転 {drawingPageRotations[page.pageNumber] || 0}°</span>
-                          <div className="drawing-page-card__preview">
-                            <img
-                              src={previewUrlForPage(page)}
-                              alt={`${page.pageNumber}ページのプレビュー`}
-                            />
-                          </div>
-                          <div className="drawing-page-card__rotate">
-                            <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); rotateDrawingPage(page.pageNumber, -90) }}>↺ 左90°</button>
-                            <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); rotateDrawingPage(page.pageNumber, 90) }}>↻ 右90°</button>
-                          </div>
-                        </label>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="drawing-text-tool drawing-text-tool--pdf">
-                    <div>
-                      <strong>注記・画像貼り付け</strong>
-                      <span>文字は入力後にページをクリック。画像はクリップボードから読み込み、貼り付けたい範囲をドラッグします。</span>
-                    </div>
-                    <textarea
-                      value={drawingTextTool.text}
-                      onChange={(event) => setDrawingTextTool((current) => ({ ...current, text: event.target.value }))}
-                      placeholder={'例：確認済 / 要差替 / 2026.07.15\n複数行も入力できます'}
-                      rows="2"
-                    />
-                    <label>
-                      文字サイズ
-                      <select
-                        value={drawingTextTool.size}
-                        onChange={(event) => changeDrawingTextSize(Number(event.target.value))}
-                      >
-                        <option value="20">小</option>
-                        <option value="28">標準</option>
-                        <option value="38">大</option>
-                        <option value="52">特大</option>
-                      </select>
-                    </label>
-                    <button type="button" onClick={loadClipboardImageForPdf}>画像読込</button>
-                    <button type="button" onClick={() => setDrawingTextTool(initialDrawingTextTool)}>文字クリア</button>
-                    <button type="button" onClick={() => setDrawingImageTool(initialDrawingImageTool)}>画像クリア</button>
-                  </div>
-                  <div className="drawing-image-edit-tool drawing-text-edit-tool">
-                    <div>
-                      <strong>選択文字の調整</strong>
-                      <span>配置した文字をクリックして選択。文字をドラッグすると位置を動かせます。</span>
-                    </div>
-                    <button type="button" onClick={() => scaleSelectedText(0.88)} disabled={!drawingTextTool.selected}>縮小</button>
-                    <button type="button" onClick={() => scaleSelectedText(1.14)} disabled={!drawingTextTool.selected}>拡大</button>
-                    <button type="button" onClick={deleteSelectedText} disabled={!drawingTextTool.selected}>削除</button>
-                  </div>
-                  <div className="drawing-image-edit-tool">
-                    <div>
-                      <strong>選択画像の調整</strong>
-                      <span>貼り付けた画像をクリックして選択。画像をドラッグすると位置を動かせます。</span>
-                    </div>
-                    <button type="button" onClick={() => rotateSelectedImage(-90)}>↺ 90°</button>
-                    <button type="button" onClick={() => rotateSelectedImage(90)}>↻ 90°</button>
-                    <button type="button" onClick={() => scaleSelectedImage(0.9)}>縮小</button>
-                    <button type="button" onClick={() => scaleSelectedImage(1.1)}>拡大</button>
-                    <button type="button" onClick={deleteSelectedImage}>削除</button>
-                  </div>
-                </div>
-              ) : (
-                <p className="inline-message">PDFを開くか、複数PDFを選択するとページプレビューが表示されます。</p>
-              )}
-            </div>
-          </section>
+          <PdfToolsPage
+            ArrayLengthHelp={ArrayLengthHelp}
+            state={{
+              drawingConvertStatus,
+              drawingJob,
+              drawingSelectedPages,
+              drawingMergeFiles,
+              drawingMergePreview,
+              activeDrawingPage,
+              drawingImageTool,
+              drawingTextTool,
+              pdfPreviewView,
+              drawingPageRotations,
+              selectedImageOpacity,
+              selectedTextOpacity,
+              canChooseSaveLocation,
+            }}
+            actions={{
+              switchPage,
+              handleDrawingPdfToJpg,
+              handleMergePdfFiles,
+              handleImageFilesToPdf,
+              setDrawingMergePreview,
+              saveMergedDrawingPdfs,
+              setDrawingSelectedPages,
+              saveSelectedDrawingPages,
+              saveSelectedDrawingPagesAsPdf,
+              setDrawingTextPosition,
+              beginDrawingImageArea,
+              updateDrawingImageArea,
+              finishDrawingImageArea,
+              startDrawingImageMove,
+              startDrawingImageResize,
+              startDrawingTextMove,
+              setDrawingImageTool,
+              setDrawingTextTool,
+              toggleDrawingPage,
+              changePdfPreviewZoom,
+              setPdfPreviewView,
+              resetPdfPreviewView,
+              rotateDrawingPage,
+              setActiveDrawingPageNumber,
+              loadClipboardImageForPdf,
+              changeDrawingTextSize,
+              activateTextPlacementMode: () => {
+                setDrawingImageTool(clearPendingImagePlacement)
+                setDrawingTextTool((current) => ({ ...current, selected: null, editDrag: null }))
+                setDrawingConvertStatus({ status: 'idle', message: '文字入力モードに切り替えました。ページをクリックすると文字を配置できます。' })
+              },
+              resetDrawingTextTool: () => setDrawingTextTool(initialDrawingTextTool),
+              resetDrawingImageTool: () => setDrawingImageTool(initialDrawingImageTool),
+              scaleSelectedText,
+              changeSelectedTextOpacity,
+              deleteSelectedText,
+              rotateSelectedImage,
+              scaleSelectedImage,
+              changeSelectedImageOpacity,
+              deleteSelectedImage,
+            }}
+            refs={{ activePdfPreviewRef }}
+            helpers={{
+              activePreviewBoxStyle,
+              previewUrlForPage,
+              activePreviewImageStyle,
+              isRotatedPreviewReady,
+              activePreviewPointStyle,
+            }}
+          />
         )}
 
         {activePage === 'inheritance' && (

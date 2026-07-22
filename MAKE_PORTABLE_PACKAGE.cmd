@@ -3,7 +3,7 @@ cd /d "%~dp0"
 
 set "NODE_EXE=%USERPROFILE%\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe"
 set "PACKAGE_DIR=outputs\SolarSitePrecheck_Portable"
-set "PACKAGE_ZIP=outputs\SolarSitePrecheck_v1.21_portable.zip"
+set "PACKAGE_ZIP=outputs\SolarSitePrecheck_v1.22_portable.zip"
 
 if not exist "%NODE_EXE%" (
   echo Bundled Node was not found.
@@ -17,6 +17,15 @@ if not exist "node_modules\vite\bin\vite.js" (
   echo node_modules was not found.
   echo Please run npm install first in this project folder.
   echo.
+  pause
+  exit /b 1
+)
+
+echo Checking source tree...
+"%NODE_EXE%" "work\assert-clean-tree.mjs"
+if errorlevel 1 (
+  echo.
+  echo Portable packaging stopped.
   pause
   exit /b 1
 )

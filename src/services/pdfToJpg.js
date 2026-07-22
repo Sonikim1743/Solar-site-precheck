@@ -48,6 +48,7 @@ function drawTextOverlay(canvas, overlay = {}) {
   if (!lines.length) return
 
   context.save()
+  context.globalAlpha = Math.max(0.1, Math.min(1, Number.isFinite(overlay.opacity) ? overlay.opacity : 1))
   context.font = `700 ${fontSize}px system-ui, -apple-system, BlinkMacSystemFont, "Yu Gothic", "Meiryo", sans-serif`
   context.textBaseline = 'top'
   context.textAlign = 'center'
@@ -111,7 +112,9 @@ async function drawImageOverlay(canvas, overlay = {}) {
   const imageHeight = image.naturalHeight || image.height || 1
   const fitted = fitRectContain(width, height, imageWidth, imageHeight)
   const rotation = normalizeRotation(Number.isFinite(overlay.rotation) ? overlay.rotation : 0)
+  const opacity = Math.max(0.1, Math.min(1, Number.isFinite(overlay.opacity) ? overlay.opacity : 1))
   context.save()
+  context.globalAlpha = opacity
   context.translate(left + width / 2, top + height / 2)
   if (rotation) {
     context.rotate((rotation * Math.PI) / 180)
@@ -227,6 +230,76 @@ export async function preparePdfJpgPreview(file, onProgress = () => {}, options 
     file,
     baseName: safeFileName(file.name),
     pageCount: pdf.numPages,
+    pages,
+  }
+}
+
+async function renderImageFileToCanvas(file, options = {}) {
+  const rotation = normalizeRotation(options.rotation || 0)
+  const maxSide = options.maxSide ?? 2200
+  const src = URL.createObjectURL(file)
+  try {
+    const image = await loadImageElement(src)
+    const naturalWidth = image.naturalWidth || image.width
+    const naturalHeight = image.naturalHeight || image.height
+    const scale = Math.min(1, maxSide / Math.max(naturalWidth, naturalHeight))
+    const width = Math.max(1, Math.round(naturalWidth * scale))
+    const height = Math.max(1, Math.round(naturalHeight * scale))
+    const swapped = rotation === 90 || rotation === 270
+    const canvas = document.createElement('canvas')
+    canvas.width = swapped ? height : width
+    canvas.height = swapped ? width : height
+    const context = canvas.getContext('2d', { willReadFrequently: true })
+    context.fillStyle = '#fff'
+    context.fillRect(0, 0, canvas.width, canvas.height)
+    context.save()
+    if (rotation === 90) {
+      context.translate(canvas.width, 0)
+      context.rotate(Math.PI / 2)
+    } else if (rotation === 180) {
+      context.translate(canvas.width, canvas.height)
+      context.rotate(Math.PI)
+    } else if (rotation === 270) {
+      context.translate(0, canvas.height)
+      context.rotate(-Math.PI / 2)
+    }
+    context.drawImage(image, 0, 0, width, height)
+    context.restore()
+    return canvas
+  } finally {
+    URL.revokeObjectURL(src)
+  }
+}
+
+export async function prepareImageFilesPdfPreview(files, onProgress = () => {}, options = {}) {
+  const inputFiles = Array.from(files || []).filter((file) => /^image\//i.test(file?.type || '') || /\.(jpe?g|png|webp)$/i.test(file?.name || ''))
+  if (!inputFiles.length) throw new Error('PDFに変換する画像を選択してください。')
+  const previewMaxSide = options.previewMaxSide ?? 1200
+  const pages = []
+
+  for (let index = 0; index < inputFiles.length; index += 1) {
+    const file = inputFiles[index]
+    onProgress(`${index + 1}/${inputFiles.length}枚目の画像プレビューを作成中…`)
+    const canvas = await renderImageFileToCanvas(file, { maxSide: previewMaxSide })
+    pages.push({
+      pageNumber: index + 1,
+      sourcePageNumber: index + 1,
+      sourceName: safeFileName(file.name),
+      file,
+      previewUrl: canvas.toDataURL('image/jpeg', 0.86),
+      width: canvas.width,
+      height: canvas.height,
+    })
+    canvas.width = 1
+    canvas.height = 1
+  }
+
+  return {
+    mode: 'images',
+    file: null,
+    files: inputFiles,
+    baseName: inputFiles.length === 1 ? safeFileName(inputFiles[0].name) : `画像PDF_${inputFiles.length}枚`,
+    pageCount: pages.length,
     pages,
   }
 }
@@ -357,6 +430,72 @@ export async function savePreparedPdfPagesAsPdf(pageItems, pageRotations = {}, o
 
   const blob = buildSimplePdfFromJpegs(pages)
   const fileName = `${safeFileName(options.fileNameBase || 'PDFまとめ')}.pdf`
+  if (options.fileHandle) await writeBlobToFileHandle(options.fileHandle, blob)
+  else downloadBlob(blob, fileName)
+  return selected.length
+}
+
+export async function savePreparedImagePagesAsJpg(pageItems, pageRotations = {}, onProgress = () => {}, options = {}) {
+  const quality = options.quality ?? 0.92
+  const baseName = safeFileName(options.fileNameBase || '画像PDF')
+  const selected = Array.from(pageItems || []).filter((item) => item?.file)
+  if (!selected.length) throw new Error('保存する画像ページを選択してください。')
+
+  for (let index = 0; index < selected.length; index += 1) {
+    const item = selected[index]
+    const pageId = item.pageNumber
+    const rotation = normalizeRotation(pageRotations[pageId] || 0)
+    onProgress(`${index + 1}/${selected.length}ページをJPGに保存中…`)
+    const canvas = await renderImageFileToCanvas(item.file, { maxSide: options.maxSide ?? 2200, rotation })
+    const imageAnnotations = options.imageOverlay?.annotations?.[pageId] || []
+    for (const annotation of imageAnnotations) {
+      await drawImageOverlay(canvas, annotation)
+    }
+    const annotations = options.textOverlay?.annotations?.[pageId] || []
+    annotations.forEach((annotation) => drawTextOverlay(canvas, annotation))
+    const blob = await canvasToJpegBlob(canvas, quality)
+    const suffix = selected.length > 1 ? `_p${String(pageId).padStart(2, '0')}` : ''
+    const fileName = `${baseName}${suffix}.jpg`
+    if (options.fileHandle && selected.length === 1) await writeBlobToFileHandle(options.fileHandle, blob)
+    else if (options.directoryHandle) await writeBlobToDirectory(options.directoryHandle, fileName, blob)
+    else downloadBlob(blob, fileName)
+    canvas.width = 1
+    canvas.height = 1
+  }
+
+  return selected.length
+}
+
+export async function savePreparedImagePagesAsPdf(pageItems, pageRotations = {}, onProgress = () => {}, options = {}) {
+  const quality = options.quality ?? 0.92
+  const selected = Array.from(pageItems || []).filter((item) => item?.file)
+  if (!selected.length) throw new Error('保存する画像ページを選択してください。')
+  const pages = []
+
+  for (let index = 0; index < selected.length; index += 1) {
+    const item = selected[index]
+    const pageId = item.pageNumber
+    const rotation = normalizeRotation(pageRotations[pageId] || 0)
+    onProgress(`${index + 1}/${selected.length}ページをPDF用に準備中…`)
+    const canvas = await renderImageFileToCanvas(item.file, { maxSide: options.maxSide ?? 2200, rotation })
+    const imageAnnotations = options.imageOverlay?.annotations?.[pageId] || []
+    for (const annotation of imageAnnotations) {
+      await drawImageOverlay(canvas, annotation)
+    }
+    const annotations = options.textOverlay?.annotations?.[pageId] || []
+    annotations.forEach((annotation) => drawTextOverlay(canvas, annotation))
+    const jpeg = await blobToUint8Array(await canvasToJpegBlob(canvas, quality))
+    pages.push({
+      width: canvas.width,
+      height: canvas.height,
+      jpeg,
+    })
+    canvas.width = 1
+    canvas.height = 1
+  }
+
+  const blob = buildSimplePdfFromJpegs(pages)
+  const fileName = `${safeFileName(options.fileNameBase || '画像PDF')}_selected.pdf`
   if (options.fileHandle) await writeBlobToFileHandle(options.fileHandle, blob)
   else downloadBlob(blob, fileName)
   return selected.length
