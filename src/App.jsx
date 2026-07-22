@@ -6,6 +6,11 @@ import TerrainSectionPreview from './components/TerrainSectionPreview.jsx'
 import SolarProPreviewButton from './components/SolarProPreviewButton.jsx'
 import DiagnosticPanel from './components/DiagnosticPanel.jsx'
 import PdfToolsPage, { clearPendingImagePlacement } from './components/PdfToolsPage.jsx'
+import usePdfToolState, {
+  initialDrawingImageTool,
+  initialDrawingTextTool,
+  initialPdfPreviewView,
+} from './hooks/usePdfToolState.js'
 import {
   DETAILED_HORIZON_DIRECTIONS,
   HORIZON_DIRECTIONS,
@@ -58,8 +63,6 @@ const PLACE_API_FAILURE_THRESHOLD = 2
 const TERRAIN_ANALYSIS_VERSION = 2
 const GROUNDY_URL = 'https://www.app.groundy.net/map'
 const SOLAR_PRO_PORTAL_URL = 'https://laplaceid.energymntr.com/servicelist/solarpro/installer-related-info'
-const initialDrawingTextTool = { text: '', size: 28, opacity: 1, annotations: {}, selected: null, editDrag: null }
-const initialDrawingImageTool = { src: '', name: '', aspectRatio: null, opacity: 1, annotations: {}, drag: null, selected: null, editDrag: null }
 const initialSolarProMemo = {
   reportName: '',
   annualYield: '',
@@ -304,20 +307,35 @@ export default function App() {
     ...initialSolarProMemo,
     ...(draftSeed.solarProMemo || {}),
   }))
-  const [drawingConvertStatus, setDrawingConvertStatus] = useState({ status: 'idle', message: '' })
-  const [drawingJob, setDrawingJob] = useState(null)
-  const [drawingSelectedPages, setDrawingSelectedPages] = useState([])
-  const [activeDrawingPageNumber, setActiveDrawingPageNumber] = useState(null)
-  const [pdfPreviewView, setPdfPreviewView] = useState({ zoom: 1, x: 0, y: 0, panMode: false, drag: null })
-  const activePdfPreviewRef = useRef(null)
-  const [activePdfPreviewSize, setActivePdfPreviewSize] = useState({ width: 0, height: 0 })
-  const [drawingPageRotations, setDrawingPageRotations] = useState({})
-  const [drawingRotatedPreviews, setDrawingRotatedPreviews] = useState({})
-  const [drawingTextTool, setDrawingTextTool] = useState(initialDrawingTextTool)
-  const [drawingImageTool, setDrawingImageTool] = useState(initialDrawingImageTool)
-  const [drawingMergeFiles, setDrawingMergeFiles] = useState([])
-  const [drawingMergePreview, setDrawingMergePreview] = useState(true)
-  const [drawingPanelOpen, setDrawingPanelOpen] = useState(false)
+  const {
+    drawingConvertStatus,
+    setDrawingConvertStatus,
+    drawingJob,
+    setDrawingJob,
+    drawingSelectedPages,
+    setDrawingSelectedPages,
+    activeDrawingPageNumber,
+    setActiveDrawingPageNumber,
+    pdfPreviewView,
+    setPdfPreviewView,
+    activePdfPreviewRef,
+    activePdfPreviewSize,
+    setActivePdfPreviewSize,
+    drawingPageRotations,
+    setDrawingPageRotations,
+    drawingRotatedPreviews,
+    setDrawingRotatedPreviews,
+    drawingTextTool,
+    setDrawingTextTool,
+    drawingImageTool,
+    setDrawingImageTool,
+    drawingMergeFiles,
+    setDrawingMergeFiles,
+    drawingMergePreview,
+    setDrawingMergePreview,
+    drawingPanelOpen,
+    setDrawingPanelOpen,
+  } = usePdfToolState()
   const [templateFileName, setTemplateFileName] = useState('')
   const [equipmentDownloadMessage, setEquipmentDownloadMessage] = useState('')
   const [inheritanceStatus, setInheritanceStatus] = useState({ status: 'idle', message: '' })
@@ -505,7 +523,7 @@ export default function App() {
     setDrawingJob(null)
     setDrawingSelectedPages([])
     setActiveDrawingPageNumber(null)
-    setPdfPreviewView({ zoom: 1, x: 0, y: 0, panMode: false, drag: null })
+    setPdfPreviewView(initialPdfPreviewView())
     setDrawingPageRotations({})
     setDrawingRotatedPreviews({})
     setDrawingTextTool(initialDrawingTextTool)
@@ -833,7 +851,7 @@ export default function App() {
     setDrawingJob(null)
     setDrawingSelectedPages([])
     setActiveDrawingPageNumber(null)
-    setPdfPreviewView({ zoom: 1, x: 0, y: 0, panMode: false, drag: null })
+    setPdfPreviewView(initialPdfPreviewView())
     setDrawingPageRotations({})
     setDrawingRotatedPreviews({})
     setDrawingMergeFiles([])
@@ -846,7 +864,7 @@ export default function App() {
       setDrawingJob(job)
       setDrawingSelectedPages(job.pages.map((page) => page.pageNumber))
       setActiveDrawingPageNumber(job.pages[0]?.pageNumber || null)
-      setPdfPreviewView({ zoom: 1, x: 0, y: 0, panMode: false, drag: null })
+      setPdfPreviewView(initialPdfPreviewView())
       setDrawingPageRotations(Object.fromEntries(job.pages.map((page) => [page.pageNumber, 0])))
       setDrawingRotatedPreviews({})
       setDrawingTextTool(initialDrawingTextTool)
@@ -876,7 +894,7 @@ export default function App() {
       setDrawingJob(null)
       setDrawingSelectedPages([])
       setActiveDrawingPageNumber(null)
-      setPdfPreviewView({ zoom: 1, x: 0, y: 0, panMode: false, drag: null })
+      setPdfPreviewView(initialPdfPreviewView())
       setDrawingPageRotations({})
       setDrawingRotatedPreviews({})
       setDrawingConvertStatus({ status: 'success', message: `${files.length}ファイルを選択しました。「PDFまとめ保存」を押すと全ページを保存します。` })
@@ -911,7 +929,7 @@ export default function App() {
       setDrawingJob({ mode: 'multi', file: null, files, baseName, pageCount: pages.length, pages })
       setDrawingSelectedPages(pages.map((page) => page.pageNumber))
       setActiveDrawingPageNumber(pages[0]?.pageNumber || null)
-      setPdfPreviewView({ zoom: 1, x: 0, y: 0, panMode: false, drag: null })
+      setPdfPreviewView(initialPdfPreviewView())
       setDrawingPageRotations(Object.fromEntries(pages.map((page) => [page.pageNumber, 0])))
       setDrawingRotatedPreviews({})
       setDrawingConvertStatus({ status: 'success', message: `${files.length}ファイル / ${pages.length}ページを読み込みました。必要なページだけ選んで保存できます。` })
@@ -1112,7 +1130,15 @@ export default function App() {
     })
   }
 
-  function pointFromClientInPage(page, clientX, clientY, container) {
+  function clampAnnotationPosition(value) {
+    return Math.max(-0.65, Math.min(1.65, value))
+  }
+
+  function clampAnnotationSize(value) {
+    return Math.max(0.03, Math.min(1.8, value))
+  }
+
+  function pointFromClientInPage(page, clientX, clientY, container, options = {}) {
     const rect = container.getBoundingClientRect()
     const rotation = drawingPageRotations[page.pageNumber] || 0
     const activePageNumber = activeDrawingPageNumber || drawingJob?.pages?.[0]?.pageNumber || page.pageNumber
@@ -1120,6 +1146,12 @@ export default function App() {
     const imageRect = textImageRectForPage(page, rect, rotation, view)
     const x = (clientX - rect.left - imageRect.left) / imageRect.width
     const y = (clientY - rect.top - imageRect.top) / imageRect.height
+    if (options.allowOutside) {
+      return {
+        x: clampAnnotationPosition(x),
+        y: clampAnnotationPosition(y),
+      }
+    }
     return {
       x: Math.max(0, Math.min(1, x)),
       y: Math.max(0, Math.min(1, y)),
@@ -1180,6 +1212,11 @@ export default function App() {
   function pagePointFromEvent(page, event) {
     const container = event.currentTarget.closest?.('.pdf-active-page__preview') || event.currentTarget
     return pointFromClientInPage(page, event.clientX, event.clientY, container)
+  }
+
+  function pagePointFromEventLoose(page, event) {
+    const container = event.currentTarget.closest?.('.pdf-active-page__preview') || activePdfPreviewRef.current || event.currentTarget
+    return pointFromClientInPage(page, event.clientX, event.clientY, container, { allowOutside: true })
   }
 
   function normalizedPageRotation(pageNumber) {
@@ -1313,7 +1350,7 @@ export default function App() {
       return
     }
     if (drawingImageTool.editDrag?.pageNumber === page.pageNumber) {
-      const point = pagePointFromEvent(page, event)
+      const point = pagePointFromEventLoose(page, event)
       const edit = drawingImageTool.editDrag
       setDrawingImageTool((current) => ({
         ...current,
@@ -1329,26 +1366,16 @@ export default function App() {
               const widthByHeight = rawHeight * aspectRatio / pageAspect
               let width = Math.max(rawWidth, widthByHeight)
               let height = width * pageAspect / aspectRatio
-              if (annotation.x + width > 1) {
-                width = Math.max(0.03, 1 - annotation.x)
-                height = width * pageAspect / aspectRatio
-              }
-              if (annotation.y + height > 1) {
-                height = Math.max(0.03, 1 - annotation.y)
-                width = height * aspectRatio / pageAspect
-              }
               return {
                 ...annotation,
-                width: Math.max(0.03, Math.min(1 - annotation.x, width)),
-                height: Math.max(0.03, Math.min(1 - annotation.y, height)),
+                width: clampAnnotationSize(width),
+                height: clampAnnotationSize(height),
               }
             }
-            const width = annotation.width || 0.1
-            const height = annotation.height || 0.1
             return {
               ...annotation,
-              x: Math.max(0, Math.min(1 - width, point.x - edit.offsetX)),
-              y: Math.max(0, Math.min(1 - height, point.y - edit.offsetY)),
+              x: clampAnnotationPosition(point.x - edit.offsetX),
+              y: clampAnnotationPosition(point.y - edit.offsetY),
             }
           }),
         },
@@ -1526,8 +1553,8 @@ export default function App() {
         ...annotation,
         width,
         height,
-        x: Math.max(0, Math.min(1 - width, annotation.x || 0)),
-        y: Math.max(0, Math.min(1 - height, annotation.y || 0)),
+        x: clampAnnotationPosition(annotation.x || 0),
+        y: clampAnnotationPosition(annotation.y || 0),
       }
     })
   }
@@ -1622,7 +1649,7 @@ export default function App() {
     setDrawingJob(null)
     setDrawingSelectedPages([])
     setActiveDrawingPageNumber(null)
-    setPdfPreviewView({ zoom: 1, x: 0, y: 0, panMode: false, drag: null })
+    setPdfPreviewView(initialPdfPreviewView())
     setDrawingPageRotations({})
     setDrawingRotatedPreviews({})
     setDrawingMergeFiles([])
@@ -1636,7 +1663,7 @@ export default function App() {
       setDrawingJob(job)
       setDrawingSelectedPages(job.pages.map((page) => page.pageNumber))
       setActiveDrawingPageNumber(job.pages[0]?.pageNumber || null)
-      setPdfPreviewView({ zoom: 1, x: 0, y: 0, panMode: false, drag: null })
+      setPdfPreviewView(initialPdfPreviewView())
       setDrawingPageRotations(Object.fromEntries(job.pages.map((page) => [page.pageNumber, 0])))
       setDrawingRotatedPreviews({})
       setDrawingConvertStatus({ status: 'success', message: `${job.pageCount}枚の画像を読み込みました。注記を配置してから、選択ページPDF保存で保存先を指定できます。` })
@@ -1653,7 +1680,7 @@ export default function App() {
   }
 
   function resetPdfPreviewView() {
-    setPdfPreviewView({ zoom: 1, x: 0, y: 0, panMode: false, drag: null })
+    setPdfPreviewView(initialPdfPreviewView())
   }
 
   function sanitizeSuggestedFileName(name, fallback = 'output') {
@@ -2198,6 +2225,19 @@ export default function App() {
   }, [activeDrawingPage?.pageNumber, activePage])
 
   useEffect(() => {
+    if (!activeDrawingPage) return undefined
+    if (drawingImageTool.editDrag?.pageNumber !== activeDrawingPage.pageNumber) return undefined
+    const handleMove = (event) => updateDrawingImageArea(activeDrawingPage, event)
+    const handleUp = (event) => finishDrawingImageArea(activeDrawingPage, event)
+    window.addEventListener('mousemove', handleMove)
+    window.addEventListener('mouseup', handleUp)
+    return () => {
+      window.removeEventListener('mousemove', handleMove)
+      window.removeEventListener('mouseup', handleUp)
+    }
+  }, [activeDrawingPage, drawingImageTool.editDrag])
+
+  useEffect(() => {
     if (!drawingJob?.pages?.length) return undefined
     let cancelled = false
     drawingJob.pages.forEach((page) => {
@@ -2690,6 +2730,7 @@ export default function App() {
                       position={position}
                       terrain={terrain}
                       solarReference={solarReference}
+                      obstructionHeight={obstructionHeight}
                     />
                     <label className="assumption-row">
                       <span>保守的に加算する想定樹高</span>

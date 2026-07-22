@@ -14,7 +14,7 @@ import {
 } from '../src/utils/obstructionElevations.js'
 import { snowRateLevel } from '../src/utils/snowRates.js'
 import { interpolateHorizonAngle, peakSolarWindowReference, solarPositionAtHour } from '../src/utils/solarWindow.js'
-import { evaluateSiteVerdict, primaryVerdictReasons } from '../src/utils/verdict.js'
+import { evaluateSiteVerdict, primaryVerdictReasons, verdictCriteriaText } from '../src/utils/verdict.js'
 import { DETAILED_HORIZON_DIRECTIONS, HORIZON_DIRECTIONS, createHorizonDirections, recalculateTerrainObstruction } from '../src/services/gsi.js'
 import { adjacentThirdMeshes, productionFactor, thirdMeshBoundaryDistance, thirdMeshCenter, thirdMeshCode } from '../src/services/nedo.js'
 import { selectConsistentRates, validateRateSummaries } from '../src/services/nedoValidation.js'
@@ -388,6 +388,14 @@ test('site verdict escalates to caution when winter sun or snow is critical', ()
   assert.equal(verdict.label, '要注意')
   assert.ok(verdict.flags.some((flag) => flag.title === '冬季太陽高度'))
   assert.ok(verdict.flags.some((flag) => flag.title === '積雪注意'))
+})
+
+test('site verdict criteria text documents user-visible thresholds', () => {
+  const text = verdictCriteriaText()
+  assert.match(text, /最大地平線角 5°以上/)
+  assert.match(text, /積雪10cm以上出現率 0\.50以上/)
+  assert.match(text, /冬至9〜15時/)
+  assert.match(text, /高低差 5m超/)
 })
 
 test('Solar Pro obstruction CSV interpolates horizon values every 1 degree', () => {

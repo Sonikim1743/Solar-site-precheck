@@ -5,6 +5,29 @@ function maxMonthlySnowRate(station) {
   return Math.max(...valid)
 }
 
+export const VERDICT_THRESHOLDS = Object.freeze({
+  horizonWatchDeg: 5,
+  horizonInfoDeg: 2,
+  snowDangerRate: 0.5,
+  snowWatchRate: 0.01,
+  terrainSectionDiffMeters: 5,
+})
+
+export const VERDICT_CRITERIA = [
+  `最大地平線角 ${VERDICT_THRESHOLDS.horizonWatchDeg}°以上：地平線確認`,
+  `最大地平線角 ${VERDICT_THRESHOLDS.horizonInfoDeg}°以上：やや高めとして表示`,
+  '冬至9〜15時の太陽高度と地平線角を比較',
+  `積雪10cm以上出現率 ${VERDICT_THRESHOLDS.snowDangerRate.toFixed(2)}以上：積雪注意`,
+  `積雪10cm以上出現率 ${VERDICT_THRESHOLDS.snowWatchRate.toFixed(2)}以上：積雪補正確認`,
+  `周辺断面の高低差 ${VERDICT_THRESHOLDS.terrainSectionDiffMeters}m超：造成・進入路確認`,
+  '3次メッシュ境界付近：隣接メッシュ確認',
+  'DEM10m相当が多い場合：参考値として注意',
+]
+
+export function verdictCriteriaText() {
+  return VERDICT_CRITERIA.join('\n')
+}
+
 function maxTerrainSectionDiff(terrainSection) {
   const diffs = (terrainSection?.lines || [])
     .map((line) => line.summary?.elevationDiff)
@@ -41,9 +64,9 @@ export function evaluateSiteVerdict({
 
   if (!terrain || !Number.isFinite(terrain.maxAngle)) {
     addFlag(flags, 'info', '地平線未分析', '地平線CSV出力前にDEM地平線を分析してください。')
-  } else if (terrain.maxAngle >= 5) {
+  } else if (terrain.maxAngle >= VERDICT_THRESHOLDS.horizonWatchDeg) {
     addFlag(flags, 'watch', '地平線確認', `最大地平線角 ${terrain.maxAngle.toFixed(1)}°。影の影響を重点確認してください。`)
-  } else if (terrain.maxAngle >= 2) {
+  } else if (terrain.maxAngle >= VERDICT_THRESHOLDS.horizonInfoDeg) {
     addFlag(flags, 'info', '地平線やや高め', `最大地平線角 ${terrain.maxAngle.toFixed(1)}°。Solar Pro入力前に方向を確認してください。`)
   }
 
@@ -56,9 +79,9 @@ export function evaluateSiteVerdict({
   const snowMax = maxMonthlySnowRate(snowStation)
   if (snowMax === null) {
     addFlag(flags, 'info', '積雪未取得', 'NEDO MONSOLA-11の積雪出現率を取得してください。')
-  } else if (snowMax >= 0.5) {
+  } else if (snowMax >= VERDICT_THRESHOLDS.snowDangerRate) {
     addFlag(flags, 'danger', '積雪注意', `積雪10cm以上出現率の月最大が ${snowMax.toFixed(2)} です。`)
-  } else if (snowMax >= 0.01) {
+  } else if (snowMax >= VERDICT_THRESHOLDS.snowWatchRate) {
     addFlag(flags, 'watch', '積雪補正確認', `積雪10cm以上出現率の月最大が ${snowMax.toFixed(2)} です。`)
   }
 
@@ -75,7 +98,7 @@ export function evaluateSiteVerdict({
   const sectionDiff = maxTerrainSectionDiff(terrainSection)
   if (sectionDiff === null) {
     addFlag(flags, 'info', '断面未取得', '候補地周辺100m断面を取得すると造成・傾斜感を確認できます。')
-  } else if (Math.abs(sectionDiff) > 5) {
+  } else if (Math.abs(sectionDiff) > VERDICT_THRESHOLDS.terrainSectionDiffMeters) {
     addFlag(flags, 'watch', '周辺高低差', `100m断面で最大高低差 ${sectionDiff > 0 ? '+' : ''}${sectionDiff.toFixed(1)}m。造成・進入路を確認してください。`)
   }
 

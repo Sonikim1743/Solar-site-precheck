@@ -227,6 +227,12 @@ function TerrainProfileChart({ line, minElevation, maxElevation, showSlopeDetail
   const range = line.rangeMeters || 100
   const interval = line.intervalMeters || 10
   const diffNotice = heightDiffNotice(line)
+  const sitePoint = (line.points || [])
+    .filter((point) => Number.isFinite(point?.distance) && Number.isFinite(point?.elevation))
+    .reduce((closest, point) => (
+      !closest || Math.abs(point.distance) < Math.abs(closest.distance) ? point : closest
+    ), null)
+  const siteElevationText = sitePoint ? `標高 ${sitePoint.elevation.toFixed(1)}m` : ''
   const distanceTicks = Array.from(
     { length: Math.floor((range * 2) / interval) + 1 },
     (_, index) => -range + index * interval,
@@ -281,15 +287,22 @@ function TerrainProfileChart({ line, minElevation, maxElevation, showSlopeDetail
                     y2={padding.top + plotHeight}
                   />
                   {isLabeled && (
-                    <text x={x} y={graphHeight - 11} textAnchor="middle">
-                      {distance === 0
-                        ? '候補地'
-                        : distance === -range
-                          ? `${line.negativeDirection || ''} ${distance}m`
-                          : distance === range
-                            ? `${line.positiveDirection || ''} ${distance}m`
-                            : `${distance}m`}
-                    </text>
+                    <>
+                      <text x={x} y={distance === 0 && siteElevationText ? graphHeight - 16 : graphHeight - 11} textAnchor="middle">
+                        {distance === 0
+                          ? '候補地'
+                          : distance === -range
+                            ? `${line.negativeDirection || ''} ${distance}m`
+                            : distance === range
+                              ? `${line.positiveDirection || ''} ${distance}m`
+                              : `${distance}m`}
+                      </text>
+                      {distance === 0 && siteElevationText && (
+                        <text className="terrain-section-chart__site-elevation" x={x} y={graphHeight - 4} textAnchor="middle">
+                          {siteElevationText}
+                        </text>
+                      )}
+                    </>
                   )}
                 </g>
               )

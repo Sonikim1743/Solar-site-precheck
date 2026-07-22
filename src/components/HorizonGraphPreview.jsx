@@ -125,7 +125,7 @@ function pointTooltip(point) {
   return `${point.hour}時：太陽高度 ${point.altitude.toFixed(1)}° / 方位 ${point.azimuth.toFixed(0)}°${horizon}${margin}`
 }
 
-export default function HorizonGraphPreview({ position, terrain, solarReference, reportMode = false }) {
+export default function HorizonGraphPreview({ position, terrain, solarReference, obstructionHeight = null, reportMode = false }) {
   const samples = terrain?.samples || []
   if (!position || !samples.length) return null
 
@@ -140,6 +140,9 @@ export default function HorizonGraphPreview({ position, terrain, solarReference,
   const guideHours = reportMode
     ? [8, 10, 11, 12, 13, 14, 16]
     : [10, 12, 14]
+  const obstructionLabel = Number.isFinite(obstructionHeight)
+    ? ` / 約${obstructionHeight.toFixed(1)}m`
+    : ''
 
   return (
     <section className={`horizon-graph-card ${reportMode ? 'horizon-graph-card--report' : ''}`} aria-label="地平線グラフプレビュー">
@@ -219,7 +222,7 @@ export default function HorizonGraphPreview({ position, terrain, solarReference,
       </div>
 
       <div className="horizon-graph-legend">
-        <span><i className="legend-line legend-line--horizon" />地平線（地形＋想定樹高）</span>
+        <span><i className="legend-line legend-line--horizon" />地平線（地形＋想定樹高{obstructionLabel}）</span>
         <span><i className="legend-line legend-line--terrain" />地形のみ</span>
         <span><i className="legend-line legend-line--summer" />夏至</span>
         <span><i className="legend-line legend-line--equinox" />春分・秋分</span>

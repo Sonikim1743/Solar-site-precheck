@@ -447,11 +447,43 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
   position: relative;
   height: min(70vh, 680px);
   min-height: 460px;
+  margin: 16px 22px 24px;
+  border: 1px dashed rgba(13, 108, 85, .18);
+  border-radius: 12px;
   background:
+    radial-gradient(circle at 50% 50%, rgba(255,255,255,.72), rgba(255,255,255,0) 58%),
     linear-gradient(45deg, rgba(13,108,85,.035) 25%, transparent 25%),
     linear-gradient(-45deg, rgba(13,108,85,.035) 25%, transparent 25%),
     #eef3f0;
   background-size: 18px 18px;
+}
+.pdf-active-page__preview.drawing-page-card__preview {
+  overflow: visible;
+}
+.pdf-active-page__preview.drawing-page-card__preview::after {
+  content: "";
+  position: absolute;
+  inset: -18px;
+  z-index: 0;
+  border: 1px solid rgba(13,108,85,.08);
+  border-radius: 18px;
+  background: rgba(239, 246, 242, .34);
+  pointer-events: none;
+}
+.pdf-active-page__preview::before {
+  content: "ページ外に出した部分は保存時に自然に切り落とされます";
+  position: absolute;
+  left: 10px;
+  bottom: -19px;
+  color: #7b8d87;
+  font-size: 10px;
+  font-weight: 800;
+}
+.pdf-active-page__preview > * {
+  z-index: 1;
+}
+.pdf-active-page__preview > .pdf-active-page__image {
+  z-index: 0;
 }
 .pdf-active-page__preview--pan {
   cursor: grab;
@@ -744,7 +776,8 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
 }
 .drawing-page-card__image-marker {
   position: absolute;
-  border: 1px solid rgba(13, 108, 85, .35);
+  border: 1px solid rgba(13, 108, 85, .22);
+  border-radius: 4px;
   background: transparent;
   pointer-events: none;
   transform-origin: center;
@@ -765,9 +798,9 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
   pointer-events: none;
 }
 .drawing-page-card__image-marker--selected {
-  outline: 3px solid rgba(240, 183, 57, .9);
-  outline-offset: 2px;
-  box-shadow: 0 6px 18px rgba(23, 62, 51, .18);
+  outline: 2px solid rgba(240, 183, 57, .9);
+  outline-offset: 3px;
+  box-shadow: 0 6px 18px rgba(23, 62, 51, .14);
 }
 .drawing-page-card__image-resize-handle {
   position: absolute;
@@ -1673,6 +1706,11 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
   fill: #0d6c55;
   font-size: 11px;
   font-weight: 950;
+}
+.terrain-section-chart__site-elevation {
+  fill: #0d5f4f;
+  font-size: 8.5px;
+  font-weight: 900;
 }
 .terrain-section-chart__segment-list {
   max-height: 92px;
@@ -3559,6 +3597,124 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
 .report-visual-panel--single .horizon-graph-card {
   box-shadow: none;
 }
+.report-map-preview {
+  margin: 0 0 12px;
+  padding: 12px;
+  border: 1px solid #cfe2db;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #fbfdfc, #f1f8f4);
+}
+.report-map-preview__head {
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+.report-map-preview__head strong {
+  display: block;
+  color: var(--green-dark);
+  font-size: 13px;
+  font-weight: 950;
+}
+.report-map-preview__head span {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+.report-map-preview__head em {
+  flex: 0 0 auto;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #0f6654;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 900;
+  box-shadow: 0 0 0 1px rgba(15, 102, 84, .16);
+}
+.report-map-preview svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 900 / 400;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #e7eee9;
+}
+.report-map-preview p {
+  margin: 8px 0 0;
+  color: #52665f;
+  font-size: 11px;
+  line-height: 1.55;
+}
+.report-map-preview__dir {
+  fill: #ffffff;
+  stroke: rgba(0,0,0,.24);
+  stroke-width: .8px;
+  paint-order: stroke;
+  filter: url(#reportAerialTextShadow);
+  font-size: 15px;
+  font-weight: 950;
+}
+.report-map-preview__tag,
+.report-map-preview__callout,
+.report-map-preview__scale {
+  fill: #0d5f4f;
+  font-size: 12px;
+  font-weight: 950;
+}
+.report-map-preview__tag {
+  paint-order: stroke;
+  stroke: rgba(255,255,255,.85);
+  stroke-width: 5px;
+}
+.report-map-preview__tag--range {
+  fill: #ffffff;
+  stroke: rgba(190, 60, 46, .76);
+  filter: url(#reportAerialTextShadow);
+}
+.report-map-preview__callout {
+  fill: #ffffff;
+  paint-order: stroke;
+  stroke: rgba(13, 95, 79, .75);
+  stroke-width: 6px;
+  filter: url(#reportAerialTextShadow);
+}
+.report-map-preview__callout--dark {
+  fill: #0d5f4f;
+  stroke: rgba(255,255,255,.88);
+}
+.report-map-preview__scale {
+  fill: #123c34;
+  stroke: rgba(255,255,255,.85);
+  stroke-width: 4px;
+  paint-order: stroke;
+}
+.report-map-preview__fallback {
+  fill: #52665f;
+  font-size: 13px;
+  font-weight: 900;
+}
+.report-map-preview__credit {
+  fill: #ffffff;
+  stroke: rgba(0,0,0,.55);
+  stroke-width: 3px;
+  paint-order: stroke;
+  font-size: 9px;
+  font-weight: 800;
+}
+.report-map-preview--empty {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.report-map-preview--empty strong {
+  color: var(--green-dark);
+}
 .report-section-page .terrain-section-preview {
   box-shadow: none;
 }
@@ -5088,8 +5244,8 @@ footer > div:first-child {
     page-break-after: auto;
   }
   .report-print-page::before { display: none; }
-  .report-page-header { padding-bottom: 6mm; }
-  .report-page-body { padding-top: 5mm; }
+  .report-page-header { padding-bottom: 3.5mm; }
+  .report-page-body { padding-top: 3mm; }
   .report-cover-layout { gap: 14px; }
   .report-cover-layout h3 { font-size: 28px; margin-bottom: 8px; }
   .report-cover-layout p { font-size: 12px; line-height: 1.55; }
@@ -5116,49 +5272,157 @@ footer > div:first-child {
     cursor: default;
   }
   .report-value--hinted dt::after { display: none; }
-  .report-alert { margin-top: 10px; padding: 9px 11px; }
+  .report-alert { margin-top: 7px; padding: 7px 9px; }
   .report-visual-panel { padding: 8px; }
+  .report-map-preview {
+    margin-bottom: 6px;
+    padding: 5px;
+    border-radius: 9px;
+  }
+  .report-map-preview__head {
+    margin-bottom: 4px;
+  }
+  .report-map-preview__head strong {
+    font-size: 10px;
+  }
+  .report-map-preview__head span {
+    font-size: 8px;
+    line-height: 1.2;
+  }
+  .report-map-preview__head em {
+    padding: 2px 6px;
+    font-size: 8px;
+  }
+  .report-map-preview svg {
+    height: 72mm;
+    aspect-ratio: auto;
+    max-height: none;
+  }
+  .report-map-preview p {
+    margin-top: 3px;
+    font-size: 8px;
+    line-height: 1.25;
+  }
+  .report-map-preview__dir {
+    font-size: 12px;
+  }
+  .report-map-preview__tag,
+  .report-map-preview__callout,
+  .report-map-preview__scale {
+    font-size: 9px;
+  }
+  .report-map-preview__credit {
+    font-size: 7px;
+  }
+  .report-visual-panel--single .horizon-graph-card {
+    padding: 5px;
+  }
+  .report-visual-panel--single .horizon-graph-card svg {
+    max-height: 84mm;
+  }
   .report-data-block { margin-top: 10px; padding: 10px; }
   .report-data-block h3 { margin-bottom: 8px; }
   .report-note { margin-top: 8px; font-size: 9px; line-height: 1.35; }
   .report-data-block, .report-visual-panel, .terrain-section-chart { break-inside: avoid; }
+  .report-section-print-page .report-visual-panel,
+  .report-section-print-page .terrain-section-chart {
+    break-inside: auto;
+  }
+  .report-horizon-print-page .report-page-body {
+    padding-top: 3mm;
+  }
+  .report-horizon-print-page .report-map-preview {
+    margin-bottom: 4px;
+  }
+  .report-horizon-print-page .report-map-preview svg {
+    width: 100%;
+    height: 72mm;
+    aspect-ratio: auto;
+    max-height: none;
+  }
+  .report-horizon-print-page .report-visual-panel {
+    padding: 4px;
+  }
+  .report-horizon-print-page .horizon-graph-card__heading {
+    margin-bottom: 4px;
+  }
+  .report-horizon-print-page .horizon-graph-card__heading strong {
+    font-size: 10px;
+  }
+  .report-horizon-print-page .horizon-graph-card__heading span {
+    font-size: 7.5px;
+    line-height: 1.15;
+  }
+  .report-horizon-print-page .horizon-graph-scroll {
+    margin-top: 0;
+  }
+  .report-horizon-print-page .horizon-graph {
+    max-height: 78mm;
+  }
+  .report-horizon-print-page .horizon-graph-legend {
+    gap: 4px 8px;
+    margin-top: 4px;
+    font-size: 7.5px;
+  }
+  .report-horizon-print-page .horizon-graph-peak {
+    margin-top: 4px;
+    padding: 5px 7px;
+    gap: 2px;
+  }
+  .report-horizon-print-page .horizon-graph-peak strong {
+    font-size: 8px;
+  }
+  .report-horizon-print-page .horizon-graph-peak span {
+    font-size: 7.5px;
+    line-height: 1.25;
+  }
+  .report-horizon-print-page .report-alert {
+    margin-top: 4px;
+    padding: 5px 7px;
+  }
+  .report-section-print-page .report-page-body {
+    padding-top: 3mm;
+  }
   .terrain-section-preview__detail-toggle { display: none !important; }
   .report-section-page.report-visual-panel { padding: 5px; }
-  .terrain-section-preview--report { gap: 6px; }
+  .report-section-print-page .report-section-page.report-visual-panel {
+    padding: 3px;
+  }
+  .terrain-section-preview--report { gap: 5px; }
   .terrain-section-preview--report .terrain-section-preview__heading {
-    padding: 6px 8px;
+    padding: 5px 7px;
     border-radius: 8px;
   }
   .terrain-section-preview--report .terrain-section-preview__heading strong {
-    font-size: 12px;
+    font-size: 10px;
   }
   .terrain-section-preview--report .terrain-section-preview__heading span {
-    font-size: 9px;
-    line-height: 1.25;
+    font-size: 7.5px;
+    line-height: 1.15;
   }
   .terrain-section-preview--report .terrain-section-preview__charts {
-    gap: 6px;
+    gap: 4px;
   }
   .terrain-section-chart--report {
-    padding: 6px;
-    border-radius: 9px;
+    padding: 4px;
+    border-radius: 8px;
     box-shadow: none;
   }
   .terrain-section-chart__title { gap: 1px; }
   .terrain-section-chart__title strong { font-size: 10px; }
   .terrain-section-chart__title strong small { font-size: 8px; }
   .terrain-section-chart__title span {
-    font-size: 8px;
-    line-height: 1.2;
+    font-size: 7px;
+    line-height: 1.08;
   }
   .terrain-section-chart__height-alert {
     padding: 1px 5px;
     font-size: 8px;
   }
   .terrain-section-chart--report .terrain-section-chart__body {
-    margin-top: 4px;
-    grid-template-columns: minmax(0, 1.75fr) minmax(150px, .56fr);
-    gap: 6px;
+    margin-top: 3px;
+    grid-template-columns: minmax(0, 1.9fr) minmax(130px, .5fr);
+    gap: 4px;
   }
   .terrain-section-chart--report .terrain-section-chart__figure {
     padding: 4px;
@@ -5166,9 +5430,56 @@ footer > div:first-child {
   }
   .terrain-section-chart--report svg {
     margin-top: 0;
+    max-height: 36mm;
+  }
+  .report-section-print-page .terrain-section-chart--report .terrain-section-chart__body {
+    grid-template-columns: minmax(0, 1.72fr) minmax(180px, .58fr);
+    gap: 6px;
+  }
+  .report-section-print-page .terrain-section-chart--report .terrain-section-chart__figure {
+    padding: 4px;
+  }
+  .report-section-print-page .terrain-section-chart--report svg {
+    display: block;
+    width: 100%;
+    height: 46mm;
+    max-height: none;
+  }
+  .report-section-print-page .terrain-section-chart__metrics {
+    order: 0;
+    padding: 5px;
+  }
+  .report-section-print-page .terrain-section-chart__metrics h4 {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 9px;
+  }
+  .report-section-print-page .terrain-section-chart__metrics dl {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .report-section-print-page .terrain-section-chart__metrics dl > div {
+    padding: 4px 5px;
+    border-radius: 7px;
+  }
+  .report-section-print-page .terrain-section-chart__metrics dt {
+    font-size: 7.5px;
+    line-height: 1.15;
+  }
+  .report-section-print-page .terrain-section-chart__metrics dd {
+    margin-top: 1px;
+    font-size: 8.8px;
+    line-height: 1.15;
+  }
+  .report-section-print-page .terrain-section-chart__metrics small {
+    display: block;
+    margin-top: 1px;
+    font-size: 6.8px;
+    line-height: 1.12;
   }
   .terrain-section-chart__metrics {
-    padding: 5px;
+    padding: 4px;
     border-radius: 8px;
   }
   .terrain-section-chart__metrics h4 {
@@ -5177,13 +5488,13 @@ footer > div:first-child {
   }
   .terrain-section-chart__metrics dl { gap: 3px; }
   .terrain-section-chart__metrics dl > div {
-    padding: 4px 5px;
+    padding: 3px 4px;
     border-radius: 6px;
   }
   .terrain-section-chart__metrics dt { font-size: 7.5px; }
   .terrain-section-chart__metrics dd {
     margin-top: 1px;
-    font-size: 9px;
+    font-size: 8.5px;
     line-height: 1.12;
   }
   .terrain-section-chart__metrics small {
@@ -5192,17 +5503,19 @@ footer > div:first-child {
     line-height: 1.12;
   }
   .terrain-section-chart__segment-list {
-    gap: 2px;
-    margin-top: 3px;
-    padding: 3px;
+    gap: 1.5px;
+    margin-top: 1.5px;
+    padding: 1px;
     border-radius: 6px;
+    max-height: 12mm;
+    overflow: hidden;
   }
   .terrain-section-chart__segment-chip {
     gap: 2px;
-    padding: 2px 3px;
-    font-size: 6.5px;
+    padding: 1.5px 2.5px;
+    font-size: 6px;
   }
-  .terrain-section-chart__segment-chip strong { font-size: 7px; }
+  .terrain-section-chart__segment-chip strong { font-size: 6.5px; }
   .terrain-section-summary {
     margin-top: 4px;
     gap: 4px;
@@ -5214,13 +5527,13 @@ footer > div:first-child {
   .terrain-section-summary span { font-size: 8px; }
   .terrain-section-summary strong { font-size: 10px; }
   .terrain-section-source-note {
-    padding: 5px 7px;
-    font-size: 7.5px;
+    padding: 4px 6px;
+    font-size: 7px;
     line-height: 1.2;
   }
   .snow-table-wrap { overflow: visible; }
   .snow-table--compact-report { font-size: 12px; }
   .snow-table--compact-report th,
   .snow-table--compact-report td { padding: 8px 6px; }
-  @page { size: A4; margin: 10mm; }
+  @page { size: A4; margin: 8mm; }
 }
