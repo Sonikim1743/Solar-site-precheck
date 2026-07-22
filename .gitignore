@@ -14,6 +14,8 @@ work/*
 !work/serve-dist.mjs
 !work/inheritance-server.mjs
 !work/preflight-release.mjs
+!work/assert-clean-tree.mjs
+!work/verify-release-metadata.mjs
 *.zip
 !release/latest/*.zip
 eng.traineddata
