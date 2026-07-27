@@ -1,8 +1,7 @@
-const CACHE_NAME = 'solar-site-precheck-v5'
+const CACHE_NAME = 'solar-site-precheck-v6'
 const APP_SHELL = [
   '/',
   '/manifest.json',
-  '/manifest.webmanifest',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
 ]
@@ -32,6 +31,26 @@ self.addEventListener('fetch', (event) => {
   if (url.pathname.startsWith('/api/')) return
   if (url.pathname.startsWith('/assets/')) {
     event.respondWith(fetch(request))
+    return
+  }
+
+  if (url.pathname.startsWith('/data/')) {
+    event.respondWith(
+      caches.match(request).then((cached) => {
+        const network = fetch(request).then((response) => {
+          if (response && response.status === 200 && response.type !== 'opaque') {
+            const copy = response.clone()
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy))
+          }
+          return response
+        }).catch(() => cached)
+        if (cached) {
+          network.catch(() => null)
+          return cached
+        }
+        return network
+      }),
+    )
     return
   }
 

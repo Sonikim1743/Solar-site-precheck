@@ -2,6 +2,10 @@ import { Fragment, useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import { Circle, CircleMarker, GeoJSON, LayersControl, MapContainer, Marker, Polyline, Popup, Rectangle, ScaleControl, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet'
 import { parcelInfo } from '../services/cadastre.js'
+import { normalizeDisplayText } from '../utils/text.js'
+
+const INITIAL_MAP_CENTER = [36.2048, 138.2529]
+const INITIAL_MAP_ZOOM = 5
 
 const markerIcon = L.divIcon({
   className: 'site-marker-wrapper',
@@ -30,7 +34,11 @@ function MapController({ position }) {
   const map = useMap()
 
   useEffect(() => {
-    if (position) map.flyTo([position.lat, position.lon], Math.max(map.getZoom(), 14))
+    if (position) {
+      map.flyTo([position.lat, position.lon], Math.max(map.getZoom(), 14))
+    } else {
+      map.flyTo(INITIAL_MAP_CENTER, INITIAL_MAP_ZOOM)
+    }
   }, [map, position])
 
   return null
@@ -59,6 +67,7 @@ function MapInteractionController({ locked }) {
 
 function SiteMarker({ position, placeInfo, suppressPopup = false }) {
   const markerRef = useRef(null)
+  const placeLabel = normalizeDisplayText(placeInfo?.data?.label)
 
   useEffect(() => {
     if (!position) return
@@ -79,7 +88,7 @@ function SiteMarker({ position, placeInfo, suppressPopup = false }) {
           {placeInfo?.status === 'loading' && <strong>周辺住所を確認中…</strong>}
           {placeInfo?.status === 'success' && (
             <>
-              <strong>{placeInfo.data.label}</strong>
+              <strong>{placeLabel}</strong>
               <small>{placeInfo.data.source}</small>
             </>
           )}
@@ -134,7 +143,9 @@ function terrainLineNote(line) {
   const to = line.positiveDirection || '右'
   const slope = line.summary?.averageSlopePercent
   const diff = line.summary?.elevationDiff
-  const slopeText = Number.isFinite(slope) ? `平均${slope.toFixed(1)}%` : '平均—'
+  const slopeText = Number.isFinite(slope)
+    ? `平均角${((Math.atan(Math.abs(slope) / 100) * 180) / Math.PI).toFixed(1)}°`
+    : '平均角—'
   if (!Number.isFinite(diff) || Math.abs(diff) < 0.1) return `${from}→${to} ${slopeText}`
   return `${from}→${to} ${diff > 0 ? '上り' : '下り'} ${slopeText}`
 }
@@ -378,8 +389,8 @@ export default function MapPanel({
   return (
     <div className="map-shell">
       <MapContainer
-        center={[36.2048, 138.2529]}
-        zoom={5}
+        center={INITIAL_MAP_CENTER}
+        zoom={INITIAL_MAP_ZOOM}
         minZoom={4}
         scrollWheelZoom
         className="map"

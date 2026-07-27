@@ -34,6 +34,7 @@ import { escapeCsv } from './utils/csv.js'
 import { buildObstructionElevationsCsv } from './utils/obstructionElevations.js'
 import { solarAltitudeReference } from './utils/solarWindow.js'
 import { snowRateLevel } from './utils/snowRates.js'
+import { normalizeDisplayText } from './utils/text.js'
 import { APP_VERSION, BUILD_DATE, detectRuntimeEnvironment, pdfLimitMb } from './utils/buildInfo.js'
 import {
   featureCenter,
@@ -213,6 +214,28 @@ function horizonTimeBand(bearing) {
   return '北側・低影響時間帯'
 }
 
+function shadowOffsetSummary(solarReference, obstructionHeight) {
+  const height = Number(obstructionHeight)
+  const points = solarReference?.peakWindow?.points
+    ?.filter((point) => Number.isFinite(point.altitude) && point.altitude > 0.5 && Number.isFinite(point.azimuth)) || []
+  if (!Number.isFinite(height) || height <= 0 || !points.length) return null
+
+  const rows = points.map((point) => {
+    const length = height / Math.tan((point.altitude * Math.PI) / 180)
+    const shadowBearing = normalizeBearing(point.azimuth + 180)
+    return { ...point, length, shadowBearing }
+  }).filter((point) => Number.isFinite(point.length))
+
+  if (!rows.length) return null
+  const longest = rows.reduce((max, point) => point.length > max.length ? point : max)
+  return {
+    height,
+    longest,
+    rows,
+    message: `高さ${height.toFixed(0)}mの木・建物を想定すると、冬至9〜15時の影は最長で約${longest.length.toFixed(0)}mです。影は太陽と反対側（${compassDirection(longest.shadowBearing)}方向）へ伸びるため、候補地がその範囲に入る場合だけ近接影を現地確認してください。`,
+  }
+}
+
 function formatHorizonDirection(sample) {
   if (!sample || !Number.isFinite(sample.bearing)) return ''
   const direction = sample.direction || compassDirection(sample.bearing)
@@ -387,10 +410,14 @@ export default function App() {
     if (siteNameTouched) return
     if (siteName.trim()) return
     if (!terrain || !['success', 'manual'].includes(terrainStatus)) return
+    if (placeInfo.status === 'success' && placeInfo.data?.label) {
+      setSiteName(normalizeDisplayText(placeInfo.data.label))
+      return
+    }
     const station = isConfirmedSnowStation(snowData.station) ? snowData.station : null
     if (!station) return
     setSiteName(station.placeName || station.name || '')
-  }, [siteName, siteNameTouched, terrain, terrainStatus, snowData.station])
+  }, [siteName, siteNameTouched, terrain, terrainStatus, placeInfo.status, placeInfo.data?.label, snowData.station])
 
   async function loadNearestSnow(nextPosition) {
     setSnowData({ status: 'loading', station: null, message: '' })
@@ -520,6 +547,17 @@ export default function App() {
   }
 
   function resetWorkTools() {
+    window.clearTimeout(placeRequestTimer.current)
+    placeRequestSeq.current += 1
+    resetCandidateInputs()
+    setPosition(null)
+    setAddress('')
+    setAddressResults([])
+    setSearchStatus('idle')
+    setPlaceInfo(initialPlaceInfo)
+    setElevation(initialElevation)
+    setSnowData(initialSnow)
+    setPlaceApiStatus(initialPlaceApiStatus)
     setDrawingJob(null)
     setDrawingSelectedPages([])
     setActiveDrawingPageNumber(null)
@@ -529,7 +567,7 @@ export default function App() {
     setDrawingTextTool(initialDrawingTextTool)
     setDrawingImageTool(initialDrawingImageTool)
     setDrawingMergeFiles([])
-    setDrawingConvertStatus({ status: 'idle', message: 'PDF管理と地形解析の一時結果を初期化しました。' })
+    setDrawingConvertStatus({ status: 'idle', message: '候補地点、PDF管理、地形解析の一時結果を初期化しました。' })
     setInheritanceJob(null)
     setInheritanceStatus({ status: 'idle', message: '' })
     setInheritanceCopyStatus('')
@@ -2002,8 +2040,12 @@ export default function App() {
   const confirmedSnowStation = isConfirmedSnowStation(snowData.station) ? snowData.station : null
   const referenceSnowStation = snowData.station && !isConfirmedSnowStation(snowData.station) ? snowData.station : null
   const confirmedMeshPlaceName = confirmedSnowStation?.placeName || ''
-  const selectedPlaceLabel = placeInfo.status === 'success' ? placeInfo.data.label : ''
+  const selectedPlaceLabel = placeInfo.status === 'success' ? normalizeDisplayText(placeInfo.data.label) : ''
   const solarReference = useMemo(() => solarAltitudeReference(position, terrain), [position, terrain])
+  const shadowOffset = useMemo(
+    () => shadowOffsetSummary(solarReference, obstructionHeight),
+    [solarReference, obstructionHeight],
+  )
   const inheritanceSingleTransferRows = useMemo(
     () => inheritanceJob?.results?.filter(isSingleInheritanceLandTransfer) || [],
     [inheritanceJob]
@@ -2124,7 +2166,7 @@ export default function App() {
       try {
         const fileHandle = await window.showSaveFilePicker({
           suggestedName: 'ObstructionElevations.csv',
-          types: [{ description: 'Solar Pro地平線CSV', accept: { 'text/csv': ['.csv'] } }],
+          types: [{ description: 'Solar Pro 地平線データ（CSV）', accept: { 'text/csv': ['.csv'] } }],
         })
         const writable = await fileHandle.createWritable()
         await writable.write(blob)
@@ -2657,7 +2699,7 @@ export default function App() {
                     <span>{detailedHorizon ? '10°間隔・36方位を一括分析（詳細）' : '0° / 45° / 90° / 135° / 180° / 225° / 270° / 315°を一括分析'}</span>
                     <small className="terrain-box-note">
                       DEM解析結果を1°間隔に補間してSolar Pro用CSVに出力します。<br />
-                      ※ SunEye実測値ではなく概算データです。
+                      ※ DEMから作成した参考用の地平線データです。
                     </small>
                   </div>
                   <div className="terrain-actions">
@@ -2694,11 +2736,11 @@ export default function App() {
                     <button
                       type="button"
                       className="horizon-tool-button horizon-csv-button horizon-csv-button--solarpro"
-                      aria-label="Solar Pro用地平線CSVを出力"
+                      aria-label="Solar Pro用地平線データを保存"
                       disabled={!position || !terrain?.samples?.length}
                       onClick={downloadSolarProObstructionCsv}
                     >
-                      Solar Pro地平線CSV出力
+                      Solar Pro用 地平線データ保存
                     </button>
                   </div>
                 </div>
@@ -2732,6 +2774,17 @@ export default function App() {
                       solarReference={solarReference}
                       obstructionHeight={obstructionHeight}
                     />
+                    {shadowOffset && (
+                      <div className="shadow-offset-note">
+                        <div>
+                          <strong>近接影のかんたん目安</strong>
+                          <span>{shadowOffset.message}</span>
+                        </div>
+                        <small>
+                          地平線分析とは別の簡易メモです。木幅・斜面・造成後の高さは反映しないため、写真や現地で確認してください。
+                        </small>
+                      </div>
+                    )}
                     <label className="assumption-row">
                       <span>保守的に加算する想定樹高</span>
                       <span className="number-with-unit">
@@ -3121,11 +3174,11 @@ export default function App() {
 
             <article className="manual-card">
               <span>STEP 2</span>
-              <h3>地平線CSVを読み込む</h3>
+              <h3>地平線データを読み込む</h3>
               <p><strong>3DCAD → 地平線</strong> を開き、このツールで出力した <strong>ObstructionElevations.csv</strong> を読み込みます。</p>
               <ul>
                 <li>分析結果は1°間隔へ補間してCSV化。</li>
-                <li>SunEye実測値ではなく、DEM解析＋想定樹高の概算値。</li>
+                <li>DEM解析＋想定樹高から作成した参考用データ。</li>
                 <li>読み込み後、Solar Pro側の地平線グラフで不自然な方位がないか確認。</li>
               </ul>
             </article>
@@ -3169,13 +3222,17 @@ export default function App() {
           </section>
 
           <section className="knowledge-section panel" id="solar-tips">
-          <div className="section-heading">
-            <div className="step-number">4</div>
-            <div>
-              <h2>情報・ダウンロード・リンク集</h2>
-              <p>Solar Pro入力前後に使うテンプレート、標準機器メモ、外部確認サイトをまとめます。</p>
-            </div>
-          </div>
+          <details className="knowledge-disclosure">
+            <summary className="knowledge-disclosure__summary">
+              <div className="section-heading">
+                <div className="step-number">4</div>
+                <div>
+                  <h2>情報・ダウンロード・リンク集</h2>
+                  <p>Solar Pro入力前後に使うテンプレート、標準機器メモ、外部確認サイトをまとめます。</p>
+                </div>
+              </div>
+              <span>開く / 閉じる</span>
+            </summary>
 
           <div className="knowledge-grid">
             <article className="knowledge-card knowledge-card--accent">
@@ -3296,6 +3353,7 @@ export default function App() {
             </details>
 
           </div>
+          </details>
         </section>
         </div>
           </>

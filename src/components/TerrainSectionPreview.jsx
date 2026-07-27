@@ -10,13 +10,18 @@ function valueText(value, digits = 1, suffix = '') {
   return Number.isFinite(value) ? `${value.toFixed(digits)}${suffix}` : '—'
 }
 
+function slopeAngleText(percent) {
+  if (!Number.isFinite(percent)) return '—'
+  return `約${((Math.atan(Math.abs(percent) / 100) * 180) / Math.PI).toFixed(1)}°`
+}
+
 function profileStats(line) {
   const s = line.summary || {}
   return [
     `最高 ${valueText(s.maxElevation, 1, 'm')}`,
     `最低 ${valueText(s.minElevation, 1, 'm')}`,
-    `平均勾配 ${valueText(s.averageSlopePercent, 1, '%')}`,
-    `最大勾配 ${valueText(s.maxSlopePercent, 1, '%')}`,
+    `端点差 ${valueText(s.elevationDiff, 1, 'm')}`,
+    `端点平均角 ${slopeAngleText(s.averageSlopePercent)}`,
   ].join(' / ')
 }
 
@@ -99,9 +104,9 @@ function slopeLevel(segment) {
 
 function steepestSegmentText(line) {
   const segment = steepestSegment(line)
-  if (!segment) return '最大10m勾配 —'
+  if (!segment) return '最急10m区間 —'
   const direction = segment.elevationDelta >= 0 ? '上り' : '下り'
-  return `最大10m勾配 ${segment.slopePercent.toFixed(1)}%（約${segment.angle.toFixed(1)}°・${direction}）`
+  return `最急10m区間 約${segment.angle.toFixed(1)}°（${segment.slopePercent.toFixed(1)}%・${direction}）`
 }
 
 function ReportMetric({ label, value, note }) {
@@ -119,10 +124,10 @@ function TerrainProfileMetrics({ line, steepest, diffNotice }) {
   const s = line.summary || {}
   const direction = steepest?.elevationDelta >= 0 ? '上り' : '下り'
   const steepestValue = steepest
-    ? `${steepest.angle.toFixed(1)}° / ${steepest.slopePercent.toFixed(1)}%`
+    ? `${steepest.angle.toFixed(1)}°`
     : '—'
   const steepestNote = steepest
-    ? `${steepest.start.distance}m→${steepest.end.distance}m・${direction}`
+    ? `${steepest.start.distance}m→${steepest.end.distance}m・${direction}（${steepest.slopePercent.toFixed(1)}%）`
     : ''
 
   return (
@@ -144,11 +149,12 @@ function TerrainProfileMetrics({ line, steepest, diffNotice }) {
           note={diffNotice || '±5m以内は大きな高低差なし'}
         />
         <ReportMetric
-          label="平均勾配"
-          value={valueText(s.averageSlopePercent, 1, '%')}
+          label="端点平均角"
+          value={slopeAngleText(s.averageSlopePercent)}
+          note="両端の標高差÷水平距離"
         />
         <ReportMetric
-          label="最大10m勾配"
+          label="最急10m区間"
           value={steepestValue}
           note={steepestNote}
         />
@@ -195,7 +201,7 @@ function TerrainSectionSummary({ analysis }) {
         <strong>{Number.isFinite(summary.maxAbsDiff) ? `${summary.maxAbsDiff > 0 ? '+' : ''}${summary.maxAbsDiff.toFixed(1)}m` : '—'}</strong>
       </div>
       <div>
-        <span>最大10m勾配</span>
+        <span>最急10m区間</span>
         <strong>{summary.steepest ? `${summary.steepest.line.label} ${summary.steepest.segment.angle.toFixed(1)}°` : '—'}</strong>
       </div>
     </div>
@@ -384,7 +390,7 @@ export default function TerrainSectionPreview({ analysis, forceSlopeDetails = fa
       <div className="terrain-section-preview__heading">
         <div>
           <strong>候補地周辺{analysis.rangeMeters || 100}m 断面プレビュー</strong>
-          <span>候補地点を中心に、東西・南北方向を10m間隔で標高取得した簡易断面です。勾配角度は、読みやすさを優先して最も急な10m区間だけ橙色で表示します。</span>
+          <span>候補地点を中心に、東西・南北方向を10m間隔で標高取得した簡易断面です。橙色は10mごとの取得点で最も急な区間です。</span>
         </div>
         {!forceSlopeDetails && (
           <button

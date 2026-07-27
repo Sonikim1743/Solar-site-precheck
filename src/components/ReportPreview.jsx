@@ -150,8 +150,8 @@ function shortLineName(line) {
 
 function lineAverageText(line) {
   const slope = line?.summary?.averageSlopePercent
-  if (!Number.isFinite(slope)) return '平均 —'
-  return `平均${slope.toFixed(1)}%`
+  if (!Number.isFinite(slope)) return '平均角 —'
+  return `平均角${((Math.atan(Math.abs(slope) / 100) * 180) / Math.PI).toFixed(1)}°`
 }
 
 function axisLineLabel(line, fallback) {
@@ -269,8 +269,10 @@ function ReportTerrainMapPreview({ analysis, position }) {
         <rect x={cx - innerPx} y={cy - innerPx} width={innerPx * 2} height={innerPx * 2} fill="rgba(255, 255, 255, .06)" stroke="rgba(255,255,255,.92)" strokeWidth="2" strokeDasharray="8 6" />
         <line x1={cx - rangePx} y1={cy} x2={cx + rangePx} y2={cy} stroke="#d84c3c" strokeWidth="4" strokeLinecap="round" />
         <line x1={cx} y1={cy - rangePx} x2={cx} y2={cy + rangePx} stroke="#d84c3c" strokeWidth="4" strokeLinecap="round" />
-        <circle cx={cx} cy={cy} r="12" fill="#0f8062" stroke="#ffffff" strokeWidth="4" />
-        <circle cx={cx} cy={cy} r="3.6" fill="#ffd24a" />
+        <g opacity="0.5">
+          <circle cx={cx} cy={cy} r="12" fill="#0f8062" stroke="#ffffff" strokeWidth="4" />
+          <circle cx={cx} cy={cy} r="3.6" fill="#ffd24a" />
+        </g>
         <text x={cx} y={Math.max(18, cy - rangePx - 8)} className="report-map-preview__dir" textAnchor="middle">北</text>
         <text x={cx} y={Math.min(viewHeight - 14, cy + rangePx + 18)} className="report-map-preview__dir" textAnchor="middle">南</text>
         <text x={Math.max(28, cx - rangePx - 14)} y={cy + 5} className="report-map-preview__dir" textAnchor="end">西</text>

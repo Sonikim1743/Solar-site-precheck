@@ -14,6 +14,7 @@ import {
 } from '../src/utils/obstructionElevations.js'
 import { snowRateLevel } from '../src/utils/snowRates.js'
 import { interpolateHorizonAngle, peakSolarWindowReference, solarPositionAtHour } from '../src/utils/solarWindow.js'
+import { normalizeDisplayText } from '../src/utils/text.js'
 import { evaluateSiteVerdict, primaryVerdictReasons, verdictCriteriaText } from '../src/utils/verdict.js'
 import { DETAILED_HORIZON_DIRECTIONS, HORIZON_DIRECTIONS, createHorizonDirections, recalculateTerrainObstruction } from '../src/services/gsi.js'
 import { adjacentThirdMeshes, productionFactor, thirdMeshBoundaryDistance, thirdMeshCenter, thirdMeshCode } from '../src/services/nedo.js'
@@ -75,6 +76,11 @@ test('coordinate parser returns null for unusable text', () => {
 test('degree-minute formatter keeps Japanese Solar Pro style', () => {
   assert.equal(toDegreeMinutes(34.8617, 'lat', 1), '北緯 34度 51.7分')
   assert.equal(toDegreeMinutes(133.2433, 'lon', 1), '東経 133度 14.6分')
+})
+
+test('display text normalization collapses full-width and repeated spaces', () => {
+  assert.equal(normalizeDisplayText('岡山県　真庭市  蒜山富掛田\n607-1'), '岡山県 真庭市 蒜山富掛田 607-1')
+  assert.equal(normalizeDisplayText(null), '')
 })
 
 test('NEDO rate summaries validate monthly, annual and seasonal consistency', () => {
@@ -150,11 +156,20 @@ test('serve:dist script points to an existing local server file', () => {
 
 test('public deployment metadata and headers are explicit', () => {
   assert.ok(existsSync('public/robots.txt'))
-  assert.ok(existsSync('public/sitemap.xml'))
+  assert.equal(existsSync('public/sitemap.xml'), false)
+  assert.ok(existsSync('public/manifest.json'))
+  assert.equal(existsSync('public/manifest.webmanifest'), false)
+  const robots = readFileSync('public/robots.txt', 'utf8')
+  assert.match(robots, /Disallow:\s*\//)
+  assert.doesNotMatch(robots, /Sitemap:/)
+  const serviceWorker = readFileSync('public/sw.js', 'utf8')
+  assert.doesNotMatch(serviceWorker, /manifest\.webmanifest/)
   const headers = readFileSync('public/_headers', 'utf8')
   assert.match(headers, /Content-Security-Policy:/)
   assert.match(headers, /Strict-Transport-Security:/)
   assert.match(headers, /Permissions-Policy:/)
+  assert.match(headers, /\/sw\.js[\s\S]*Cache-Control:\s*no-cache/)
+  assert.match(headers, /\/data\/\*[\s\S]*Cache-Control:\s*no-cache/)
 })
 
 test('search placeholder does not mix mismatched address and coordinates', () => {

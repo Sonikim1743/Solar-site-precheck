@@ -1319,6 +1319,11 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
 .site-popup .leaflet-popup-content-wrapper {
   border-radius: 13px;
   box-shadow: 0 12px 28px rgba(18, 55, 44, 0.22);
+  background: rgba(255, 255, 255, 0.68);
+  backdrop-filter: blur(6px);
+}
+.site-popup .leaflet-popup-tip {
+  background: rgba(255, 255, 255, 0.68);
 }
 .site-popup .leaflet-popup-content {
   margin: 0;
@@ -3948,6 +3953,34 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
   margin-top: 0;
   scroll-margin-top: 92px;
 }
+.knowledge-disclosure {
+  display: grid;
+}
+.knowledge-disclosure__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 2px;
+  list-style: none;
+  cursor: pointer;
+}
+.knowledge-disclosure__summary::-webkit-details-marker { display: none; }
+.knowledge-disclosure__summary > span {
+  flex: 0 0 auto;
+  padding: 7px 12px;
+  border: 1px solid #dce9e3;
+  border-radius: 999px;
+  background: #f7fcf9;
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 900;
+}
+.knowledge-disclosure[open] .knowledge-disclosure__summary > span {
+  background: var(--green);
+  color: #fff;
+  border-color: var(--green);
+}
 .inheritance-section {
   margin-top: 18px;
   padding: 22px;
@@ -4144,6 +4177,32 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
+}
+.shadow-offset-note {
+  margin: 12px 0;
+  padding: 12px 14px;
+  display: grid;
+  gap: 6px;
+  border: 1px solid #e4d39a;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #fffaf0, #ffffff);
+  color: #6c5520;
+}
+.shadow-offset-note strong {
+  display: block;
+  margin-bottom: 3px;
+  color: #5b4210;
+  font-size: 13px;
+}
+.shadow-offset-note span {
+  color: #5e4a18;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.shadow-offset-note small {
+  color: #8a7440;
+  font-size: 11px;
+  line-height: 1.5;
 }
 .knowledge-card {
   padding: 18px;
@@ -5207,6 +5266,15 @@ footer > div:first-child {
 }
 
 @media print {
+  html,
+  body,
+  .report-card,
+  .report-card *,
+  .report-print-page,
+  .report-print-page * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
   body { background: white; }
   .topbar,
   .hero,
