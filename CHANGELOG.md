@@ -2,16 +2,16 @@
 
 GitHub上では最新版をすぐ確認できるよう、詳細な作業メモではなく運用上必要な変更点だけを残します。
 
-## 現行版: Version 1.22 — 2026-07-22
+## 現行版: Version 1.22 — 2026-07-27
 
 現在の配布基準です。
 
 - 最新オンライン版: https://solar-site-precheck.pages.dev
 - 軽量更新ZIP: `release/latest/SolarSitePrecheck_v1.22_release_light.zip`
 - 最新メタデータ: `release/latest/latest-version.json`
-- JS bundle: `index-pysY9Jsw.js`
-- SHA-256: `aff4c8b00f17f248dd7b3b1564e8c30e566dc596f2b1d0e9ffe8c70be5256cda`
-- サイズ: `2047437` bytes
+- JS bundle: `index-BRiIWtE0.js`
+- SHA-256: `d98beb371fd7e51ecdfd4275a1dab36fb304ea604465375f1d74e0470da78363`
+- サイズ: `2051261` bytes
 
 ### 主な内容
 
@@ -24,10 +24,15 @@ GitHub上では最新版をすぐ確認できるよう、詳細な作業メモ�
 - 候補地レポートに一次判定、印刷用ページ構成、地平線グラフ、断面レポート、NEDO出典・計算条件を整理。
 - 判定ロジックを `src/utils/verdict.js` へ分離し、テスト対象に追加。
 - リリース作成前に未コミット変更を検出して停止する安全装置を追加。
+- 住所表示の全角スペースを正規化し、候補地名・地図ポップアップの表示崩れを軽減。
+- 地図ポップアップとレポート中心点の透過表示を調整し、航空写真上の視認性を改善。
+- 断面レポートの勾配表現を角度中心に統一し、`%`値の誤読を防止。
+- Solar Pro用地平線CSVの案内文を「DEMから作成した参考用の地平線データ」へ整理。
+- 印刷時の背景色保持、robots非公開設定、Service Worker / HTML / dataキャッシュ方針を見直し、Cloudflare運用時の更新安定性を改善。
 
 ### 配布前検証
 
-- `npm test`: 38件通過
+- `npm test`: 40件通過
 - `work/preflight-release.mjs`: main HTML / NEDO API / bad mesh / PDF API GET guard 通過
 - GitHub raw ZIP再取得後のSHA-256一致を確認
 
