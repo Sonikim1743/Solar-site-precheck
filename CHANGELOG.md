@@ -2,9 +2,33 @@
 
 GitHub上では最新版をすぐ確認できるよう、詳細な作業メモではなく運用上必要な変更点だけを残します。
 
-## 現行版: Version 1.22 — 2026-07-27
+## 現行版: Version 1.23 — 2026-07-28
 
 現在の配布基準です。
+
+- 最新オンライン版: https://solar-site-precheck.pages.dev
+- 軽量更新ZIP: `release/latest/SolarSitePrecheck_v1.23_release_light.zip`
+- 最新メタデータ: `release/latest/latest-version.json`
+
+### 主な内容
+
+- Solar Pro入力メニューを追加し、入力マニュアル内の作業補助機能へすぐ移動できるように整理。
+- Huawei `SUN2000-50KTL-JPM0` / `SUN2000-125KTL-JPH0` とJINKOモジュール枚数から、Solar Proの電気回路構成に入力するPCS台数・最大並列・最大直列の候補を計算する「PCS・モジュール結線アシスト」を追加。
+- 「I-Vカーブ → 電気回路構成」から入力画面へ入る場所を、PCSアシスト横のヘルプ画像で確認できるように追加。
+- Solar Pro上の「全アレイ自動結線」後に確認するPV設備容量、PCS比率、設置モジュール枚数・実モジュール枚数の確認手順を追加。
+- PCS詳細設定で「詳細設定 → PCS詳細設定 → 全選択 → 設定 → Huawei Japan / 対象PCS選択」へ進む操作をスクリーンショット付きで案内。
+- PCS比率が低い場合に注意しやすいよう、計算結果の表示を改善。
+- Solar Pro入力マニュアルの順序を見直し、結線アシストを最初に確認できる構成へ変更。
+
+### 配布前検証
+
+- `npm test`
+- `npm run build`
+- `work/preflight-release.mjs`
+
+## Version 1.22 — 2026-07-27
+
+前回の配布基準です。
 
 - 最新オンライン版: https://solar-site-precheck.pages.dev
 - 軽量更新ZIP: `release/latest/SolarSitePrecheck_v1.22_release_light.zip`

@@ -5,6 +5,7 @@ import HorizonGraphPreview from './components/HorizonGraphPreview.jsx'
 import TerrainSectionPreview from './components/TerrainSectionPreview.jsx'
 import SolarProPreviewButton from './components/SolarProPreviewButton.jsx'
 import DiagnosticPanel from './components/DiagnosticPanel.jsx'
+import CircuitPlanner from './components/CircuitPlanner.jsx'
 import PdfToolsPage, { clearPendingImagePlacement } from './components/PdfToolsPage.jsx'
 import usePdfToolState, {
   initialDrawingImageTool,
@@ -2322,6 +2323,16 @@ export default function App() {
     }
   }
 
+  function openSolarManual() {
+    setActivePage('solar')
+    if (typeof window !== 'undefined') {
+      window.history.replaceState(null, '', '#solar-manual')
+      window.setTimeout(() => {
+        document.getElementById('solar-manual')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 0)
+    }
+  }
+
   return (
     <div className="app">
       <header className="topbar">
@@ -2342,6 +2353,13 @@ export default function App() {
               onClick={() => switchPage('solar')}
             >
               太陽光チェック
+            </button>
+            <button
+              type="button"
+              className="page-switcher__button"
+              onClick={openSolarManual}
+            >
+              Solar Pro入力
             </button>
             <button
               type="button"
@@ -3149,6 +3167,8 @@ export default function App() {
 
               <div className="manual-disclosure__body">
                 <div className="manual-grid">
+            <CircuitPlanner />
+
             <article className="manual-card manual-card--accent">
               <span>まず確認</span>
               <h3>このツールで準備する値</h3>

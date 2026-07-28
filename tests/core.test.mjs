@@ -5,6 +5,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { parseCoordinateInput, toDegreeMinutes } from '../src/utils/coordinates.js'
 import { escapeCsv } from '../src/utils/csv.js'
 import { detectRuntimeEnvironment, pdfLimitMb } from '../src/utils/buildInfo.js'
+import { calculateCircuitPlan } from '../src/utils/circuitPlanner.js'
 import { analyzeInheritanceText, summarizeInheritanceReceipts } from '../src/utils/inheritance.js'
 import {
   OBSTRUCTION_ELEVATIONS_HEADER,
@@ -469,4 +470,60 @@ test('Solar Pro obstruction CSV keeps the verified sample structure', () => {
 test('Solar Pro obstruction CSV is not generated without horizon results', () => {
   assert.equal(buildObstructionElevationsCsv({ samples: [], position: { lat: 35, lon: 135 } }), null)
   assert.equal(buildObstructionElevationsCsv({ samples: [{ bearing: 0, angle: null }], position: { lat: 35, lon: 135 } }), null)
+})
+
+test('circuit planner recommends the smallest Solar Pro frame that covers module count', () => {
+  const plan = calculateCircuitPlan({
+    pcsCount: 4,
+    pcsCapacityKw: 50,
+    maxParallelPerPcs: 12,
+    moduleCount: 528,
+    modulePowerW: 650,
+    seriesSearchLimit: 18,
+  })
+  assert.equal(plan.seriesCount, 11)
+  assert.equal(plan.maxCircuitModules, 528)
+  assert.equal(plan.connectedModules, 528)
+  assert.equal(plan.spareModuleSlots, 0)
+  assert.ok(plan.isEnough)
+})
+
+test('circuit planner compares adjacent series options and reports shortage', () => {
+  const plan = calculateCircuitPlan({
+    pcsCount: 4,
+    pcsCapacityKw: 50,
+    maxParallelPerPcs: 12,
+    moduleCount: 528,
+    modulePowerW: 650,
+    seriesSearchLimit: 18,
+  })
+  assert.equal(plan.recommendedSeriesCount, 11)
+  const tenSeries = plan.seriesRecommendations.find((option) => option.seriesCount === 10)
+  const twelveSeries = plan.seriesRecommendations.find((option) => option.seriesCount === 12)
+  assert.ok(tenSeries)
+  assert.equal(tenSeries.isEnough, false)
+  assert.equal(tenSeries.shortageModules, 48)
+  assert.ok(twelveSeries)
+  assert.equal(twelveSeries.isEnough, true)
+  assert.equal(twelveSeries.spareModuleSlots, 48)
+})
+
+test('circuit planner follows 125kW input-port examples around the calculated series', () => {
+  const plan = calculateCircuitPlan({
+    pcsCount: 3,
+    pcsCapacityKw: 125,
+    maxParallelPerPcs: 18,
+    moduleCount: 872,
+    modulePowerW: 655,
+    seriesSearchLimit: 18,
+  })
+  assert.equal(plan.recommendedSeriesCount, 17)
+  assert.equal(plan.maxCircuitModules, 918)
+  assert.equal(plan.spareModuleSlots, 46)
+  const sixteenSeries = plan.seriesRecommendations.find((option) => option.seriesCount === 16)
+  const eighteenSeries = plan.seriesRecommendations.find((option) => option.seriesCount === 18)
+  assert.ok(sixteenSeries)
+  assert.equal(sixteenSeries.shortageModules, 8)
+  assert.ok(eighteenSeries)
+  assert.equal(eighteenSeries.spareModuleSlots, 100)
 })
