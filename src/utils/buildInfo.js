@@ -21,6 +21,11 @@ export function currentBundleName(documentRef = globalThis?.document) {
 }
 
 export function pdfLimitMb(environment = detectRuntimeEnvironment()) {
-  if (PDF_LIMIT_MB) return PDF_LIMIT_MB
   return environment === 'Cloudflare Pages' ? '20' : '80'
+}
+
+export function runtimeBuildTarget(environment = detectRuntimeEnvironment()) {
+  if (environment === 'Cloudflare Pages') return 'cloudflare'
+  if (environment === 'Portable / Local' || environment === 'Portable LAN') return 'portable'
+  return BUILD_TARGET || 'web'
 }

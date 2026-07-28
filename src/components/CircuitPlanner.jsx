@@ -28,7 +28,11 @@ export default function CircuitPlanner() {
     moduleCount,
     modulePowerW: selectedModule.powerW,
     seriesSearchLimit: selectedModule.seriesSearchLimit,
-  }), [pcsCount, moduleCount, selectedModule.seriesSearchLimit, selectedModule.powerW, selectedPcs.capacityKw, selectedPcs.defaultParallelPerPcs])
+    maxDcVoltage: selectedPcs.maxDcVoltage,
+    vocStc: selectedModule.vocStc,
+    tempCoeffVocPercentPerC: selectedModule.tempCoeffVocPercentPerC,
+    designMinTempC: selectedModule.designMinTempC,
+  }), [pcsCount, moduleCount, selectedModule.seriesSearchLimit, selectedModule.powerW, selectedModule.vocStc, selectedModule.tempCoeffVocPercentPerC, selectedModule.designMinTempC, selectedPcs.capacityKw, selectedPcs.defaultParallelPerPcs, selectedPcs.maxDcVoltage])
 
   return (
     <article className="knowledge-card knowledge-card--wide circuit-planner">
@@ -94,6 +98,25 @@ export default function CircuitPlanner() {
         <div className="circuit-formula__body">
           <strong>
             PCS {plan.pcsCount}台 × 最大並列 {plan.maxParallelPerPcs} × 最大直列 {plan.seriesCount}
+            {plan.voltageLimit && (
+              <span
+                className={`help-tooltip help-tooltip--below circuit-voltage-help ${plan.exceedsVoltageReference ? 'circuit-voltage-help--warn' : ''}`}
+                tabIndex="0"
+                aria-label={`最大直列の低温時Voc確認。${plan.voltageLimit.designMinTempC}度時の概算上限は${plan.voltageLimit.maxSeriesByVoltage}直列です。最終値は仕様書で確認してください。`}
+              >
+                ?
+                <span className="help-tooltip__body circuit-voltage-help__body" role="tooltip">
+                  <strong>最大直列の安全確認</strong>
+                  <span>
+                    低温時はモジュールのVocが上がるため、PCS最大入力電圧を超えない確認が必要です。
+                  </span>
+                  <span>
+                    参考：{plan.voltageLimit.designMinTempC}℃時Voc概算では最大 {plan.voltageLimit.maxSeriesByVoltage} 直列目安。
+                    最終値はモジュール・PCS仕様書で確認してください。
+                  </span>
+                </span>
+              </span>
+            )}
             <em>= {plan.maxCircuitModules.toLocaleString()} 枚枠</em>
           </strong>
           <small>
@@ -121,7 +144,41 @@ export default function CircuitPlanner() {
             </ol>
           </section>
           <section>
-            <h4>2. PCS詳細設定の入れ方</h4>
+            <h4 className="circuit-guide__section-title">
+              2. PCS詳細設定の入れ方
+              <span
+                className="help-tooltip help-tooltip--below circuit-detail-help"
+                tabIndex="0"
+                aria-label="PCS詳細設定の画面例。全選択、設定、メーカーと型式の選択位置を確認できます。"
+              >
+                ?
+                <span className="help-tooltip__body circuit-detail-help__body" role="tooltip">
+                  <strong>PCS詳細設定の画面例</strong>
+                  <span>電気回路構成 → PCS詳細設定一覧 → PCS詳細設定 の順で確認します。</span>
+                  <span className="circuit-detail-help__images">
+                    <span className="circuit-guide__image-wrap">
+                      <img src="/screenshots/solarpro-circuit-composition.png" alt="Solar Pro 電気回路構成画面" />
+                      <span className="circuit-guide__hotspot circuit-guide__hotspot--composition-pcs">PCS台数</span>
+                      <span className="circuit-guide__hotspot circuit-guide__hotspot--composition-series">最大直列</span>
+                      <span className="circuit-guide__hotspot circuit-guide__hotspot--blue circuit-guide__hotspot--composition-auto">自動結線</span>
+                    </span>
+                    <span className="circuit-guide__image-wrap">
+                      <img src="/screenshots/solarpro-pcs-detail-list.png" alt="Solar Pro PCS詳細設定一覧" />
+                      <span className="circuit-guide__callout circuit-guide__callout--pcs-list-all">1 全選択</span>
+                      <span className="circuit-guide__arrow circuit-guide__arrow--pcs-list-all">↘</span>
+                      <span className="circuit-guide__callout circuit-guide__callout--pcs-list-setting">2 設定</span>
+                      <span className="circuit-guide__arrow circuit-guide__arrow--pcs-list-setting">↙</span>
+                    </span>
+                    <span className="circuit-guide__image-wrap">
+                      <img src="/screenshots/solarpro-pcs-detail-setting.png" alt="Solar Pro PCS詳細設定画面" />
+                      <span className="circuit-guide__callout circuit-guide__callout--pcs-setting-select">メーカー・型式を選択</span>
+                      <span className="circuit-guide__arrow circuit-guide__arrow--pcs-setting-select">↓</span>
+                      <span className="circuit-guide__hotspot circuit-guide__hotspot--pcs-setting-ok">OK</span>
+                    </span>
+                  </span>
+                </span>
+              </span>
+            </h4>
             <ol>
               <li>PCS台数を入力し、PCS設定は <strong>詳細設定</strong> を選択する。</li>
               <li><strong>PCS詳細設定...</strong> を開き、一覧画面で <strong>全選択</strong> を押す。</li>
@@ -129,36 +186,6 @@ export default function CircuitPlanner() {
               <li>メーカー名は <strong>ファーウェイ・ジャパン</strong>、型式は図面・仕様書と同じPCSを選択する。</li>
             </ol>
           </section>
-          <div className="circuit-guide__images" aria-label="Solar Pro PCS設定画面例">
-            <figure>
-              <span className="circuit-guide__image-wrap">
-                <img src="/screenshots/solarpro-circuit-composition.png" alt="Solar Pro 電気回路構成画面" />
-                <span className="circuit-guide__hotspot circuit-guide__hotspot--composition-pcs">PCS台数</span>
-                <span className="circuit-guide__hotspot circuit-guide__hotspot--composition-series">最大直列</span>
-                <span className="circuit-guide__hotspot circuit-guide__hotspot--blue circuit-guide__hotspot--composition-auto">自動結線</span>
-              </span>
-              <figcaption>電気回路構成：自動結線後に容量・枚数を確認</figcaption>
-            </figure>
-            <figure>
-              <span className="circuit-guide__image-wrap">
-                <img src="/screenshots/solarpro-pcs-detail-list.png" alt="Solar Pro PCS詳細設定一覧" />
-                <span className="circuit-guide__callout circuit-guide__callout--pcs-list-all">1 全選択</span>
-                <span className="circuit-guide__arrow circuit-guide__arrow--pcs-list-all">↘</span>
-                <span className="circuit-guide__callout circuit-guide__callout--pcs-list-setting">2 設定</span>
-                <span className="circuit-guide__arrow circuit-guide__arrow--pcs-list-setting">↙</span>
-              </span>
-              <figcaption>PCS詳細設定一覧：全選択して設定へ進む</figcaption>
-            </figure>
-            <figure>
-              <span className="circuit-guide__image-wrap">
-                <img src="/screenshots/solarpro-pcs-detail-setting.png" alt="Solar Pro PCS詳細設定画面" />
-                <span className="circuit-guide__callout circuit-guide__callout--pcs-setting-select">メーカー・型式を選択</span>
-                <span className="circuit-guide__arrow circuit-guide__arrow--pcs-setting-select">↓</span>
-                <span className="circuit-guide__hotspot circuit-guide__hotspot--pcs-setting-ok">OK</span>
-              </span>
-              <figcaption>PCS詳細設定：メーカーと型式を図面条件に合わせる</figcaption>
-            </figure>
-          </div>
         </div>
       </details>
 

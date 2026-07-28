@@ -4,8 +4,8 @@ import { existsSync, readFileSync } from 'node:fs'
 
 import { parseCoordinateInput, toDegreeMinutes } from '../src/utils/coordinates.js'
 import { escapeCsv } from '../src/utils/csv.js'
-import { detectRuntimeEnvironment, pdfLimitMb } from '../src/utils/buildInfo.js'
-import { calculateCircuitPlan } from '../src/utils/circuitPlanner.js'
+import { detectRuntimeEnvironment, pdfLimitMb, runtimeBuildTarget } from '../src/utils/buildInfo.js'
+import { calculateCircuitPlan, estimateVoltageLimitedSeries } from '../src/utils/circuitPlanner.js'
 import { analyzeInheritanceText, summarizeInheritanceReceipts } from '../src/utils/inheritance.js'
 import {
   OBSTRUCTION_ELEVATIONS_HEADER,
@@ -129,6 +129,9 @@ test('runtime environment helpers classify deployment targets', () => {
   assert.equal(detectRuntimeEnvironment({ hostname: '192.168.1.20' }), 'Portable LAN')
   assert.equal(pdfLimitMb('Cloudflare Pages'), '20')
   assert.equal(pdfLimitMb('Portable / Local'), '80')
+  assert.equal(pdfLimitMb('Portable LAN'), '80')
+  assert.equal(runtimeBuildTarget('Cloudflare Pages'), 'cloudflare')
+  assert.equal(runtimeBuildTarget('Portable LAN'), 'portable')
 })
 
 test('snowRateLevel uses shared visual thresholds', () => {
@@ -169,7 +172,7 @@ test('public deployment metadata and headers are explicit', () => {
   assert.match(headers, /Content-Security-Policy:/)
   assert.match(headers, /Strict-Transport-Security:/)
   assert.match(headers, /Permissions-Policy:/)
-  assert.match(headers, /\/sw\.js[\s\S]*Cache-Control:\s*no-cache/)
+  assert.doesNotMatch(headers, /\/sw\.js/)
   assert.match(headers, /\/data\/\*[\s\S]*Cache-Control:\s*no-cache/)
 })
 
@@ -526,4 +529,32 @@ test('circuit planner follows 125kW input-port examples around the calculated se
   assert.equal(sixteenSeries.shortageModules, 8)
   assert.ok(eighteenSeries)
   assert.equal(eighteenSeries.spareModuleSlots, 100)
+})
+
+test('circuit planner estimates voltage-limited series from cold Voc reference', () => {
+  const limit = estimateVoltageLimitedSeries({
+    maxDcVoltage: 1500,
+    vocStc: 49.8,
+    tempCoeffVocPercentPerC: -0.25,
+    designMinTempC: -10,
+  })
+  assert.ok(limit)
+  assert.equal(limit.maxSeriesByVoltage, 27)
+  assert.ok(limit.correctedVoc > 49.8)
+
+  const plan = calculateCircuitPlan({
+    pcsCount: 4,
+    pcsCapacityKw: 50,
+    maxParallelPerPcs: 12,
+    moduleCount: 528,
+    modulePowerW: 655,
+    seriesSearchLimit: 18,
+    maxDcVoltage: 1500,
+    vocStc: 49.8,
+    tempCoeffVocPercentPerC: -0.25,
+    designMinTempC: -10,
+  })
+  assert.equal(plan.seriesCount, 11)
+  assert.equal(plan.exceedsVoltageReference, false)
+  assert.equal(plan.voltageLimit.maxSeriesByVoltage, 27)
 })

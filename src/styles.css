@@ -4529,11 +4529,31 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
 .circuit-ratio--low {
   color: #d62828;
 }
+.circuit-voltage-help {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  font-size: 11px;
+  vertical-align: middle;
+}
+.circuit-voltage-help--warn {
+  border-color: rgba(214, 40, 40, .35);
+  background: #fff0f0;
+  color: #d62828;
+}
+.circuit-voltage-help__body {
+  width: min(380px, 82vw);
+  text-align: left;
+}
+.circuit-voltage-help__body strong,
+.circuit-voltage-help__body span {
+  display: block;
+}
 .circuit-guide {
   border: 1px solid #dbe9e3;
   border-radius: 16px;
   background: rgba(255, 255, 255, .78);
-  overflow: hidden;
+  overflow: visible;
 }
 .circuit-guide > summary {
   min-height: 48px;
@@ -4585,6 +4605,11 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
   color: var(--green-dark);
   font-size: 14px;
 }
+.circuit-guide__section-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
 .circuit-guide__body ol {
   margin: 0;
   padding-left: 18px;
@@ -4596,6 +4621,28 @@ main { width: 100%; max-width: 1440px; min-width: 0; margin: 0 auto; padding: 0 
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
+}
+.circuit-guide__images--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+.circuit-detail-help__body {
+  width: min(1180px, 94vw);
+  padding: 13px;
+  text-align: left;
+}
+.circuit-detail-help__body > strong,
+.circuit-detail-help__body > span {
+  display: block;
+}
+.circuit-detail-help__images {
+  margin-top: 9px;
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.circuit-detail-help__images img {
+  width: 100%;
+  display: block;
 }
 .circuit-guide__images figure {
   margin: 0;

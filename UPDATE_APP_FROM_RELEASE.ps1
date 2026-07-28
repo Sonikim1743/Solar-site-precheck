@@ -28,6 +28,23 @@ function Get-GitHubHeaders {
   return @{ "User-Agent" = "SolarSitePrecheckUpdater" }
 }
 
+function Remove-OldBackups {
+  param(
+    [string]$Path,
+    [int]$Keep = 3
+  )
+  if (-not (Test-Path $Path)) {
+    return
+  }
+  Get-ChildItem -LiteralPath $Path -Directory -Filter "backup_*" |
+    Sort-Object LastWriteTime -Descending |
+    Select-Object -Skip $Keep |
+    ForEach-Object {
+      Write-Host "Removing old backup: $($_.FullName)"
+      Remove-Item -LiteralPath $_.FullName -Recurse -Force
+    }
+}
+
 Write-Step "Checking latest release"
 $headers = Get-GitHubHeaders
 $meta = Invoke-RestMethod -Uri $VersionUrl -UseBasicParsing -Headers $headers
@@ -58,6 +75,17 @@ if (-not (Test-Path $downloadZip)) {
 
 $downloadedSize = (Get-Item $downloadZip).Length
 Write-Host "Downloaded: $downloadedSize bytes"
+
+if ($meta.sha256) {
+  Write-Step "Verifying SHA-256"
+  $actualHash = (Get-FileHash -LiteralPath $downloadZip -Algorithm SHA256).Hash.ToLowerInvariant()
+  $expectedHash = [string]$meta.sha256
+  $expectedHash = $expectedHash.ToLowerInvariant()
+  if ($actualHash -ne $expectedHash) {
+    throw "SHA256 mismatch: expected $expectedHash, got $actualHash"
+  }
+  Write-Host "SHA-256 OK: $actualHash"
+}
 
 Write-Step "Extracting zip"
 Expand-Archive -LiteralPath $downloadZip -DestinationPath $extractDir -Force
@@ -116,6 +144,9 @@ $status | ConvertTo-Json -Depth 5 | Set-Content -Path (Join-Path $root "update-s
 
 Write-Step "Cleaning temporary files"
 Remove-Item -LiteralPath $tempRoot -Recurse -Force
+
+Write-Step "Cleaning old backups"
+Remove-OldBackups -Path $backupRoot -Keep 3
 
 Write-Step "Update complete"
 Write-Host "Please close the old server window if it is still running, then start RUN_PORTABLE.cmd again."

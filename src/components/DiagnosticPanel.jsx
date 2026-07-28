@@ -2,11 +2,11 @@ import { useState } from 'react'
 import {
   APP_VERSION,
   BUILD_DATE,
-  BUILD_TARGET,
   MIN_REQUIRED_RUNTIME,
   currentBundleName,
   detectRuntimeEnvironment,
   pdfLimitMb,
+  runtimeBuildTarget,
 } from '../utils/buildInfo.js'
 
 const initialChecks = {
@@ -46,6 +46,7 @@ function formatCheckedAt(value) {
 export default function DiagnosticPanel({ placeApiStatus = null }) {
   const [checks, setChecks] = useState(initialChecks)
   const environment = detectRuntimeEnvironment()
+  const target = runtimeBuildTarget(environment)
   const bundleName = currentBundleName()
   const addressApi = placeApiStatus || {
     status: 'idle',
@@ -80,7 +81,7 @@ export default function DiagnosticPanel({ placeApiStatus = null }) {
       <div className="diagnostic-panel__body">
         <dl>
           <div><dt>環境</dt><dd>{environment}</dd></div>
-          <div><dt>Build</dt><dd>{BUILD_DATE} / {BUILD_TARGET}</dd></div>
+          <div><dt>Build</dt><dd>{BUILD_DATE} / {target}</dd></div>
           <div><dt>JS</dt><dd>{bundleName}</dd></div>
           <div><dt>住所API</dt><dd className={apiStatusClass(addressApi.status)}>{addressApi.label}</dd></div>
           <div><dt>住所確認</dt><dd>{formatCheckedAt(addressApi.checkedAt)}</dd></div>
