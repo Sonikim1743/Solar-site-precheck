@@ -3,9 +3,12 @@ import { createRoot } from 'react-dom/client'
 import 'leaflet/dist/leaflet.css'
 import './styles.css'
 import App from './App.jsx'
+import AppErrorBoundary from './components/AppErrorBoundary.jsx'
 import { installBrowserCompat } from './utils/browserCompat.js'
+import { recordLocalVisit } from './utils/visitCounter.js'
 
 installBrowserCompat()
+recordLocalVisit()
 
 const CHUNK_RELOAD_KEY = 'solar-site-precheck-chunk-reload-at'
 const CHUNK_RELOAD_COOLDOWN_MS = 30_000
@@ -40,7 +43,9 @@ window.addEventListener('unhandledrejection', (event) => {
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <App />
+    <AppErrorBoundary>
+      <App />
+    </AppErrorBoundary>
   </StrictMode>,
 )
 

@@ -5,7 +5,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { parseCoordinateInput, toDegreeMinutes } from '../src/utils/coordinates.js'
 import { escapeCsv } from '../src/utils/csv.js'
 import { detectRuntimeEnvironment, pdfLimitMb, runtimeBuildTarget } from '../src/utils/buildInfo.js'
-import { calculateCircuitPlan, estimateVoltageLimitedSeries } from '../src/utils/circuitPlanner.js'
+import { PCS_PRESETS, calculateCircuitPlan, estimateVoltageLimitedSeries } from '../src/utils/circuitPlanner.js'
 import { analyzeInheritanceText, summarizeInheritanceReceipts } from '../src/utils/inheritance.js'
 import {
   OBSTRUCTION_ELEVATIONS_HEADER,
@@ -17,6 +17,7 @@ import { snowRateLevel } from '../src/utils/snowRates.js'
 import { interpolateHorizonAngle, peakSolarWindowReference, solarPositionAtHour } from '../src/utils/solarWindow.js'
 import { normalizeDisplayText } from '../src/utils/text.js'
 import { evaluateSiteVerdict, primaryVerdictReasons, verdictCriteriaText } from '../src/utils/verdict.js'
+import { readLocalVisitStats, recordLocalVisit } from '../src/utils/visitCounter.js'
 import { DETAILED_HORIZON_DIRECTIONS, HORIZON_DIRECTIONS, createHorizonDirections, recalculateTerrainObstruction } from '../src/services/gsi.js'
 import { adjacentThirdMeshes, productionFactor, thirdMeshBoundaryDistance, thirdMeshCenter, thirdMeshCode } from '../src/services/nedo.js'
 import { selectConsistentRates, validateRateSummaries } from '../src/services/nedoValidation.js'
@@ -370,6 +371,30 @@ test('tree height changes recalculate horizon angles without dropping terrain re
   assert.ok(Number.isFinite(recalculated.maxAngle))
 })
 
+test('horizon recalculation ignores coastal samples without elevation data', () => {
+  const terrain = {
+    radius: 'coastal',
+    obstructionHeight: 20,
+    samples: [{
+      direction: '南東',
+      bearing: 135,
+      angle: 6,
+      terrainAngle: 3,
+      profile: [
+        { distance: 250, elevation: 40, angle: 6, terrainAngle: 3 },
+        { distance: 500, elevation: null, angle: null, terrainAngle: null, missing: true },
+        { distance: 750, elevation: 30, angle: 4, terrainAngle: 1 },
+      ],
+    }],
+  }
+  const recalculated = recalculateTerrainObstruction(terrain, 10, 20)
+  assert.equal(recalculated.samples.length, 1)
+  assert.equal(recalculated.samples[0].profile[1].missing, true)
+  assert.equal(recalculated.samples[0].profile[1].angle, null)
+  assert.ok(Number.isFinite(recalculated.maxAngle))
+  assert.equal(recalculated.direction, '南東')
+})
+
 test('site verdict stays data-missing until core precheck data exists', () => {
   const verdict = evaluateSiteVerdict({})
   assert.equal(verdict.status, 'missing')
@@ -531,6 +556,27 @@ test('circuit planner follows 125kW input-port examples around the calculated se
   assert.equal(eighteenSeries.spareModuleSlots, 100)
 })
 
+test('circuit planner includes 33kW and 40kW PCS presets with 8 input ports', () => {
+  const models = new Map(PCS_PRESETS.map((pcs) => [pcs.model, pcs]))
+  assert.equal(models.get('SUN2000-33KTL-NH')?.defaultParallelPerPcs, 8)
+  assert.equal(models.get('SUN2000-40KTL-NH')?.defaultParallelPerPcs, 8)
+  assert.equal(models.get('SUN2000-33KTL-NH')?.capacityKw, 33)
+  assert.equal(models.get('SUN2000-40KTL-NH')?.capacityKw, 40)
+
+  const plan = calculateCircuitPlan({
+    pcsCount: 5,
+    pcsCapacityKw: 40,
+    maxParallelPerPcs: 8,
+    moduleCount: 528,
+    modulePowerW: 655,
+    seriesSearchLimit: 18,
+  })
+  assert.equal(plan.recommendedSeriesCount, 14)
+  assert.equal(plan.maxCircuitModules, 560)
+  assert.equal(plan.spareModuleSlots, 32)
+  assert.ok(plan.isEnough)
+})
+
 test('circuit planner estimates voltage-limited series from cold Voc reference', () => {
   const limit = estimateVoltageLimitedSeries({
     maxDcVoltage: 1500,
@@ -557,4 +603,24 @@ test('circuit planner estimates voltage-limited series from cold Voc reference',
   assert.equal(plan.seriesCount, 11)
   assert.equal(plan.exceedsVoltageReference, false)
   assert.equal(plan.voltageLimit.maxSeriesByVoltage, 27)
+})
+
+test('local visit counter records browser-local launch stats', () => {
+  const data = new Map()
+  const storage = {
+    getItem: (key) => data.get(key) ?? null,
+    setItem: (key, value) => data.set(key, String(value)),
+  }
+
+  assert.deepEqual(readLocalVisitStats(storage), { count: 0, lastAt: null })
+
+  const first = recordLocalVisit(storage, Date.parse('2026-07-28T00:00:00.000Z'))
+  const second = recordLocalVisit(storage, Date.parse('2026-07-28T00:01:00.000Z'))
+
+  assert.equal(first.count, 1)
+  assert.equal(second.count, 2)
+  assert.deepEqual(readLocalVisitStats(storage), {
+    count: 2,
+    lastAt: '2026-07-28T00:01:00.000Z',
+  })
 })

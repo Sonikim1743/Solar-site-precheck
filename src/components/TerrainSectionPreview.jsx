@@ -106,7 +106,7 @@ function steepestSegmentText(line) {
   const segment = steepestSegment(line)
   if (!segment) return '最急10m区間 —'
   const direction = segment.elevationDelta >= 0 ? '上り' : '下り'
-  return `最急10m区間 約${segment.angle.toFixed(1)}°（${segment.slopePercent.toFixed(1)}%・${direction}）`
+  return `最急10m区間 約${segment.angle.toFixed(1)}°（${direction}）`
 }
 
 function ReportMetric({ label, value, note }) {
@@ -127,7 +127,7 @@ function TerrainProfileMetrics({ line, steepest, diffNotice }) {
     ? `${steepest.angle.toFixed(1)}°`
     : '—'
   const steepestNote = steepest
-    ? `${steepest.start.distance}m→${steepest.end.distance}m・${direction}（${steepest.slopePercent.toFixed(1)}%）`
+    ? `${steepest.start.distance}m→${steepest.end.distance}m・${direction}`
     : ''
 
   return (

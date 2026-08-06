@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   MODULE_PRESETS,
   PCS_PRESETS,
@@ -13,11 +14,115 @@ function findPreset(presets, id) {
   return presets.find((item) => item.id === id) || presets[0]
 }
 
+const SCREENSHOT_HELP = {
+  entry: {
+    title: 'Solar Proで開く場所',
+    description: 'I-Vカーブ → 電気回路構成 を開き、このアシスト結果を入力します。',
+  },
+  circuit: {
+    title: '電気回路構成の確認画面',
+    description: '入力値を反映後、全アレイ自動結線を押して容量・枚数を確認します。',
+  },
+  pcs: {
+    title: 'PCS詳細設定の画面例',
+    description: 'PCS詳細設定一覧 → PCS詳細設定 の順で、メーカーと型式を図面条件に合わせます。',
+  },
+}
+
+function HelpButton({ helpId, label, activeHelp, setActiveHelp }) {
+  const open = activeHelp === helpId
+  return (
+    <button
+      type="button"
+      className={`circuit-help-button ${open ? 'is-active' : ''}`}
+      aria-label={label}
+      aria-expanded={open}
+      onClick={() => setActiveHelp(open ? null : helpId)}
+    >
+      ?
+    </button>
+  )
+}
+
+function ScreenshotHelpDialog({ helpId, onClose }) {
+  useEffect(() => {
+    if (!helpId) return undefined
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') onClose()
+    }
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [helpId, onClose])
+
+  if (!helpId) return null
+  const help = SCREENSHOT_HELP[helpId]
+  if (!help) return null
+
+  return createPortal(
+    <div className="circuit-screenshot-help__backdrop" onMouseDown={onClose}>
+      <div
+        className="circuit-screenshot-help"
+        role="dialog"
+        aria-modal="true"
+        aria-label={help.title}
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="circuit-screenshot-help__header">
+          <div>
+            <strong>{help.title}</strong>
+            <span>{help.description}</span>
+          </div>
+          <button type="button" onClick={onClose} aria-label="ヘルプを閉じる">×</button>
+        </div>
+        {helpId === 'entry' && (
+          <div className="circuit-screenshot-help__images circuit-screenshot-help__images--single">
+            <img src="/screenshots/solarpro-circuit-menu-entry.png" alt="Solar Pro I-Vカーブメニューから電気回路構成を開く画面" />
+          </div>
+        )}
+        {helpId === 'circuit' && (
+          <div className="circuit-screenshot-help__images circuit-screenshot-help__images--single">
+            <span className="circuit-guide__image-wrap">
+              <img src="/screenshots/solarpro-circuit-composition.png" alt="Solar Pro 電気回路構成画面" />
+              <span className="circuit-guide__hotspot circuit-guide__hotspot--composition-pcs">PCS台数</span>
+              <span className="circuit-guide__hotspot circuit-guide__hotspot--composition-series">最大直列</span>
+              <span className="circuit-guide__hotspot circuit-guide__hotspot--blue circuit-guide__hotspot--composition-auto">自動結線</span>
+            </span>
+          </div>
+        )}
+        {helpId === 'pcs' && (
+          <div className="circuit-screenshot-help__images">
+            <span className="circuit-guide__image-wrap">
+              <img src="/screenshots/solarpro-pcs-detail-list.png" alt="Solar Pro PCS詳細設定一覧" />
+              <span className="circuit-guide__callout circuit-guide__callout--pcs-list-all">1 全選択</span>
+              <span className="circuit-guide__arrow circuit-guide__arrow--pcs-list-all">↘</span>
+              <span className="circuit-guide__callout circuit-guide__callout--pcs-list-setting">2 設定</span>
+              <span className="circuit-guide__arrow circuit-guide__arrow--pcs-list-setting">↙</span>
+            </span>
+            <span className="circuit-guide__image-wrap">
+              <img src="/screenshots/solarpro-pcs-detail-setting.png" alt="Solar Pro PCS詳細設定画面" />
+              <span className="circuit-guide__callout circuit-guide__callout--pcs-setting-select">メーカー・型式を選択</span>
+              <span className="circuit-guide__arrow circuit-guide__arrow--pcs-setting-select">↓</span>
+              <span className="circuit-guide__hotspot circuit-guide__hotspot--pcs-setting-ok">OK</span>
+            </span>
+          </div>
+        )}
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
 export default function CircuitPlanner() {
   const [pcsId, setPcsId] = useState(PCS_PRESETS[0].id)
   const [moduleId, setModuleId] = useState(MODULE_PRESETS[0].id)
   const [pcsCount, setPcsCount] = useState(4)
   const [moduleCount, setModuleCount] = useState(528)
+  const [activeHelp, setActiveHelp] = useState(null)
   const selectedPcs = findPreset(PCS_PRESETS, pcsId)
   const selectedModule = findPreset(MODULE_PRESETS, moduleId)
 
@@ -41,18 +146,12 @@ export default function CircuitPlanner() {
           <span className="knowledge-card__label">電気回路構成</span>
           <div className="circuit-planner__title-row">
             <h3>PCS・モジュール結線アシスト</h3>
-            <span
-              className="help-tooltip help-tooltip--below circuit-entry-help"
-              tabIndex="0"
-              aria-label="Solar Pro上部メニューのI-Vカーブから電気回路構成を開き、この入力アシストの値を転記します。"
-            >
-              ?
-              <span className="help-tooltip__body circuit-entry-help__body" role="tooltip">
-                <strong>Solar Proで開く場所</strong>
-                <span>I-Vカーブ → 電気回路構成 を開き、このアシスト結果を入力します。</span>
-                <img src="/screenshots/solarpro-circuit-menu-entry.png" alt="Solar Pro I-Vカーブメニューから電気回路構成を開く画面" />
-              </span>
-            </span>
+            <HelpButton
+              helpId="entry"
+              label="Solar Pro上部メニューのI-Vカーブから電気回路構成を開く画面を表示"
+              activeHelp={activeHelp}
+              setActiveHelp={setActiveHelp}
+            />
           </div>
           <p>Solar Proの「PCS台数 × 最大並列数 × 最大直列数」が、設置モジュール枚数以上になる最小構成を提案します。</p>
         </div>
@@ -102,17 +201,16 @@ export default function CircuitPlanner() {
               <span
                 className={`help-tooltip help-tooltip--below circuit-voltage-help ${plan.exceedsVoltageReference ? 'circuit-voltage-help--warn' : ''}`}
                 tabIndex="0"
-                aria-label={`最大直列の低温時Voc確認。${plan.voltageLimit.designMinTempC}度時の概算上限は${plan.voltageLimit.maxSeriesByVoltage}直列です。最終値は仕様書で確認してください。`}
+                aria-label="最大直列の安全確認。仕様書条件に合わせて最終確認してください。"
               >
                 ?
                 <span className="help-tooltip__body circuit-voltage-help__body" role="tooltip">
                   <strong>最大直列の安全確認</strong>
                   <span>
-                    低温時はモジュールのVocが上がるため、PCS最大入力電圧を超えない確認が必要です。
+                    最大直列数は、モジュール・PCS仕様書の条件に合わせて最終確認してください。
                   </span>
                   <span>
-                    参考：{plan.voltageLimit.designMinTempC}℃時Voc概算では最大 {plan.voltageLimit.maxSeriesByVoltage} 直列目安。
-                    最終値はモジュール・PCS仕様書で確認してください。
+                    このアシストは枚数入力用の目安です。最終値はモジュール・PCS仕様書で確認してください。
                   </span>
                 </span>
               </span>
@@ -135,7 +233,15 @@ export default function CircuitPlanner() {
         </summary>
         <div className="circuit-guide__body">
           <section>
-            <h4>1. 電気回路構成で結線結果を確認</h4>
+            <h4 className="circuit-guide__section-title">
+              1. 電気回路構成で結線結果を確認
+              <HelpButton
+                helpId="circuit"
+                label="電気回路構成画面の確認ポイントを表示"
+                activeHelp={activeHelp}
+                setActiveHelp={setActiveHelp}
+              />
+            </h4>
             <ol>
               <li>PCS台数を入力し、最大並列数・最大直列数をこのアシスト結果に合わせる。</li>
               <li><strong>全アレイ自動結線</strong> を押して、Solar Pro側で結線を作成する。</li>
@@ -146,38 +252,12 @@ export default function CircuitPlanner() {
           <section>
             <h4 className="circuit-guide__section-title">
               2. PCS詳細設定の入れ方
-              <span
-                className="help-tooltip help-tooltip--below circuit-detail-help"
-                tabIndex="0"
-                aria-label="PCS詳細設定の画面例。全選択、設定、メーカーと型式の選択位置を確認できます。"
-              >
-                ?
-                <span className="help-tooltip__body circuit-detail-help__body" role="tooltip">
-                  <strong>PCS詳細設定の画面例</strong>
-                  <span>電気回路構成 → PCS詳細設定一覧 → PCS詳細設定 の順で確認します。</span>
-                  <span className="circuit-detail-help__images">
-                    <span className="circuit-guide__image-wrap">
-                      <img src="/screenshots/solarpro-circuit-composition.png" alt="Solar Pro 電気回路構成画面" />
-                      <span className="circuit-guide__hotspot circuit-guide__hotspot--composition-pcs">PCS台数</span>
-                      <span className="circuit-guide__hotspot circuit-guide__hotspot--composition-series">最大直列</span>
-                      <span className="circuit-guide__hotspot circuit-guide__hotspot--blue circuit-guide__hotspot--composition-auto">自動結線</span>
-                    </span>
-                    <span className="circuit-guide__image-wrap">
-                      <img src="/screenshots/solarpro-pcs-detail-list.png" alt="Solar Pro PCS詳細設定一覧" />
-                      <span className="circuit-guide__callout circuit-guide__callout--pcs-list-all">1 全選択</span>
-                      <span className="circuit-guide__arrow circuit-guide__arrow--pcs-list-all">↘</span>
-                      <span className="circuit-guide__callout circuit-guide__callout--pcs-list-setting">2 設定</span>
-                      <span className="circuit-guide__arrow circuit-guide__arrow--pcs-list-setting">↙</span>
-                    </span>
-                    <span className="circuit-guide__image-wrap">
-                      <img src="/screenshots/solarpro-pcs-detail-setting.png" alt="Solar Pro PCS詳細設定画面" />
-                      <span className="circuit-guide__callout circuit-guide__callout--pcs-setting-select">メーカー・型式を選択</span>
-                      <span className="circuit-guide__arrow circuit-guide__arrow--pcs-setting-select">↓</span>
-                      <span className="circuit-guide__hotspot circuit-guide__hotspot--pcs-setting-ok">OK</span>
-                    </span>
-                  </span>
-                </span>
-              </span>
+              <HelpButton
+                helpId="pcs"
+                label="PCS詳細設定の画面例を表示"
+                activeHelp={activeHelp}
+                setActiveHelp={setActiveHelp}
+              />
             </h4>
             <ol>
               <li>PCS台数を入力し、PCS設定は <strong>詳細設定</strong> を選択する。</li>
@@ -194,6 +274,7 @@ export default function CircuitPlanner() {
           現在のPCS台数・入力ポート数では設置モジュール枚数に届きません。PCS台数を増やすか、構成を見直してください。
         </p>
       )}
+      <ScreenshotHelpDialog helpId={activeHelp} onClose={() => setActiveHelp(null)} />
     </article>
   )
 }

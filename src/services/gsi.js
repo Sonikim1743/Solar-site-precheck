@@ -385,7 +385,7 @@ export function createHorizonDirections(step = 10) {
 export const DETAILED_HORIZON_DIRECTIONS = createHorizonDirections(10)
 
 function summarizeTerrainSamples(samples, radius, obstructionHeight) {
-  const valid = samples.filter((sample) => Number.isFinite(sample.angle))
+  const valid = samples.filter((sample) => Number.isFinite(sample.angle) && !sample.missing)
   if (!valid.length) {
     return {
       risk: '低',
@@ -407,11 +407,72 @@ function summarizeTerrainSamples(samples, radius, obstructionHeight) {
   }
 }
 
+function emptyTerrainProfilePoint(distance, reason = '標高データなし') {
+  return {
+    distance,
+    elevation: null,
+    source: reason,
+    obstructionHeight: null,
+    effectiveElevation: null,
+    terrainAngle: null,
+    angle: null,
+    missing: true,
+    missingReason: reason,
+  }
+}
+
+function buildTerrainSampleFromProfile(direction, bearing, profile, obstructionHeight) {
+  const validProfile = profile.filter((item) => Number.isFinite(item.angle))
+  const validTerrainProfile = profile.filter((item) => Number.isFinite(item.terrainAngle))
+
+  if (!validProfile.length) {
+    return {
+      direction,
+      bearing,
+      elevation: null,
+      distance: null,
+      angle: 0,
+      terrainAngle: 0,
+      terrainDistance: null,
+      missing: true,
+      missingReason: '標高データなし',
+      profile,
+    }
+  }
+
+  const highest = validProfile.reduce((max, item) => item.angle > max.angle ? item : max)
+  const terrainHighest = validTerrainProfile.length
+    ? validTerrainProfile.reduce((max, item) => item.terrainAngle > max.terrainAngle ? item : max)
+    : null
+
+  return {
+    direction,
+    bearing,
+    elevation: highest.elevation,
+    distance: highest.distance,
+    angle: highest.angle,
+    terrainAngle: terrainHighest?.terrainAngle ?? 0,
+    terrainDistance: terrainHighest?.distance ?? null,
+    missingCount: profile.length - validProfile.length,
+    profile,
+  }
+}
+
 export function recalculateTerrainObstruction(terrain, siteElevation, obstructionHeight = 20) {
   if (!terrain?.samples?.length || !Number.isFinite(siteElevation)) return terrain
   const samples = terrain.samples.map((sample) => {
     if (!sample.profile?.length) return { ...sample, obstructionHeight }
     const profile = sample.profile.map((point) => {
+      if (!Number.isFinite(point.elevation) || !Number.isFinite(point.distance)) {
+        return {
+          ...point,
+          obstructionHeight: null,
+          effectiveElevation: null,
+          terrainAngle: null,
+          angle: null,
+          missing: true,
+        }
+      }
       const curvatureDrop = point.distance ** 2 / (2 * 6371000)
       const terrainElevationDiff = point.elevation - siteElevation - curvatureDrop
       const terrainAngle = (Math.atan2(terrainElevationDiff, point.distance) * 180) / Math.PI
@@ -425,16 +486,9 @@ export function recalculateTerrainObstruction(terrain, siteElevation, obstructio
         angle: Math.max(0, angle),
       }
     })
-    const highest = profile.reduce((max, item) => item.angle > max.angle ? item : max)
-    const terrainHighest = profile.reduce((max, item) => item.terrainAngle > max.terrainAngle ? item : max)
     return {
       ...sample,
-      elevation: highest.elevation,
-      distance: highest.distance,
-      angle: highest.angle,
-      terrainAngle: terrainHighest.terrainAngle,
-      terrainDistance: terrainHighest.distance,
-      profile,
+      ...buildTerrainSampleFromProfile(sample.direction, sample.bearing, profile, obstructionHeight),
     }
   })
   return summarizeTerrainSamples(samples, terrain.radius || '250m〜5km・各方位10点', obstructionHeight)
@@ -454,34 +508,27 @@ export async function analyzeSurroundingTerrain(
     async ({ direction, bearing }) => {
       const profile = await mapWithConcurrency(distances, 4, async (distance) => {
         const point = pointAtDistance(lat, lon, distance, bearing)
-        const result = await fetchElevation(point.lat, point.lon)
-        const curvatureDrop = distance ** 2 / (2 * 6371000)
-        const terrainElevationDiff = result.value - siteElevation - curvatureDrop
-        const terrainAngle = (Math.atan2(terrainElevationDiff, distance) * 180) / Math.PI
-        const elevationDiff = result.value + obstructionHeight - siteElevation - curvatureDrop
-        const angle = (Math.atan2(elevationDiff, distance) * 180) / Math.PI
-        return {
-          distance,
-          elevation: result.value,
-          source: result.dataSource,
-          obstructionHeight,
-          effectiveElevation: result.value + obstructionHeight,
-          terrainAngle: Math.max(0, terrainAngle),
-          angle: Math.max(0, angle),
+        try {
+          const result = await fetchElevation(point.lat, point.lon)
+          const curvatureDrop = distance ** 2 / (2 * 6371000)
+          const terrainElevationDiff = result.value - siteElevation - curvatureDrop
+          const terrainAngle = (Math.atan2(terrainElevationDiff, distance) * 180) / Math.PI
+          const elevationDiff = result.value + obstructionHeight - siteElevation - curvatureDrop
+          const angle = (Math.atan2(elevationDiff, distance) * 180) / Math.PI
+          return {
+            distance,
+            elevation: result.value,
+            source: result.dataSource,
+            obstructionHeight,
+            effectiveElevation: result.value + obstructionHeight,
+            terrainAngle: Math.max(0, terrainAngle),
+            angle: Math.max(0, angle),
+          }
+        } catch {
+          return emptyTerrainProfilePoint(distance)
         }
       })
-      const highest = profile.reduce((max, item) => item.angle > max.angle ? item : max)
-      const terrainHighest = profile.reduce((max, item) => item.terrainAngle > max.terrainAngle ? item : max)
-      return {
-        direction,
-        bearing,
-        elevation: highest.elevation,
-        distance: highest.distance,
-        angle: highest.angle,
-        terrainAngle: terrainHighest.terrainAngle,
-        terrainDistance: terrainHighest.distance,
-        profile,
-      }
+      return buildTerrainSampleFromProfile(direction, bearing, profile, obstructionHeight)
     },
   )
 

@@ -12,9 +12,10 @@ Solar Pro本体を置き換えるものではありません。発電量の最�
 - 想定利用者：Solar Proで発電量シミュレーションを行う担当者、候補地調査担当者
 - 運用段階：チーム内運用・作業補助ツール
 - 現行バージョン：v1.23
-- 最終更新：2026-07-28
+- 最終更新：2026-08-07
 - 最新オンライン版：https://solar-site-precheck.pages.dev
 - 最新軽量更新ZIP：`release/latest/SolarSitePrecheck_v1.23_release_light.zip`
+- 操作案内PDF：`public/manual/site-operation-guide-v1.23.pdf`
 
 ## 主な機能
 
@@ -44,6 +45,7 @@ Solar Pro本体を置き換えるものではありません。発電量の最�
 - Solar Pro内でどのメニューを開くかの説明
 - 地平線CSV読込、設置場所、積雪補正などの作業順を整理
 - 入力マニュアル・作業メモを追加していける折りたたみ式セクション
+- 社内共有用の操作案内PDFをトップ画面から直接ダウンロード
 - JINKO SOLAR `JKM655N-66QL6-BDV-F1-JP` / `JKM720N-66HL5-BDV` のSolar Pro用 `.MD0W` データ保存と取込手順
 - Huawei PCSとJINKOモジュール枚数から、Solar Proの電気回路構成に入力するPCS台数・最大並列・最大直列の候補を計算
 - PCS詳細設定、全アレイ自動結線、PV設備容量・PCS比率確認までの操作手順をスクリーンショット付きで案内

@@ -1,14 +1,5 @@
-export function clearPendingImagePlacement(current) {
-  return {
-    ...current,
-    src: '',
-    name: '',
-    aspectRatio: null,
-    drag: null,
-    selected: null,
-    editDrag: null,
-  }
-}
+import { clearPendingImagePlacement } from '../hooks/usePdfToolState.js'
+export { clearPendingImagePlacement } from '../hooks/usePdfToolState.js'
 
 export default function PdfToolsPage({
   state,

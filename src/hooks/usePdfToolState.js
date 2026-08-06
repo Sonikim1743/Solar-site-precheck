@@ -24,6 +24,18 @@ export function initialPdfPreviewView() {
   return { zoom: 1, x: 0, y: 0, panMode: false, drag: null }
 }
 
+export function clearPendingImagePlacement(current) {
+  return {
+    ...current,
+    src: '',
+    name: '',
+    aspectRatio: null,
+    drag: null,
+    selected: null,
+    editDrag: null,
+  }
+}
+
 export default function usePdfToolState() {
   const [drawingConvertStatus, setDrawingConvertStatus] = useState({ status: 'idle', message: '' })
   const [drawingJob, setDrawingJob] = useState(null)

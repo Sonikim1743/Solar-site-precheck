@@ -8,6 +8,7 @@ import {
   pdfLimitMb,
   runtimeBuildTarget,
 } from '../utils/buildInfo.js'
+import { readLocalVisitStats } from '../utils/visitCounter.js'
 
 const initialChecks = {
   status: 'idle',
@@ -43,11 +44,26 @@ function formatCheckedAt(value) {
   }
 }
 
+function formatVisitAt(value) {
+  if (!value) return '—'
+  try {
+    return new Date(value).toLocaleString('ja-JP', {
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  } catch {
+    return '—'
+  }
+}
+
 export default function DiagnosticPanel({ placeApiStatus = null }) {
   const [checks, setChecks] = useState(initialChecks)
   const environment = detectRuntimeEnvironment()
   const target = runtimeBuildTarget(environment)
   const bundleName = currentBundleName()
+  const localVisits = readLocalVisitStats()
   const addressApi = placeApiStatus || {
     status: 'idle',
     label: '待機',
@@ -88,6 +104,8 @@ export default function DiagnosticPanel({ placeApiStatus = null }) {
           <div><dt>住所対策</dt><dd>{addressApi.status === 'cooldown' ? '再試行抑制中' : 'キャッシュ/遅延'}</dd></div>
           <div><dt>PDF目安</dt><dd>{pdfLimitMb(environment)}MB</dd></div>
           <div><dt>Runtime</dt><dd>min {MIN_REQUIRED_RUNTIME}</dd></div>
+          <div><dt>起動回数</dt><dd>{localVisits.count ? `${localVisits.count}回` : '—'}</dd></div>
+          <div><dt>最終起動</dt><dd>{formatVisitAt(localVisits.lastAt)}</dd></div>
           <div><dt>NEDO API</dt><dd className={checks.nedo === 'OK' ? 'is-ok' : 'is-ng'}>{checks.nedo}</dd></div>
           <div><dt>Bad mesh</dt><dd className={checks.badMesh === 'OK' ? 'is-ok' : 'is-ng'}>{checks.badMesh}</dd></div>
           <div><dt>PDF API</dt><dd className={checks.pdfApi === 'OK' ? 'is-ok' : 'is-ng'}>{checks.pdfApi}</dd></div>

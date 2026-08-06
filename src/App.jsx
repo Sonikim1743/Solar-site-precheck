@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import MapPanel from './components/MapPanel.jsx'
 import ReportPreview from './components/ReportPreview.jsx'
 import HorizonGraphPreview from './components/HorizonGraphPreview.jsx'
@@ -6,8 +6,8 @@ import TerrainSectionPreview from './components/TerrainSectionPreview.jsx'
 import SolarProPreviewButton from './components/SolarProPreviewButton.jsx'
 import DiagnosticPanel from './components/DiagnosticPanel.jsx'
 import CircuitPlanner from './components/CircuitPlanner.jsx'
-import PdfToolsPage, { clearPendingImagePlacement } from './components/PdfToolsPage.jsx'
 import usePdfToolState, {
+  clearPendingImagePlacement,
   initialDrawingImageTool,
   initialDrawingTextTool,
   initialPdfPreviewView,
@@ -43,6 +43,8 @@ import {
   readCadastreFile,
   searchParcels,
 } from './services/cadastre.js'
+
+const PdfToolsPage = lazy(() => import('./components/PdfToolsPage.jsx'))
 
 const MONTHS = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月']
 const initialElevation = { status: 'idle', value: null, source: '', message: '' }
@@ -372,6 +374,9 @@ export default function App() {
     if (window.location.hash === '#pdf-tools') return 'pdf'
     return 'solar'
   })
+  const [solarManualActive, setSolarManualActive] = useState(
+    () => typeof window !== 'undefined' && window.location.hash === '#solar-manual',
+  )
   const draftSaveTimer = useRef(null)
   const placeRequestTimer = useRef(null)
   const placeRequestSeq = useRef(0)
@@ -406,6 +411,18 @@ export default function App() {
   }, [position, placeInfo.status])
 
   useEffect(() => () => window.clearTimeout(placeRequestTimer.current), [])
+
+  useEffect(() => {
+    const syncPageFromHash = () => {
+      const hash = window.location.hash
+      setSolarManualActive(hash === '#solar-manual')
+      if (hash === '#inheritance-check') setActivePage('inheritance')
+      else if (hash === '#pdf-tools') setActivePage('pdf')
+      else setActivePage('solar')
+    }
+    window.addEventListener('hashchange', syncPageFromHash)
+    return () => window.removeEventListener('hashchange', syncPageFromHash)
+  }, [])
 
   useEffect(() => {
     if (siteNameTouched) return
@@ -2226,6 +2243,7 @@ export default function App() {
   const horizonSamples = horizonDirections.map((item) =>
     terrain?.samples?.find((sample) => sample.bearing === item.bearing) || { ...item, angle: null },
   )
+  const horizonMissingPointCount = horizonSamples.reduce((total, sample) => total + (sample.missingCount || 0), 0)
   const showHorizonResult = horizonPanelOpen && (Boolean(terrain) || terrainStatus === 'error' || terrainStatus === 'loading')
   const snowStation = snowData.station
   const snowIsConfirmed = isConfirmedSnowStation(snowStation)
@@ -2312,6 +2330,7 @@ export default function App() {
 
   function switchPage(nextPage) {
     setActivePage(nextPage)
+    setSolarManualActive(false)
     if (typeof window !== 'undefined') {
       const hash = nextPage === 'inheritance'
         ? '#inheritance-check'
@@ -2325,6 +2344,7 @@ export default function App() {
 
   function openSolarManual() {
     setActivePage('solar')
+    setSolarManualActive(true)
     if (typeof window !== 'undefined') {
       window.history.replaceState(null, '', '#solar-manual')
       window.setTimeout(() => {
@@ -2349,14 +2369,14 @@ export default function App() {
           <nav className="page-switcher" aria-label="画面切替">
             <button
               type="button"
-              className={activePage === 'solar' ? 'page-switcher__button page-switcher__button--active' : 'page-switcher__button'}
+              className={activePage === 'solar' && !solarManualActive ? 'page-switcher__button page-switcher__button--active' : 'page-switcher__button'}
               onClick={() => switchPage('solar')}
             >
               太陽光チェック
             </button>
             <button
               type="button"
-              className="page-switcher__button"
+              className={activePage === 'solar' && solarManualActive ? 'page-switcher__button page-switcher__button--active' : 'page-switcher__button'}
               onClick={openSolarManual}
             >
               Solar Pro入力
@@ -2408,10 +2428,10 @@ export default function App() {
                 <strong>Solar Pro</strong>
                 <small>管理・DL</small>
               </a>
-              <a href="#solar-manual">
+              <a href="/manual/site-operation-guide-v1.23.pdf" download="サイト操作案内_260805rev7.pdf" target="_blank" rel="noreferrer">
                 <span className="hero-service-links__icon">📘</span>
                 <strong>入力マニュアル</strong>
-                <small>手順を見る</small>
+                <small>PDF保存</small>
               </a>
             </div>
           </div>
@@ -2481,13 +2501,18 @@ export default function App() {
                     <div className="workflow-help__body">
                       <strong>候補地点選択のヒント</strong>
                       <p className="workflow-help__lead">
-                        GroundyやGoogleマップで現地情報・周辺道路・区画を確認してから住所や座標を入力すると、位置指定の精度が上がります。
+                        初めて使う場合は、上の検索欄に住所・地名・緯度経度を入れるか、航空写真を直接クリックしてください。
+                        GroundyやGoogleマップで周辺道路・区画を確認してから指定すると、位置のずれを減らせます。
+                      </p>
+                      <p className="workflow-help__quick">
+                        候補地点を決めた後、断面・地平線・NEDO積雪を順に確認し、最後にレポートで根拠を整理します。
                       </p>
                       <strong>基本作業順</strong>
                       <ol>
                         <li><b>地点を選択</b><span>住所・座標・地図クリックで候補地点を決める</span></li>
-                        <li><b>地平線分析</b><span>DEMと想定樹高からCSV用の地平線値を作る</span></li>
-                        <li><b>NEDO積雪取得</b><span>同一3次メッシュの積雪値だけを採用する</span></li>
+                        <li><b>断面確認</b><span>50/100/200mの断面で高低差と傾きを確認する</span></li>
+                        <li><b>地平線分析</b><span>DEMと想定樹高からSolar Pro用CSVの元データを作る</span></li>
+                        <li><b>NEDO取得</b><span>同一3次メッシュの積雪値だけを採用する</span></li>
                         <li><b>レポート確認</b><span>一次確認レポートとSolar Pro用CSVへ進む</span></li>
                       </ol>
                       <p className="workflow-help__note">※ 事業可否の最終判定ではなく、Solar Pro入力前の根拠整理です。</p>
@@ -2792,6 +2817,11 @@ export default function App() {
                       solarReference={solarReference}
                       obstructionHeight={obstructionHeight}
                     />
+                    {horizonMissingPointCount > 0 && (
+                      <p className="inline-message">
+                        海岸部などで標高データがない地点 {horizonMissingPointCount}点を除外し、有効な地点だけで地平線を計算しました。
+                      </p>
+                    )}
                     {shadowOffset && (
                       <div className="shadow-offset-note">
                         <div>
@@ -3380,7 +3410,8 @@ export default function App() {
         )}
 
         {activePage === 'pdf' && (
-          <PdfToolsPage
+          <Suspense fallback={<div className="route-loading" role="status">PDFツールを準備しています…</div>}>
+            <PdfToolsPage
             ArrayLengthHelp={ArrayLengthHelp}
             state={{
               drawingConvertStatus,
@@ -3447,7 +3478,8 @@ export default function App() {
               isRotatedPreviewReady,
               activePreviewPointStyle,
             }}
-          />
+            />
+          </Suspense>
         )}
 
         {activePage === 'inheritance' && (
