@@ -199,7 +199,7 @@ export default function CircuitPlanner() {
             PCS {plan.pcsCount}台 × 最大並列 {plan.maxParallelPerPcs} × 最大直列 {plan.seriesCount}
             {plan.voltageLimit && (
               <span
-                className={`help-tooltip help-tooltip--below circuit-voltage-help ${plan.exceedsVoltageReference ? 'circuit-voltage-help--warn' : ''}`}
+                className={`help-tooltip help-tooltip--below circuit-voltage-help ${plan.exceedsVoltageReference || plan.voltageConstrained ? 'circuit-voltage-help--warn' : ''}`}
                 tabIndex="0"
                 aria-label="最大直列の安全確認。仕様書条件に合わせて最終確認してください。"
               >
@@ -207,10 +207,11 @@ export default function CircuitPlanner() {
                 <span className="help-tooltip__body circuit-voltage-help__body" role="tooltip">
                   <strong>最大直列の安全確認</strong>
                   <span>
-                    最大直列数は、モジュール・PCS仕様書の条件に合わせて最終確認してください。
+                    電圧基準の上限目安：{plan.voltageLimit.maxSeriesByVoltage}直列
+                    （設計最低温度 {plan.voltageLimit.designMinTempC}℃）
                   </span>
                   <span>
-                    このアシストは枚数入力用の目安です。最終値はモジュール・PCS仕様書で確認してください。
+                    最終値はモジュール・PCS仕様書で確認してください。
                   </span>
                 </span>
               </span>
@@ -222,6 +223,9 @@ export default function CircuitPlanner() {
             <span className={plan.dcAcRatio <= 110 ? 'circuit-ratio circuit-ratio--low' : 'circuit-ratio'}>
               {formatNumber(plan.dcAcRatio, 1)}%
             </span>
+            {plan.voltageLimit && (
+              <> / 電圧上限 {plan.voltageLimit.maxSeriesByVoltage}直列目安</>
+            )}
           </small>
         </div>
       </div>

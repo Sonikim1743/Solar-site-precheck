@@ -605,6 +605,28 @@ test('circuit planner estimates voltage-limited series from cold Voc reference',
   assert.equal(plan.voltageLimit.maxSeriesByVoltage, 27)
 })
 
+test('circuit planner clamps recommended series by voltage limit', () => {
+  const plan = calculateCircuitPlan({
+    pcsCount: 1,
+    pcsCapacityKw: 10,
+    maxParallelPerPcs: 1,
+    moduleCount: 20,
+    modulePowerW: 655,
+    seriesSearchLimit: 18,
+    maxDcVoltage: 600,
+    vocStc: 49.8,
+    tempCoeffVocPercentPerC: -0.25,
+    designMinTempC: -10,
+  })
+
+  assert.equal(plan.voltageLimit.maxSeriesByVoltage, 11)
+  assert.equal(plan.effectiveSeriesLimit, 11)
+  assert.equal(plan.voltageConstrained, true)
+  assert.equal(plan.recommendedSeriesCount, 11)
+  assert.equal(plan.isEnough, false)
+  assert.equal(plan.shortageModules, 9)
+})
+
 test('local visit counter records browser-local launch stats', () => {
   const data = new Map()
   const storage = {

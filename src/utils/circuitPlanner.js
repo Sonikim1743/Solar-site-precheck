@@ -130,11 +130,18 @@ export function buildSeriesRecommendations({
   maxParallelPerPcs,
   moduleCount,
   seriesSearchLimit = 18,
+  maxSeriesByVoltage = null,
 }) {
   const normalizedPcsCount = integerAtLeast(pcsCount, 1, 1)
   const normalizedParallel = integerAtLeast(maxParallelPerPcs, 1, 1)
   const normalizedModuleCount = integerAtLeast(moduleCount, 0, 0)
-  const maxSeries = integerAtLeast(seriesSearchLimit, 1, 18)
+  const nominalMaxSeries = integerAtLeast(seriesSearchLimit, 1, 18)
+  const voltageMaxSeries = Number.isFinite(Number(maxSeriesByVoltage)) && Number(maxSeriesByVoltage) > 0
+    ? Math.floor(Number(maxSeriesByVoltage))
+    : null
+  const maxSeries = voltageMaxSeries
+    ? Math.max(1, Math.min(nominalMaxSeries, voltageMaxSeries))
+    : nominalMaxSeries
   const targetSeries = normalizedModuleCount > 0
     ? Math.ceil(normalizedModuleCount / (normalizedPcsCount * normalizedParallel))
     : 1
@@ -161,6 +168,9 @@ export function buildSeriesRecommendations({
   return {
     options,
     recommended: valid[0] || options[options.length - 1] || null,
+    maxSeriesLimit: maxSeries,
+    nominalMaxSeriesLimit: nominalMaxSeries,
+    voltageConstrained: Boolean(voltageMaxSeries && voltageMaxSeries < nominalMaxSeries),
   }
 }
 
@@ -181,11 +191,18 @@ export function calculateCircuitPlan({
   const normalizedModuleCount = integerAtLeast(moduleCount, 0, 0)
   const normalizedPcsCapacityKw = finitePositiveNumber(pcsCapacityKw, 0)
   const normalizedModulePowerW = finitePositiveNumber(modulePowerW, 0)
+  const voltageLimit = estimateVoltageLimitedSeries({
+    maxDcVoltage,
+    vocStc,
+    tempCoeffVocPercentPerC,
+    designMinTempC,
+  })
   const recommendations = buildSeriesRecommendations({
     pcsCount: normalizedPcsCount,
     maxParallelPerPcs: normalizedParallel,
     moduleCount: normalizedModuleCount,
     seriesSearchLimit,
+    maxSeriesByVoltage: voltageLimit?.maxSeriesByVoltage,
   })
   const recommendedSeriesCount = recommendations.recommended?.seriesCount || 1
   const frame = calculateSeriesFrame({
@@ -197,12 +214,6 @@ export function calculateCircuitPlan({
   const dcCapacityKw = normalizedModuleCount * normalizedModulePowerW / 1000
   const acCapacityKw = normalizedPcsCount * normalizedPcsCapacityKw
   const dcAcRatio = acCapacityKw > 0 ? dcCapacityKw / acCapacityKw * 100 : 0
-  const voltageLimit = estimateVoltageLimitedSeries({
-    maxDcVoltage,
-    vocStc,
-    tempCoeffVocPercentPerC,
-    designMinTempC,
-  })
   const exceedsVoltageReference = Boolean(voltageLimit && recommendedSeriesCount > voltageLimit.maxSeriesByVoltage)
 
   return {
@@ -214,6 +225,9 @@ export function calculateCircuitPlan({
     seriesCount: recommendedSeriesCount,
     recommendedSeriesCount,
     seriesRecommendations: recommendations.options,
+    effectiveSeriesLimit: recommendations.maxSeriesLimit,
+    nominalSeriesLimit: recommendations.nominalMaxSeriesLimit,
+    voltageConstrained: recommendations.voltageConstrained,
     dcCapacityKw,
     acCapacityKw,
     dcAcRatio,

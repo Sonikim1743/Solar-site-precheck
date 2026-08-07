@@ -67,6 +67,7 @@ const PLACE_API_FAILURE_THRESHOLD = 2
 const TERRAIN_ANALYSIS_VERSION = 2
 const GROUNDY_URL = 'https://www.app.groundy.net/map'
 const SOLAR_PRO_PORTAL_URL = 'https://laplaceid.energymntr.com/servicelist/solarpro/installer-related-info'
+const SITE_OPERATION_GUIDE_URL = 'https://solar-site-precheck.pages.dev/manual/site-operation-guide-v1.23.pdf'
 const initialSolarProMemo = {
   reportName: '',
   annualYield: '',
@@ -2428,10 +2429,10 @@ export default function App() {
                 <strong>Solar Pro</strong>
                 <small>管理・DL</small>
               </a>
-              <a href="/manual/site-operation-guide-v1.23.pdf" download="サイト操作案内_260805rev7.pdf" target="_blank" rel="noreferrer">
+              <a href={SITE_OPERATION_GUIDE_URL} target="_blank" rel="noreferrer">
                 <span className="hero-service-links__icon">📘</span>
                 <strong>入力マニュアル</strong>
-                <small>PDF保存</small>
+                <small>PDFを開く</small>
               </a>
             </div>
           </div>
