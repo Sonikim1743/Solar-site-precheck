@@ -2410,7 +2410,7 @@ export default function App() {
         <section className="hero">
           <div className="hero-layout">
             <div>
-              <p className="eyebrow">SITE SCREENING WORKSPACE</p>
+              <p className="eyebrow">候補地一次確認ワークスペース</p>
               <h1>
                 候補地の情報を、<br />
                 <a className="hero-title-link" href={SOLAR_PRO_PORTAL_URL} target="_blank" rel="noreferrer">Solar Pro入力前</a>
