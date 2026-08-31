@@ -14,7 +14,7 @@ before(async () => {
     configFile: false,
     root: process.cwd(),
     plugins: [react()],
-    server: { middlewareMode: true },
+    server: { middlewareMode: true, hmr: false },
     appType: 'custom',
     logLevel: 'error',
     optimizeDeps: {

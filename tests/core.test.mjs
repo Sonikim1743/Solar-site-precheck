@@ -21,9 +21,184 @@ import { readLocalVisitStats, recordLocalVisit } from '../src/utils/visitCounter
 import { DETAILED_HORIZON_DIRECTIONS, HORIZON_DIRECTIONS, createHorizonDirections, recalculateTerrainObstruction } from '../src/services/gsi.js'
 import { adjacentThirdMeshes, productionFactor, thirdMeshBoundaryDistance, thirdMeshCenter, thirdMeshCode } from '../src/services/nedo.js'
 import { selectConsistentRates, validateRateSummaries } from '../src/services/nedoValidation.js'
+import { buildPowerGridOverpassQuery, equipmentPositionConfidence, fetchNearbyPowerGrid, parsePowerGridElements, parseVoltageKv } from '../shared/powerGrid.js'
+import { capacityValueStatusLabel, findCapacityCandidatesByPlaceName, matchPowerGridCapacity, parseCapacityCsv, summarizeGridFlowDirection } from '../src/services/gridCapacity.js'
+import { CHUGOKU_GRID_AREAS, findChugokuGridAreaByAddress } from '../src/services/chugokuGridSources.js'
 
 test('thirdMeshCode matches known Tokyo Tower mesh', () => {
   assert.equal(thirdMeshCode(35.658584, 139.745431), '53393599')
+})
+
+test('power grid parser handles voltage labels and 11-110kV target summary', () => {
+  assert.equal(parseVoltageKv('66 kV'), 66)
+  assert.equal(parseVoltageKv('66000'), 66)
+  assert.equal(parseVoltageKv('33000;77000'), 77)
+  assert.equal(parseVoltageKv('unknown'), null)
+
+  const parsed = parsePowerGridElements([
+    {
+      type: 'way',
+      id: 1,
+      tags: { power: 'line', voltage: '66000', name: 'Test 66kV line' },
+      geometry: [{ lat: 35, lon: 139.01 }, { lat: 35, lon: 139.02 }],
+    },
+    {
+      type: 'way',
+      id: 2,
+      tags: { power: 'line', voltage: '154000', name: 'High voltage line' },
+      geometry: [{ lat: 35.05, lon: 139 }, { lat: 35.06, lon: 139 }],
+    },
+    {
+      type: 'way',
+      id: 5,
+      tags: { power: 'minor_line', voltage: '22000', name: 'Test 22kV line' },
+      geometry: [{ lat: 35.02, lon: 139.01 }, { lat: 35.02, lon: 139.02 }],
+    },
+    { type: 'node', id: 3, tags: { power: 'pole', ref: 'P-1' }, lat: 35.001, lon: 139 },
+    { type: 'node', id: 4, tags: { power: 'substation', name: 'Test sub', voltage: '66 kV' }, lat: 35, lon: 139.03 },
+  ], 35, 139)
+
+  assert.equal(parsed.summary.lineCount, 3)
+  assert.equal(parsed.summary.targetLineCount, 2)
+  assert.equal(parsed.summary.nearestLine.name, 'Test 66kV line')
+  assert.equal(parsed.summary.nearestLine.direction, '東')
+  assert.deepEqual(parsed.position, { lat: 35, lon: 139 })
+  assert.equal(parsed.summary.nearestSupport.ref, 'P-1')
+  assert.equal(parsed.summary.nearestSupport.type, 'pole')
+  assert.equal(parsed.summary.nearestSupport.direction, '北')
+  assert.equal(parsed.summary.nearestSubstation.direction, '東')
+})
+
+test('Chugoku NW grid source definitions cover target prefectures and official ZIP URLs', () => {
+  assert.equal(CHUGOKU_GRID_AREAS.length, 4)
+  assert.equal(findChugokuGridAreaByAddress('広島県 神石高原町')?.id, 'hiroshima')
+  assert.equal(findChugokuGridAreaByAddress('岡山県 真庭市')?.id, 'okayama')
+  assert.equal(findChugokuGridAreaByAddress('島根県 邑智郡')?.id, 'shimane')
+  assert.equal(findChugokuGridAreaByAddress('鳥取県 米子市')?.id, 'tottori')
+  assert.ok(CHUGOKU_GRID_AREAS.every((area) => area.dataUrl.includes('/zip/')))
+  assert.ok(CHUGOKU_GRID_AREAS.every((area) => area.pdfUrl.endsWith('.pdf')))
+  assert.ok(CHUGOKU_GRID_AREAS.every((area) => area.mappingUrl.endsWith('.pdf')))
+})
+
+test('Chugoku NW capacity CSV parser extracts interpreted line values', () => {
+  const csv = [
+    '2026年8月1日現在',
+    '送電線No,送電線名,電圧(kV),設備容量,運用容量,空容量(当該設備),空容量(上位系),N-1電制適用可否,潮流方向,備考',
+    '岡5L128,帝釈川線,66.0,32.0,32.0,9.0,,不可,田原（変）→帝釈川（変）,※1',
+  ].join('\n')
+  const parsed = parseCapacityCsv(csv, 'sample.csv')
+  assert.equal(parsed.lines.length, 1)
+  assert.equal(parsed.lines[0].name, '帝釈川線')
+  assert.equal(parsed.lines[0].voltageKv, 66)
+  assert.equal(parsed.lines[0].availableCapacityMw, 9)
+  assert.equal(parsed.lines[0].nMinusOne, '不可')
+  assert.equal(parsed.lines[0].flowDirection, '田原（変）→帝釈川（変）')
+})
+
+test('published zero capacity is explained instead of displayed as an unexplained zero', () => {
+  assert.equal(capacityValueStatusLabel(0), '0 MW（空容量なし）')
+  assert.equal(capacityValueStatusLabel(0, { upstream: true }), '0 MW（上位系の余裕なし）')
+  assert.equal(capacityValueStatusLabel(9), '9 MW')
+  assert.equal(capacityValueStatusLabel(null), '記載なし')
+})
+
+test('published flow direction is separated from unverified grid hierarchy', () => {
+  const flow = summarizeGridFlowDirection({ flowDirection: '田原（変）→帝釈川（変）' })
+  assert.equal(flow.status, 'published')
+  assert.equal(flow.from, '田原（変）')
+  assert.equal(flow.to, '帝釈川（変）')
+  assert.equal(flow.hierarchyLabel, '系統上位・下位は未確定')
+
+  const missing = summarizeGridFlowDirection({})
+  assert.equal(missing.status, 'missing')
+  assert.equal(missing.label, '記載なし')
+})
+
+test('power grid Overpass query stays scoped to line, substation and support data', () => {
+  const query = buildPowerGridOverpassQuery(35, 139, 5000)
+  assert.match(query, /way\(around:5000,35\.0000000,139\.0000000\)\["power"="line"\]/)
+  assert.match(query, /way\(around:5000,35\.0000000,139\.0000000\)\["power"="minor_line"\]/)
+  assert.match(query, /node\(around:5000,35\.0000000,139\.0000000\)\["power"="substation"\]/)
+  assert.match(query, /node\(around:5000,35\.0000000,139\.0000000\)\["power"="tower"\]/)
+  assert.match(query, /node\(around:5000,35\.0000000,139\.0000000\)\["power"="pole"\]/)
+  assert.doesNotMatch(query, /relation/)
+})
+
+test('power grid progressive search expands until both line and substation are found', async () => {
+  const requestedRadii = []
+  const fetchImpl = async (_url, options) => {
+    const query = decodeURIComponent(String(options.body).replace(/^data=/, ''))
+    const radius = Number(query.match(/around:(\d+)/)?.[1])
+    requestedRadii.push(radius)
+    const elements = [
+      {
+        type: 'way', id: 11, tags: { power: 'line', name: '帝釈川線', voltage: '66000' },
+        geometry: [{ lat: 35, lon: 139.01 }, { lat: 35, lon: 139.02 }],
+      },
+    ]
+    if (radius >= 10000) {
+      elements.push({ type: 'node', id: 12, tags: { power: 'substation', name: '田原変電所', voltage: '66000' }, lat: 35.03, lon: 139 })
+    }
+    return { ok: true, json: async () => ({ elements }) }
+  }
+
+  const result = await fetchNearbyPowerGrid(35, 139, {
+    progressive: true,
+    radiiMeters: [5000, 10000, 20000],
+    fetchImpl,
+  })
+  assert.deepEqual(requestedRadii, [5000, 10000])
+  assert.deepEqual(result.search.attemptedRadiiMeters, [5000, 10000])
+  assert.equal(result.search.selectedRadiusMeters, 10000)
+  assert.equal(result.search.foundLine, true)
+  assert.equal(result.search.foundSubstation, true)
+})
+
+test('capacity matching uses name or equipment number and confirms voltage independently', () => {
+  const powerGrid = {
+    lines: [
+      { id: 'line/1', name: '帝釈川線', ref: '岡5L128', voltageKv: 66, distanceMeters: 1200 },
+      { id: 'line/2', name: '名称未記載', ref: '', voltageKv: 66, distanceMeters: 100 },
+    ],
+    substations: [],
+  }
+  const capacity = {
+    lines: [
+      { type: 'line', no: '岡5L128', name: '帝釈川線', voltageKv: 66, availableCapacityMw: 9 },
+      { type: 'line', no: '別番号', name: '別系統線', voltageKv: 66, availableCapacityMw: 20 },
+    ],
+    substations: [],
+  }
+  const result = matchPowerGridCapacity(powerGrid, capacity)
+  assert.equal(result.lineMatches.length, 1)
+  assert.equal(result.lineMatches[0].capacity.name, '帝釈川線')
+  assert.equal(result.lineMatches[0].match.level, 'high')
+  assert.deepEqual(result.lineMatches[0].match.matchedBy, ['設備番号', '名称', '電圧'])
+})
+
+test('official capacity DB exposes locality candidates without claiming distance match', () => {
+  const capacity = {
+    lines: [
+      { type: 'line', no: '広④L101', name: '庄原東城線', voltageKv: 66, availableCapacityMw: 18 },
+      { type: 'line', no: '広④L104', name: '東城線', voltageKv: 66, availableCapacityMw: 9 },
+      { type: 'line', no: '広④L999', name: '広島中央線', voltageKv: 66, availableCapacityMw: 20 },
+    ],
+    substations: [
+      { type: 'substation', no: '広④S7-2', name: '東城変電所', voltageKv: 66, secondaryVoltageKv: 6, availableCapacityMw: 2 },
+      { type: 'substation', no: '広④S1', name: '庄原変電所', voltageKv: 66, availableCapacityMw: 3 },
+    ],
+  }
+  const result = findCapacityCandidatesByPlaceName('広島県 庄原市 東城町竹森', capacity)
+  assert.deepEqual(result.tokens, ['庄原', '東城', '竹森'])
+  assert.deepEqual(result.lineCandidates.map((candidate) => candidate.capacity.name), ['庄原東城線', '東城線'])
+  assert.deepEqual(result.substationCandidates.map((candidate) => candidate.capacity.name), ['東城変電所'])
+  assert.ok(result.lineCandidates.every((candidate) => candidate.match.label.includes('距離未確定')))
+})
+
+test('equipment position confidence distinguishes confirmed attributes from reference-only geometry', () => {
+  assert.equal(equipmentPositionConfidence({ name: '帝釈川線', ref: '', voltageKv: 66, operator: '中国電力NW' }).level, 'high')
+  assert.equal(equipmentPositionConfidence({ name: '帝釈川線', ref: '', voltageKv: 66, operator: '' }).level, 'medium')
+  assert.equal(equipmentPositionConfidence({ name: '送電線（名称未記載）', ref: '', voltageKv: null, operator: '' }).level, 'reference')
 })
 
 test('thirdMeshCenter returns a center inside the same mesh', () => {
@@ -157,6 +332,9 @@ test('serve:dist script points to an existing local server file', () => {
   const match = script.match(/node\s+(.+)$/)
   assert.ok(match, 'serve:dist should run a node server file')
   assert.ok(existsSync(match[1]), `${match[1]} should exist`)
+  const server = readFileSync(match[1], 'utf8')
+  assert.match(server, /loadRootHeaders/)
+  assert.match(server, /\.\.\.rootHeaders/)
 })
 
 test('public deployment metadata and headers are explicit', () => {
@@ -173,6 +351,7 @@ test('public deployment metadata and headers are explicit', () => {
   assert.match(headers, /Content-Security-Policy:/)
   assert.match(headers, /Strict-Transport-Security:/)
   assert.match(headers, /Permissions-Policy:/)
+  assert.match(headers, /connect-src[^;]*https:\/\/overpass-api\.de/)
   assert.doesNotMatch(headers, /\/sw\.js/)
   assert.match(headers, /\/data\/\*[\s\S]*Cache-Control:\s*no-cache/)
 })

@@ -1,5 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { localOcrAssets } from './build/ocrAssets.js'
+import { powerGridMiddleware } from './work/power-grid-server.mjs'
 
 function nedoMonsolaProxy() {
   async function handler(request, response, next) {
@@ -42,7 +44,11 @@ function nedoMonsolaProxy() {
 }
 
 export default defineConfig({
-  plugins: [react(), nedoMonsolaProxy()],
+  plugins: [react(), nedoMonsolaProxy(), localOcrAssets(), {
+    name: 'power-grid-proxy',
+    configureServer: (server) => { server.middlewares.use(powerGridMiddleware) },
+    configurePreviewServer: (server) => { server.middlewares.use(powerGridMiddleware) },
+  }],
   define: {
     __BUILD_DATE__: JSON.stringify(process.env.VITE_BUILD_DATE || new Date().toISOString().slice(0, 10)),
     __BUILD_TARGET__: JSON.stringify(process.env.VITE_BUILD_TARGET || 'local'),

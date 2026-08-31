@@ -17,6 +17,8 @@ work/*
 !work/preflight-release.mjs
 !work/assert-clean-tree.mjs
 !work/verify-release-metadata.mjs
+!work/verify-csp-hosts.mjs
+!work/power-grid-server.mjs
 *.zip
 !release/latest/*.zip
 eng.traineddata

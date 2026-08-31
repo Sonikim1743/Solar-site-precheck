@@ -33,5 +33,11 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Verify external fetch hosts against CSP
+        run: pnpm verify:csp
+
+      - name: Verify manual PDF and self-hosted OCR resources
+        run: pnpm verify:assets
+
       - name: Verify release metadata
         run: pnpm verify:release

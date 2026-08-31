@@ -25,6 +25,23 @@ await check('main HTML', async () => {
   return match[0]
 })
 
+await check('operation manual is a PDF, not an SPA fallback', async () => {
+  const response = await status('/manual/site-operation-guide-v1.23.pdf')
+  if (!response.ok) throw new Error(`HTTP ${response.status}`)
+  if (!response.headers.get('content-type')?.includes('application/pdf')) throw new Error('Expected application/pdf')
+  const data = new Uint8Array(await response.arrayBuffer())
+  if (new TextDecoder().decode(data.slice(0, 5)) !== '%PDF-') throw new Error('PDF signature missing')
+  return `${data.length} bytes, PDF signature verified`
+})
+
+await check('/api/power-grid validates requests (not SPA HTML)', async () => {
+  const response = await status('/api/power-grid', {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'lat=invalid',
+  })
+  if (response.status !== 400 || !response.headers.get('content-type')?.includes('application/json')) throw new Error(`Expected JSON HTTP 400, got ${response.status}`)
+  return 'HTTP 400 JSON; power-grid function is installed'
+})
+
 await check('/api/nedo-monsola 200', async () => {
   const response = await status('/api/nedo-monsola?mesh=52331366')
   if (!response.ok) throw new Error(`HTTP ${response.status}`)

@@ -1,12 +1,35 @@
-import { createReadStream, existsSync, readdirSync, statSync } from 'node:fs'
+import { createReadStream, existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { extname, join, normalize, resolve } from 'node:path'
 import { readInheritancePdfOnServer } from './inheritance-server.mjs'
+import { powerGridMiddleware } from './power-grid-server.mjs'
 
-const root = resolve('dist')
+const root = resolve(process.env.DIST_DIR || 'dist')
 const host = process.env.HOST || '127.0.0.1'
 const port = Number(process.env.PORT || 5173)
 const maxPdfUploadBytes = 80 * 1024 * 1024
+
+function loadRootHeaders() {
+  const headersPath = join(root, '_headers')
+  if (!existsSync(headersPath)) return {}
+  const headers = {}
+  let inRootBlock = false
+  for (const line of readFileSync(headersPath, 'utf8').split(/\r?\n/)) {
+    const trimmed = line.trim()
+    if (trimmed === '/*') {
+      inRootBlock = true
+      continue
+    }
+    if (!inRootBlock) continue
+    if (!trimmed) break
+    const separator = trimmed.indexOf(':')
+    if (separator <= 0) continue
+    headers[trimmed.slice(0, separator)] = trimmed.slice(separator + 1).trim()
+  }
+  return headers
+}
+
+const rootHeaders = loadRootHeaders()
 
 const types = {
   '.html': 'text/html; charset=utf-8',
@@ -20,6 +43,7 @@ const types = {
   '.jpeg': 'image/jpeg',
   '.svg': 'image/svg+xml',
   '.wasm': 'application/wasm',
+  '.pdf': 'application/pdf',
 }
 
 function findCurrentChunk(prefix) {
@@ -45,7 +69,7 @@ function fileForUrl(url) {
   const chunkMatch = pathname.match(/^\/assets\/(index|nedoWeb|nedoPdf|nedoValidation|pdfToJpg|inheritancePdf|pdfCompat)-[A-Za-z0-9_-]+\.(?:js|jsf|mjs)$/)
   if (chunkMatch) return findCurrentChunk(`${chunkMatch[1]}-`)
   if (/^\/assets\/pdfToJpg-[A-Za-z0-9_-]+\.jsf?$/.test(pathname)) return findCurrentChunk('pdfToJpg-')
-  if (/^\/(?:assets|data|icons|screenshots|templates)\//.test(pathname)) return null
+  if (/^\/(?:assets|data|icons|screenshots|templates|manual|ocr)\//.test(pathname)) return null
   return join(root, 'index.html')
 }
 
@@ -69,6 +93,10 @@ function readRequestBody(request) {
 
 createServer(async (request, response) => {
   const requestUrl = new URL(request.url || '/', `http://${host}:${port}`)
+  if (requestUrl.pathname === '/api/power-grid') {
+    await powerGridMiddleware(request, response, () => {})
+    return
+  }
   if (requestUrl.pathname === '/api/inheritance-pdf') {
     if (request.method !== 'POST') {
       response.writeHead(405, { 'Content-Type': 'text/plain; charset=utf-8' })
@@ -126,6 +154,7 @@ createServer(async (request, response) => {
     return
   }
   response.writeHead(200, {
+    ...rootHeaders,
     'Content-Type': types[extname(file)] || 'application/octet-stream',
     'Cache-Control': 'no-store',
   })

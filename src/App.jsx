@@ -30,6 +30,9 @@ import {
   thirdMeshBoundaryDistance,
   thirdMeshCode,
 } from './services/nedo.js'
+import { fetchNearbyPowerGrid, powerGridDisplayLine, powerGridDisplayLineLabel, powerGridSearchSummary } from './services/powerGrid.js'
+import { capacityValueLabel, capacityValueStatusLabel, findCapacityCandidatesByPlaceName, loadBundledChugokuGridCapacity, matchPowerGridCapacity, parseGridCapacityFile, summarizeGridFlowDirection } from './services/gridCapacity.js'
+import { findChugokuGridAreaByAddress } from './services/chugokuGridSources.js'
 import { parseCoordinateInput, toDegreeMinutes } from './utils/coordinates.js'
 import { escapeCsv } from './utils/csv.js'
 import { buildObstructionElevationsCsv } from './utils/obstructionElevations.js'
@@ -67,7 +70,7 @@ const PLACE_API_FAILURE_THRESHOLD = 2
 const TERRAIN_ANALYSIS_VERSION = 2
 const GROUNDY_URL = 'https://www.app.groundy.net/map'
 const SOLAR_PRO_PORTAL_URL = 'https://laplaceid.energymntr.com/servicelist/solarpro/installer-related-info'
-const SITE_OPERATION_GUIDE_URL = 'https://solar-site-precheck.pages.dev/manual/site-operation-guide-v1.23.pdf'
+const SITE_OPERATION_GUIDE_URL = '/manual/site-operation-guide-v1.23.pdf'
 const initialSolarProMemo = {
   reportName: '',
   annualYield: '',
@@ -99,6 +102,264 @@ function inheritanceRowText(item) {
     item.registryAddress || item.location || '',
     item.extraCount ? `外${item.extraCount}件` : '',
   ].join('\t')
+}
+
+function formatDistanceLabel(distanceMeters) {
+  if (!Number.isFinite(distanceMeters)) return '距離未取得'
+  if (distanceMeters >= 1000) return `${(distanceMeters / 1000).toFixed(distanceMeters >= 10000 ? 0 : 1)}km`
+  return `${Math.round(distanceMeters)}m`
+}
+
+const GRID_CAPACITY_SOURCE_URL = 'https://www.energia.co.jp/nw/service/retailer/keitou/access/'
+
+function PowerGridCheckPanel({ position, powerGrid, gridCapacity, capacityMatches, placeCapacityCandidates, matchedCapacityArea, onCheck, onBundledCapacity, onCapacityFile }) {
+  const capacityAutoLoadRequested = useRef(false)
+  const data = powerGrid.data
+  const nearestLine = powerGridDisplayLine(data)
+  const lineLabel = powerGridDisplayLineLabel(data)
+  const nearestSubstation = data?.summary?.nearestSubstation
+  const isLoading = powerGrid.status === 'loading'
+  const capacityLoading = gridCapacity.status === 'loading'
+  const lineRows = nearestLine
+    ? [nearestLine, ...(data?.lines || []).filter((line) => line.id !== nearestLine.id)].slice(0, 4)
+    : []
+  const substationRows = data?.substations?.slice(0, 4) || []
+  const lineCapacityRows = capacityMatches?.lineMatches || []
+  const substationCapacityRows = capacityMatches?.substationMatches || []
+  const placeLineRows = placeCapacityCandidates?.lineCandidates || []
+  const placeSubstationRows = placeCapacityCandidates?.substationCandidates || []
+  const hasPlaceCandidates = Boolean(placeLineRows.length || placeSubstationRows.length)
+  const capacityAreaLabel = gridCapacity.data?.areaLabel || matchedCapacityArea?.label || '中国電力NW'
+  const firstCapacityMatch = lineCapacityRows[0] || substationCapacityRows[0] || null
+  const hasPowerGridResult = Boolean(data)
+  const attemptedRadii = data?.search?.attemptedRadiiMeters || []
+  const searchRangeLabel = attemptedRadii.length
+    ? attemptedRadii.map((radius) => `${Math.round(radius / 1000)}km`).join(' → ')
+    : data?.radiusMeters ? `${Math.round(data.radiusMeters / 1000)}km` : '—'
+  const nearestPositionConfidence = nearestLine?.positionConfidence || { level: 'reference', label: '位置参考' }
+  const capacityStatusLabel = firstCapacityMatch
+    ? '公表値あり'
+    : hasPlaceCandidates
+      ? '地域名候補あり'
+    : gridCapacity.data
+      ? '公式資料確認'
+      : 'DB未読込'
+  const capacityStatusDetail = firstCapacityMatch
+    ? `${firstCapacityMatch.capacity.name} / ${capacityValueStatusLabel(firstCapacityMatch.capacity.availableCapacityMw)}`
+    : hasPlaceCandidates
+      ? `${placeCapacityCandidates.tokens.join('・')} / 公式DB候補 ${placeLineRows.length + placeSubstationRows.length}件（距離未確定）`
+    : gridCapacity.data
+      ? `${capacityAreaLabel}の公式PDF・マッピング資料で線名を確認`
+      : 'パネルを開くと選択地点の地域DBを自動で準備します'
+
+  function handlePanelToggle(event) {
+    if (!event.currentTarget.open || gridCapacity.data || capacityLoading || capacityAutoLoadRequested.current) return
+    capacityAutoLoadRequested.current = true
+    Promise.resolve(onBundledCapacity()).finally(() => {
+      capacityAutoLoadRequested.current = false
+    })
+  }
+
+  return (
+    <details className="power-grid-card no-print" onToggle={handlePanelToggle}>
+      <summary className="power-grid-card__summary">
+        <div>
+          <span className="power-grid-card__badge">試験機能</span>
+          <h3>電力系統・公開空容量チェック</h3>
+          <p>必要な場合だけ開き、候補地点に近い系統線と中国電力NW公開資料を一次確認します。</p>
+        </div>
+        <span className="power-grid-card__toggle">開く / 閉じる ▼</span>
+      </summary>
+
+      <div className="power-grid-card__body">
+        <div className="power-grid-card__header">
+          <div>
+            <div className="power-grid-card__title-row">
+              <p>候補地点に近い系統線と参考変電所を取得し、中国電力NWの公開空容量DBと分けて整理します。</p>
+              <a
+                className="power-grid-source-help"
+                href={GRID_CAPACITY_SOURCE_URL}
+                target="_blank"
+                rel="noreferrer"
+                aria-label="中国電力ネットワークの公式資料を開く"
+                title="中国電力ネットワークの公式資料を開く"
+              >?</a>
+            </div>
+          </div>
+        </div>
+        <div className="power-grid-primary-actions">
+          <button type="button" className="action-button action-button--power-grid" disabled={!position || isLoading} onClick={onCheck}>
+            <span>{isLoading ? '系統情報を取得中…' : '系統情報を取得'}</span>
+            <small>66・77kVを確認するまで段階検索（最大50km）</small>
+          </button>
+          <label className="secondary-button power-grid-file-button power-grid-file-button--compact">
+            {capacityLoading ? 'DB読込中…' : 'CSV / ZIP読込'}
+            <input type="file" accept=".zip,.csv,text/csv,application/zip" onChange={onCapacityFile} disabled={capacityLoading} />
+          </label>
+        </div>
+
+      <div className="power-grid-flow" aria-label="系統確認の進め方">
+        <span>① 地域DB</span>
+        <span>② 最寄り系統線</span>
+        <span>③ 参考変電所</span>
+        <span>④ 公開空容量</span>
+        <span>⑤ 事前相談</span>
+      </div>
+      <p className="power-grid-db-note">
+        中国電力NW DBは広島・岡山・島根・鳥取の公開空容量CSV/ZIPをアプリ用に整理したものです。系統線の位置は公開地図データ、空容量は中国電力NW公開資料を参照します。
+      </p>
+
+      {powerGrid.message && (
+        <p className={`power-grid-message power-grid-message--${powerGrid.status}`}>
+          {powerGrid.message}
+        </p>
+      )}
+
+      {data && (
+        <details className="power-grid-result-details">
+          <summary>
+            <span>取得した地図情報</span>
+            <strong>
+              {lineLabel} {nearestLine ? formatDistanceLabel(nearestLine.distanceMeters) : '—'}
+              {' / '}参考変電所 {nearestSubstation ? formatDistanceLabel(nearestSubstation.distanceMeters) : '—'}
+            </strong>
+            <em>開く / 閉じる ▼</em>
+          </summary>
+          <div className="power-grid-summary">
+            <div>
+              <span>段階検索範囲</span>
+              <strong>{searchRangeLabel}</strong>
+              <small>{powerGridSearchSummary(data) || '取得できた範囲の公開地図情報'}</small>
+            </div>
+            <div>
+              <span>{lineLabel}</span>
+              <strong>{nearestLine ? formatDistanceLabel(nearestLine.distanceMeters) : '—'}</strong>
+              <small>{nearestLine?.name || '候補なし'} / {nearestLine?.direction ? `${nearestLine.direction}側 / ` : ''}{nearestLine?.voltageLabel || '電圧未記載'}</small>
+            </div>
+            <div>
+              <span>参考変電所</span>
+              <strong>{nearestSubstation ? formatDistanceLabel(nearestSubstation.distanceMeters) : '—'}</strong>
+              <small>{nearestSubstation?.direction ? `${nearestSubstation.direction}側 / ` : ''}{nearestSubstation?.name || '候補なし'}</small>
+            </div>
+            <div>
+              <span>公開資料確認</span>
+              <strong>{capacityStatusLabel}</strong>
+              <small>{capacityStatusDetail}</small>
+            </div>
+            <div>
+              <span>照合・位置信頼度</span>
+              <strong>{firstCapacityMatch?.match?.label || nearestPositionConfidence.label}</strong>
+              <small>{firstCapacityMatch ? `${firstCapacityMatch.capacity.name} / ${firstCapacityMatch.match.matchedBy.join('・')}で照合` : nearestPositionConfidence.reason}</small>
+            </div>
+          </div>
+
+          <div className="power-grid-lists">
+            <div>
+              <h4>近い系統線候補</h4>
+              {lineRows.length ? lineRows.map((line) => (
+                <div className="power-grid-row" key={line.id}>
+                  <strong>{line.name}</strong>
+                  <span>{line.voltageLabel} / {line.voltageBand} / {line.direction ? `${line.direction}側 / ` : ''}{formatDistanceLabel(line.distanceMeters)}</span>
+                  <small className={`power-grid-confidence power-grid-confidence--${line.positionConfidence?.level || 'reference'}`}>{line.positionConfidence?.label || '位置参考'}</small>
+                </div>
+                )) : <p>周辺で系統線候補を確認できませんでした。</p>}
+              </div>
+              <div>
+                <h4>参考変電所（距離順）</h4>
+                {substationRows.length ? substationRows.map((substation) => (
+                  <div className="power-grid-row" key={substation.id}>
+                    <strong>{substation.name}</strong>
+                    <span>{substation.voltageLabel} / {substation.direction ? `${substation.direction}側 / ` : ''}{formatDistanceLabel(substation.distanceMeters)}</span>
+                    <small className={`power-grid-confidence power-grid-confidence--${substation.positionConfidence?.level || 'reference'}`}>{substation.positionConfidence?.label || '位置参考'}</small>
+                  </div>
+                )) : <p>周辺で変電所候補を確認できませんでした。</p>}
+              </div>
+          </div>
+
+        </details>
+      )}
+
+      {gridCapacity.data && (
+        <div className="power-grid-capacity">
+              <div className="power-grid-capacity__head">
+                <h4>{capacityAreaLabel} 公開空容量DBの読み方</h4>
+                <span>{gridCapacity.data.updatedAt || gridCapacity.data.fileName}</span>
+              </div>
+              {lineCapacityRows.length || substationCapacityRows.length ? (
+                <div className="power-grid-capacity__matches">
+                  {[...lineCapacityRows, ...substationCapacityRows].slice(0, 6).map((match) => (
+                    <div className="power-grid-capacity-row" key={`${match.capacity.type}-${match.capacity.no}-${match.source.id}`}>
+                      {(() => {
+                        const flow = summarizeGridFlowDirection(match.capacity)
+                        return (
+                          <>
+                      <strong>{match.capacity.name}</strong>
+                      <small className={`power-grid-confidence power-grid-confidence--${match.match?.level || 'reference'}`}>{match.match?.label || '名称候補'}</small>
+                      <span>
+                        {capacityValueStatusLabel(match.capacity.availableCapacityMw)} / 上位系 {capacityValueStatusLabel(match.capacity.upstreamAvailableCapacityMw, { upstream: true })}
+                        {match.capacity.nMinusOne ? ` / N-1 ${match.capacity.nMinusOne}` : ''}
+                      </span>
+                      {flow.status === 'published' && (
+                        <div className="power-grid-flow-detail">
+                          <span>公開予想潮流 {flow.label}</span>
+                          {flow.from && flow.to && <small>潮流元 {flow.from} / 潮流先 {flow.to}</small>}
+                          <small>{flow.hierarchyLabel}（潮流方向だけでは判定しません）</small>
+                        </div>
+                      )}
+                      <small>
+                        地図候補: {match.source.name}（{match.source.direction ? `${match.source.direction}側 / ` : ''}{formatDistanceLabel(match.source.distanceMeters)}）
+                      </small>
+                          </>
+                        )
+                      })()}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p>公開地図側に名称・設備番号・電圧がないため、距離付きの自動照合はできません。下の住所地名候補または中国電力NWのマッピング資料で設備を確認してください。</p>
+              )}
+              {!firstCapacityMatch && hasPlaceCandidates && (
+                <div className="power-grid-place-candidates">
+                  <div className="power-grid-place-candidates__head">
+                    <strong>住所地名から確認できる公式DB候補</strong>
+                    <span>距離・接続先は未確定</span>
+                  </div>
+                  <p>
+                    選択地点の「{placeCapacityCandidates.tokens.join('・')}」を含む設備名を公式DBから抽出した候補です。座標未確認のため、周辺設備・最寄り設備とは断定しません。
+                  </p>
+                  <div className="power-grid-capacity__matches">
+                    {[...placeLineRows, ...placeSubstationRows].slice(0, 8).map((candidate) => {
+                      const record = candidate.capacity
+                      const flow = summarizeGridFlowDirection(record)
+                      return (
+                        <div className="power-grid-capacity-row" key={`place-${record.type}-${record.no}`}>
+                          <strong>{record.name}</strong>
+                          <small>{record.type === 'substation' ? '変電所' : '送電線'} / 設備番号 {record.no || '記載なし'} / {record.voltageKv ?? '—'}kV{Number.isFinite(record.secondaryVoltageKv) ? `→${record.secondaryVoltageKv}kV` : ''}</small>
+                          <span>{capacityValueStatusLabel(record.availableCapacityMw)} / 上位系 {capacityValueStatusLabel(record.upstreamAvailableCapacityMw, { upstream: true })}</span>
+                          {record.nMinusOne && <small>N-1電制 {record.nMinusOne}</small>}
+                          {flow.status === 'published' && <small>公表潮流方向 {flow.label}</small>}
+                          <small className="power-grid-confidence power-grid-confidence--reference">{candidate.match.label}</small>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+        </div>
+      )}
+
+      {gridCapacity.message && (
+        <p className={`power-grid-message power-grid-message--${gridCapacity.status}`}>
+          {gridCapacity.message}
+        </p>
+      )}
+
+      <p className="power-grid-note">
+        ※ 接続可否を自動判定する機能ではありません。最寄り系統線と参考変電所を距離順で整理し、公開空容量資料を読み込んだ場合のみ名称が一致した設備の公表値を表示します。
+      </p>
+      </div>
+    </details>
+  )
 }
 
 function ArrayLengthHelp({ className = '' }) {
@@ -301,6 +562,9 @@ export default function App() {
   const [terrainSectionStatus, setTerrainSectionStatus] = useState('idle')
   const [terrainSectionOpen, setTerrainSectionOpen] = useState(false)
   const [terrainSectionRange, setTerrainSectionRange] = useState(100)
+  const [powerGrid, setPowerGrid] = useState({ status: 'idle', data: null, message: '' })
+  const [gridCapacity, setGridCapacity] = useState({ status: 'idle', data: null, message: '' })
+  const [pointActionStatus, setPointActionStatus] = useState('')
   const [obstructionHeight, setObstructionHeight] = useState(draftSeed.obstructionHeight ?? 20)
   const [detailedHorizon, setDetailedHorizon] = useState(
     draftSeed.detailedHorizon ?? (draftSeed.terrain?.samples?.length > HORIZON_DIRECTIONS.length),
@@ -380,6 +644,7 @@ export default function App() {
   )
   const draftSaveTimer = useRef(null)
   const placeRequestTimer = useRef(null)
+  const pointActionTimer = useRef(null)
   const placeRequestSeq = useRef(0)
   const placeApiFailureCount = useRef(0)
   const placeApiCooldownUntil = useRef(0)
@@ -411,7 +676,10 @@ export default function App() {
     if (position && placeInfo.status === 'idle') schedulePlaceInfo(position)
   }, [position, placeInfo.status])
 
-  useEffect(() => () => window.clearTimeout(placeRequestTimer.current), [])
+  useEffect(() => () => {
+    window.clearTimeout(placeRequestTimer.current)
+    window.clearTimeout(pointActionTimer.current)
+  }, [])
 
   useEffect(() => {
     const syncPageFromHash = () => {
@@ -598,6 +866,9 @@ export default function App() {
     setTerrainSection(null)
     setTerrainSectionStatus('idle')
     setTerrainSectionOpen(false)
+    setPowerGrid({ status: 'idle', data: null, message: '' })
+    setGridCapacity({ status: 'idle', data: null, message: '' })
+    setPointActionStatus('')
   }
 
   async function selectPosition(nextPosition, options = {}) {
@@ -611,6 +882,8 @@ export default function App() {
     setTerrainSection(null)
     setTerrainSectionStatus('idle')
     setTerrainSectionOpen(false)
+    setPowerGrid({ status: 'idle', data: null, message: '' })
+    setPointActionStatus('')
     setElevation({ status: 'loading', value: null, source: '', message: '' })
     schedulePlaceInfo(nextPosition)
     loadNearestSnow(nextPosition)
@@ -786,6 +1059,123 @@ export default function App() {
       setTerrainSectionStatus('error')
       setTerrainSectionOpen(true)
     }
+  }
+
+  async function handlePowerGridCheck() {
+    if (!position) {
+      setPowerGrid({ status: 'error', data: null, message: '先に候補地点を選択してください。' })
+      return
+    }
+    setPowerGrid({ status: 'loading', data: null, message: '公開電力データを取得しています…' })
+    try {
+      const data = await fetchNearbyPowerGrid(position.lat, position.lon, {
+        progressive: true,
+        prefer66Or77: true,
+        radiiMeters: [5000, 10000, 20000, 50000],
+        onProgress: ({ type, radiusMeters }) => setPowerGrid({
+          status: 'loading',
+          data: null,
+          message: type === 'fallback'
+            ? `公開地図サーバーの接続を切り替えています…（周辺${radiusMeters / 1000}km）`
+            : `公開電力データを取得しています…（周辺${radiusMeters / 1000}km）`,
+        }),
+      })
+      const lineCount = data.summary?.lineCount || 0
+      const substationCount = data.summary?.substationCount || 0
+      const identifiableLineCount = (data.lines || []).filter((line) => (
+        (line.name && !line.name.includes('名称未記載')) || line.ref || Number.isFinite(line.voltageKv)
+      )).length
+      const notes = [powerGridSearchSummary(data)]
+      if (!substationCount) notes.push(`取得できた${data.radiusMeters / 1000}km圏内では変電所候補を確認できませんでした`)
+      if (!identifiableLineCount) notes.push('系統線の名称・設備番号・電圧が未登録のため、公式DBとの直接照合はできません')
+      if (data.search?.partialError) notes.push(`追加範囲の取得は未完了です。表示は取得済み${data.radiusMeters / 1000}km圏の結果です（${data.search.partialError}）`)
+      setPowerGrid({
+        status: 'success',
+        data,
+        message: `${data.search?.attemptedRadiiMeters?.map((radius) => `${Math.round(radius / 1000)}km`).join(' → ') || '周辺'}を段階検索し、系統線 ${lineCount}件、変電所 ${substationCount}件を取得しました。${notes.length ? `${notes.join('。')}。` : '名称・設備番号・電圧で公式DBと照合しました。'}`,
+      })
+    } catch (error) {
+      setPowerGrid({
+        status: 'error',
+        data: null,
+        message: error.message || '公開電力データを取得できませんでした。',
+      })
+    }
+  }
+
+  async function handleGridCapacityFile(event) {
+    const file = event.target.files?.[0]
+    if (!file) return
+    setGridCapacity((current) => ({
+      status: 'loading',
+      data: current.data,
+      message: '中国電力ネットワークの公開空容量CSV/ZIPを読み込んでいます…',
+    }))
+    try {
+      const data = await parseGridCapacityFile(file)
+      setGridCapacity({
+        status: 'success',
+        data,
+        message: `公開空容量資料を読み込みました（送電線 ${data.lines.length}件、変電所 ${data.substations.length}件）。`,
+      })
+    } catch (error) {
+      setGridCapacity((current) => ({
+        status: 'error',
+        data: current.data,
+        message: error.message || '公開空容量資料を読み込めませんでした。',
+      }))
+    } finally {
+      event.target.value = ''
+    }
+  }
+
+  async function handleBundledGridCapacity() {
+    const matchedArea = findChugokuGridAreaByAddress([selectedPlaceLabel, siteName].filter(Boolean).join(' '))
+    const areaLabel = matchedArea?.label || '中国電力NW'
+    setGridCapacity((current) => ({
+      status: 'loading',
+      data: current.data,
+      message: `${areaLabel}の公開空容量DBを読み込んでいます…`,
+    }))
+    try {
+      const data = await loadBundledChugokuGridCapacity(matchedArea?.id || '')
+      setGridCapacity({
+        status: 'success',
+        data,
+        message: `${data.areaLabel || areaLabel} DBを読み込みました（送電線 ${data.lines.length}件、変電所 ${data.substations.length}件）。`,
+      })
+    } catch (error) {
+      setGridCapacity((current) => ({
+        status: 'error',
+        data: current.data,
+        message: `${areaLabel} DBを読み込めませんでした。DB生成前の場合は公式のCSV/ZIPを読み込んでください。${error.message ? `（${error.message}）` : ''}`,
+      }))
+    }
+  }
+
+  async function copySelectedCoordinates() {
+    if (!position) return
+    const text = `${position.lat.toFixed(6)}, ${position.lon.toFixed(6)}`
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text)
+      } else {
+        const textarea = document.createElement('textarea')
+        textarea.value = text
+        textarea.setAttribute('readonly', '')
+        textarea.style.position = 'fixed'
+        textarea.style.left = '-9999px'
+        document.body.appendChild(textarea)
+        textarea.select()
+        document.execCommand('copy')
+        document.body.removeChild(textarea)
+      }
+      setPointActionStatus('緯度経度をコピーしました。')
+    } catch {
+      setPointActionStatus(text)
+    }
+    window.clearTimeout(pointActionTimer.current)
+    pointActionTimer.current = window.setTimeout(() => setPointActionStatus(''), 2600)
   }
 
   function updateHorizonAngle(bearing, rawValue) {
@@ -2060,7 +2450,21 @@ export default function App() {
   const referenceSnowStation = snowData.station && !isConfirmedSnowStation(snowData.station) ? snowData.station : null
   const confirmedMeshPlaceName = confirmedSnowStation?.placeName || ''
   const selectedPlaceLabel = placeInfo.status === 'success' ? normalizeDisplayText(placeInfo.data.label) : ''
+  const selectedCoordinateText = position ? `${position.lat.toFixed(6)}, ${position.lon.toFixed(6)}` : ''
+  const googleMapsUrl = position ? `https://www.google.com/maps?q=${position.lat.toFixed(6)},${position.lon.toFixed(6)}` : ''
   const solarReference = useMemo(() => solarAltitudeReference(position, terrain), [position, terrain])
+  const matchedCapacityArea = useMemo(
+    () => findChugokuGridAreaByAddress([selectedPlaceLabel, siteName].filter(Boolean).join(' ')),
+    [selectedPlaceLabel, siteName],
+  )
+  const capacityMatches = useMemo(
+    () => matchPowerGridCapacity(powerGrid.data, gridCapacity.data),
+    [powerGrid.data, gridCapacity.data],
+  )
+  const placeCapacityCandidates = useMemo(
+    () => findCapacityCandidatesByPlaceName(selectedPlaceLabel, gridCapacity.data),
+    [selectedPlaceLabel, gridCapacity.data],
+  )
   const shadowOffset = useMemo(
     () => shadowOffsetSummary(solarReference, obstructionHeight),
     [solarReference, obstructionHeight],
@@ -2105,7 +2509,11 @@ export default function App() {
     memo,
     fieldMemo,
     solarProMemo,
-  }), [position, elevation, terrain, terrainSection, siteName, selectedParcel, confirmedSnowStation, expectedSnowMesh, meshBoundary, snowBase, obstructionHeight, solarReference, selectedPlaceLabel, memo, fieldMemo, solarProMemo])
+    powerGrid: powerGrid.data,
+    gridCapacity: gridCapacity.data,
+    capacityMatches,
+    placeCapacityCandidates,
+  }), [position, elevation, terrain, terrainSection, siteName, selectedParcel, confirmedSnowStation, expectedSnowMesh, meshBoundary, snowBase, obstructionHeight, solarReference, selectedPlaceLabel, memo, fieldMemo, solarProMemo, powerGrid.data, gridCapacity.data, capacityMatches, placeCapacityCandidates])
 
   function downloadCsv() {
     const rows = [
@@ -2629,6 +3037,9 @@ export default function App() {
               focusParcelId={focusParcelId}
               onParcelSelect={chooseParcel}
               terrainSection={terrainSection}
+              powerGrid={powerGrid.data}
+              capacityMatches={capacityMatches}
+              googleMapsUrl={googleMapsUrl}
             />
 
             <div className="map-analysis-strip">
@@ -2642,6 +3053,12 @@ export default function App() {
                   {elevation.status === 'idle' && '標高 —'}
                   {selectedPlaceLabel ? ` / ${selectedPlaceLabel}` : ''}
                 </small>
+                {position && (
+                  <button type="button" className="mini-copy-button" onClick={copySelectedCoordinates} title={selectedCoordinateText}>
+                    緯度経度コピー
+                  </button>
+                )}
+                {pointActionStatus && <em>{pointActionStatus}</em>}
               </div>
               <div className="terrain-section-quick">
                 <div>
@@ -2685,6 +3102,17 @@ export default function App() {
               )}
               {terrainSectionOpen && <TerrainSectionPreview analysis={terrainSection} />}
             </div>
+            <PowerGridCheckPanel
+              position={position}
+              powerGrid={powerGrid}
+              gridCapacity={gridCapacity}
+              capacityMatches={capacityMatches}
+              placeCapacityCandidates={placeCapacityCandidates}
+              matchedCapacityArea={matchedCapacityArea}
+              onCheck={handlePowerGridCheck}
+              onBundledCapacity={handleBundledGridCapacity}
+              onCapacityFile={handleGridCapacityFile}
+            />
             {selectedParcel && (
               <div className="selected-parcel-card">
                 <div>

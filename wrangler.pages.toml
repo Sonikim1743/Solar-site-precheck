@@ -1,6 +1,6 @@
-[pages]
-project_name = "solar-site-precheck"
+name = "solar-site-precheck"
 pages_build_output_dir = "dist"
+compatibility_date = "2026-08-31"
 
 [vars]
 VITE_BUILD_TARGET = "cloudflare"

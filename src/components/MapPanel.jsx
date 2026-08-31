@@ -2,7 +2,9 @@ import { Fragment, useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import { Circle, CircleMarker, GeoJSON, LayersControl, MapContainer, Marker, Polyline, Popup, Rectangle, ScaleControl, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet'
 import { parcelInfo } from '../services/cadastre.js'
+import { capacityValueLabel, summarizeGridFlowDirection } from '../services/gridCapacity.js'
 import { normalizeDisplayText } from '../utils/text.js'
+import { powerGridDisplayLine, powerGridDisplayLineLabel } from '../services/powerGrid.js'
 
 const INITIAL_MAP_CENTER = [36.2048, 138.2529]
 const INITIAL_MAP_ZOOM = 5
@@ -309,6 +311,107 @@ function TerrainSectionMapOverlay({ analysis }) {
   )
 }
 
+function powerLineColor(voltageKv) {
+  if (Number.isFinite(voltageKv) && voltageKv >= 100) return '#16a3a3'
+  if (Number.isFinite(voltageKv) && voltageKv >= 77) return '#10b8c9'
+  if (Number.isFinite(voltageKv) && voltageKv >= 66) return '#2680eb'
+  if (Number.isFinite(voltageKv) && voltageKv >= 33) return '#3454d1'
+  if (Number.isFinite(voltageKv)) return '#2f3f8f'
+  return '#65756f'
+}
+
+function formatMapDistance(distanceMeters) {
+  if (!Number.isFinite(distanceMeters)) return '距離未取得'
+  if (distanceMeters >= 1000) return `約${(distanceMeters / 1000).toFixed(distanceMeters >= 10000 ? 0 : 1)}km`
+  return `約${Math.round(distanceMeters)}m`
+}
+
+function PowerGridOverlay({ data, capacityMatches }) {
+  const displayLine = powerGridDisplayLine(data)
+  const lines = displayLine ? [displayLine, ...(data?.lines || []).filter((line) => line.id !== displayLine.id)] : data?.lines || []
+  const substations = data?.substations || []
+  const lineMatchBySourceId = new Map((capacityMatches?.lineMatches || []).map((match) => [match.source.id, match]))
+  const substationMatchBySourceId = new Map((capacityMatches?.substationMatches || []).map((match) => [match.source.id, match]))
+  const nearestLineId = displayLine?.id
+  const nearestSubstationId = data?.summary?.nearestSubstation?.id
+  if (!lines.length && !substations.length) return null
+
+  return (
+    <>
+      {lines.slice(0, 80).map((line) => {
+        const positions = (line.geometry || [])
+          .filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lon))
+          .map((point) => [point.lat, point.lon])
+          if (positions.length < 2) return null
+          const targetVoltage = Number.isFinite(line.voltageKv) && line.voltageKv >= 11 && line.voltageKv <= 110
+          const unknownVoltage = !Number.isFinite(line.voltageKv)
+          const isNearest = line.id === nearestLineId
+          const capacityMatch = lineMatchBySourceId.get(line.id)
+          const flow = summarizeGridFlowDirection(capacityMatch?.capacity)
+          return (
+            <Polyline
+              key={line.id}
+              positions={positions}
+              pathOptions={{
+                color: powerLineColor(line.voltageKv),
+                weight: isNearest ? 7 : targetVoltage ? 4.5 : 2.2,
+                opacity: isNearest ? 0.98 : targetVoltage ? 0.9 : unknownVoltage ? 0.3 : 0.16,
+                dashArray: targetVoltage ? undefined : '5 6',
+              }}
+            >
+              <Tooltip
+                sticky={!isNearest}
+                permanent={isNearest}
+                direction="top"
+                className={`power-grid-tooltip ${isNearest ? 'power-grid-tooltip--nearest' : ''}`}
+              >
+                <strong>{isNearest ? `${powerGridDisplayLineLabel(data)}：` : ''}{line.name}</strong><br />
+                 {line.voltageLabel} / {line.voltageBand}<br />
+                 候補地から{line.direction ? `${line.direction}側 ` : ''}{formatMapDistance(line.distanceMeters)}<br />
+                 {line.positionConfidence?.label || '位置参考'}
+                 {capacityMatch && <><br />公表照合：{capacityMatch.match?.label || '名称候補'} / 空容量 {capacityValueLabel(capacityMatch.capacity.availableCapacityMw)}</>}
+                 {flow.status === 'published' && <><br />予想潮流：{flow.label}<br />上位・下位：未確定</>}
+              </Tooltip>
+            </Polyline>
+          )
+        })}
+        {substations.slice(0, 60).map((substation) => {
+          const targetVoltage = Number.isFinite(substation.voltageKv)
+            ? substation.voltageKv >= 11 && substation.voltageKv <= 110
+            : true
+          const isNearest = substation.id === nearestSubstationId
+          const capacityMatch = substationMatchBySourceId.get(substation.id)
+          return (
+        <CircleMarker
+            key={substation.id}
+            center={[substation.position.lat, substation.position.lon]}
+            radius={isNearest ? 10 : targetVoltage ? 8 : 5}
+            pathOptions={{
+              color: isNearest ? '#5b21b6' : '#6d28d9',
+              fillColor: isNearest ? '#efe7ff' : '#f4e8ff',
+              fillOpacity: isNearest ? 0.98 : targetVoltage ? 0.9 : 0.38,
+              weight: isNearest ? 3 : targetVoltage ? 2.2 : 1.4,
+            }}
+          >
+            <Tooltip
+              sticky={!isNearest}
+              permanent={isNearest}
+              direction="top"
+              className={`power-grid-tooltip power-grid-tooltip--substation ${isNearest ? 'power-grid-tooltip--nearest' : ''}`}
+            >
+              <strong>{isNearest ? '参考変電所：' : ''}{substation.name}</strong><br />
+               {substation.voltageLabel}<br />
+               候補地から{substation.direction ? `${substation.direction}側 ` : ''}{formatMapDistance(substation.distanceMeters)}<br />
+               {substation.positionConfidence?.label || '位置参考'}
+               {capacityMatch && <><br />公表照合：{capacityMatch.match?.label || '名称候補'} / 空容量 {capacityValueLabel(capacityMatch.capacity.availableCapacityMw)}</>}
+            </Tooltip>
+        </CircleMarker>
+          )
+        })}
+      </>
+  )
+}
+
 function ParcelLayer({ data, selectedParcelId, focusParcelId, onParcelSelect }) {
   const map = useMap()
   const layerRef = useRef(null)
@@ -371,6 +474,9 @@ export default function MapPanel({
   focusParcelId,
   onParcelSelect,
   terrainSection,
+  powerGrid,
+  capacityMatches,
+  googleMapsUrl,
 }) {
   const hasTerrainOverlay = !!terrainSection?.lines?.length
   const [isCompactMap, setIsCompactMap] = useState(false)
@@ -420,11 +526,17 @@ export default function MapPanel({
           focusParcelId={focusParcelId}
           onParcelSelect={onParcelSelect}
         />
+        <PowerGridOverlay data={powerGrid} capacityMatches={capacityMatches} />
         <CurrentLocationLayer currentLocation={currentLocation} />
         <TerrainSectionMapOverlay analysis={terrainSection} />
         <SiteMarker position={position} placeInfo={placeInfo} suppressPopup={hasTerrainOverlay} />
       </MapContainer>
       <div className="map-hint">地図をクリックして候補地点を指定</div>
+      {googleMapsUrl && (
+        <a className="map-google-open" href={googleMapsUrl} target="_blank" rel="noreferrer">
+          Googleマップで開く
+        </a>
+      )}
       {isCompactMap && (
         <button
           type="button"

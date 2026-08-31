@@ -1,5 +1,6 @@
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { PSM, createWorker } from 'tesseract.js'
+import { NEDO_OCR_OPTIONS } from './ocrConfig.js'
 import { thirdMeshCenter } from './nedo.js'
 import { configurePdfJs, pdfLoadOptions } from './pdfCompat.js'
 import {
@@ -221,6 +222,7 @@ export async function extractMonsolaPdf(file, onProgress = () => {}, expected = 
   lastPage.width = 1
   lastPage.height = 1
   const worker = await createWorker('eng', 1, {
+    ...NEDO_OCR_OPTIONS,
     logger(message) {
       if (message.status === 'recognizing text') {
         onProgress(`数値を読み取っています… ${Math.round(message.progress * 100)}%`)

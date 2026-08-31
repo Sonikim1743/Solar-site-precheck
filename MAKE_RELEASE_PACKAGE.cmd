@@ -52,7 +52,20 @@ if errorlevel 1 (
   exit /b 1
 )
 
+echo Verifying external fetch hosts against CSP...
+"%NODE_EXE%" "work\verify-csp-hosts.mjs"
+if errorlevel 1 (
+  echo.
+  echo CSP verification failed.
+  pause
+  exit /b 1
+)
+
 echo Preparing lightweight release folder...
+"%NODE_EXE%" "build\buildRuntimeServer.js"
+if errorlevel 1 exit /b 1
+"%NODE_EXE%" "build\verifyBrowserAssets.js"
+if errorlevel 1 exit /b 1
 if exist "%PACKAGE_DIR%" rmdir /s /q "%PACKAGE_DIR%"
 mkdir "%PACKAGE_DIR%"
 mkdir "%PACKAGE_DIR%\work"
@@ -61,7 +74,8 @@ mkdir "%PACKAGE_DIR%\functions"
 
 xcopy "dist" "%PACKAGE_DIR%\dist" /e /i /y >nul
 xcopy "functions" "%PACKAGE_DIR%\functions" /e /i /y >nul
-if exist "%PACKAGE_DIR%\dist\manual" rmdir /s /q "%PACKAGE_DIR%\dist\manual"
+xcopy "shared" "%PACKAGE_DIR%\shared" /e /i /y >nul
+copy "tmp\power-grid-runtime\power-grid-server.mjs" "%PACKAGE_DIR%\work\power-grid-server.mjs" >nul
 if exist "%PACKAGE_DIR%\dist\templates" rmdir /s /q "%PACKAGE_DIR%\dist\templates"
 if exist "%PACKAGE_DIR%\dist\sw.js" del "%PACKAGE_DIR%\dist\sw.js"
 copy "work\serve-dist.mjs" "%PACKAGE_DIR%\work\serve-dist.mjs" >nul
@@ -80,7 +94,7 @@ copy "cloudflare-portable-guide.html" "%PACKAGE_DIR%\cloudflare-portable-guide.h
   echo.
   echo This package is for online update distribution.
   echo It does not include node.exe, source code, node_modules, Service Worker, or internal .spt templates.
-  echo It also excludes large manual PDF files. The app opens the online manual URL instead.
+  echo It includes the operation manual PDF and self-hosted OCR assets for local and Cloudflare use.
   echo It includes Cloudflare Pages helper files: functions\api, wrangler.pages.toml, cloudflare-portable-guide.html.
   echo.
   echo Existing desktop installations should keep their runtime\node.exe or installed Node.js.
@@ -89,6 +103,8 @@ copy "cloudflare-portable-guide.html" "%PACKAGE_DIR%\cloudflare-portable-guide.h
 ) > "%PACKAGE_DIR%\README_RELEASE_LIGHT.txt"
 
 echo Creating lightweight zip...
+"%NODE_EXE%" "build\verifyBrowserAssets.js" "%PACKAGE_DIR%\dist"
+if errorlevel 1 exit /b 1
 if exist "%PACKAGE_ZIP%" del "%PACKAGE_ZIP%"
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Compress-Archive -Path '%PACKAGE_DIR%\*' -DestinationPath '%PACKAGE_ZIP%' -Force"
 if errorlevel 1 (

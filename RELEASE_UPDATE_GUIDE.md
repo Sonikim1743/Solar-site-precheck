@@ -1,5 +1,26 @@
 # Release更新運用メモ
 
+## 2026-08-31: Cloudflare / ローカル別ビルド
+
+最新の配布物は、変更をコミットして作業ツリーをクリーンにした後、`node build/packageDeployment.js` で作成します。テスト・CSP・同梱PDF/OCR・ZIP内SHA-256を検証し、`outputs/v1.23-日付-…/` にCloudflare用とローカル更新用のZIPを別々に出力します。GitHubへのpushや本番への配布は行いません。
+
+OpenClawには **cloudflare.zip** と [配布手順](docs/DEPLOYMENT_PACKAGE.md) を渡してください。ビルド対象によってPDFサイズ制限などが異なるため、ローカル更新版をCloudflareへ配布しないでください。`release/latest` には従来どおりローカル更新版とメタデータが配置されます。
+
+## 2026-08-31 修正時の確認事項
+
+- ブラウザは同一オリジンの `/api/power-grid` に座標と検索半径を送信します。ローカル/Vite/Cloudflare共通の処理がアプリ識別User-Agentを付けて取得します。通常は `overpass-api.de`、接続障害時のみ公式 `lambert.openstreetmap.de` に切り替えます。429時は切り替えず待機します。結果はメモリーに10分間（最大8検索）保持します。
+- `dist` だけでなく `functions/api/power-grid.js`・`shared/` も一緒に配布してください。ローカル版には `work/power-grid-server.mjs` も必要です（配布スクリプトが依存関係を1ファイルにまとめるため、dist/workのみコピーする旧アップデーターでも起動できます）。CloudflareはプロジェクトルートからWranglerでFunctionsを含めてデプロイします。
+- `public/_headers` とビルド済みJSを必ず同時に更新してください。ローカル版もサーバー再起動後にページを再読込し、古いCSPを残さないでください。
+- NEDO PDF OCRのworker・LSTM core（標準/SIMD/relaxed SIMD）・英語モデルは `dist/ocr/` に同梱します。CDN例外やJavaScriptの `unsafe-eval` は不要です。WebAssembly用の `wasm-unsafe-eval` のみ許可します。
+- `dist/manual/site-operation-guide-v1.23.pdf` を更新ZIPから除外しないでください。操作案内は同一サイトの `/manual/` を参照します。`public/404.html` はCloudflareの欠落ファイルがアプリHTMLに化けるのを防ぎます。
+- ビルド後は `pnpm test`、`pnpm verify:csp`、`pnpm verify:assets` を実行します。配布スクリプトでもコピー後のPDF/OCRファイルを検査します。
+- 配布先では `node work/preflight-release.mjs https://solar-site-precheck.pages.dev` を実行し、PDFのContent-Typeと `%PDF-` シグネチャまで確認してください。
+- `bad object HEAD` が出た作業コピーではリリース作成を止め、`git rev-parse --verify HEAD` と `git fsck --connectivity-only --no-dangling` を確認してください。未保存変更を退避する前に `.git` の削除や強制リセットをしないでください。
+
+### CSP付きブラウザOCR確認（開発用）
+
+`node build/buildBrowserSmoke.js` で独立した検証ビルドを作成し、`DIST_DIR=tmp/browser-smoke`、`PORT=5177` を環境変数に設定して `node work/serve-dist.mjs` を起動します。`http://127.0.0.1:5177/tests/browser/ocr-smoke.html` で「OCRを検証」を押し、合成画像の数値を読み取って `PASS` と `CSP violations: 0` が出ることを確認します。検証ページは通常の `dist` には入りません。
+
 ## 目的
 
 会社ノートPCで最新ビルドを作成し、GitHub上の `release/latest` に軽量更新ZIPを置く。デスクトップ側では `UPDATE_APP_FROM_RELEASE.cmd` を実行するだけで、最新アプリへ更新できるようにする。

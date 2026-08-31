@@ -41,7 +41,20 @@ if errorlevel 1 (
   exit /b 1
 )
 
+echo Verifying external fetch hosts against CSP...
+"%NODE_EXE%" "work\verify-csp-hosts.mjs"
+if errorlevel 1 (
+  echo.
+  echo CSP verification failed.
+  pause
+  exit /b 1
+)
+
 echo Preparing portable folder...
+"%NODE_EXE%" "build\buildRuntimeServer.js"
+if errorlevel 1 exit /b 1
+"%NODE_EXE%" "build\verifyBrowserAssets.js"
+if errorlevel 1 exit /b 1
 if exist "%PACKAGE_DIR%" rmdir /s /q "%PACKAGE_DIR%"
 mkdir "%PACKAGE_DIR%"
 mkdir "%PACKAGE_DIR%\work"
@@ -49,6 +62,9 @@ mkdir "%PACKAGE_DIR%\work\pdfjs"
 mkdir "%PACKAGE_DIR%\runtime"
 
 xcopy "dist" "%PACKAGE_DIR%\dist" /e /i /y >nul
+xcopy "functions" "%PACKAGE_DIR%\functions" /e /i /y >nul
+xcopy "shared" "%PACKAGE_DIR%\shared" /e /i /y >nul
+copy "tmp\power-grid-runtime\power-grid-server.mjs" "%PACKAGE_DIR%\work\power-grid-server.mjs" >nul
 if exist "%PACKAGE_DIR%\dist\templates" rmdir /s /q "%PACKAGE_DIR%\dist\templates"
 if exist "%PACKAGE_DIR%\dist\sw.js" del "%PACKAGE_DIR%\dist\sw.js"
 copy "work\serve-dist.mjs" "%PACKAGE_DIR%\work\serve-dist.mjs" >nul
@@ -71,6 +87,8 @@ copy "%NODE_EXE%" "%PACKAGE_DIR%\runtime\node.exe" >nul
 ) > "%PACKAGE_DIR%\README_PORTABLE.txt"
 
 echo Creating zip...
+"%NODE_EXE%" "build\verifyBrowserAssets.js" "%PACKAGE_DIR%\dist"
+if errorlevel 1 exit /b 1
 if exist "%PACKAGE_ZIP%" del "%PACKAGE_ZIP%"
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Compress-Archive -Path '%PACKAGE_DIR%\*' -DestinationPath '%PACKAGE_ZIP%' -Force"
 if errorlevel 1 (
