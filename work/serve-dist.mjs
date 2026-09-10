@@ -93,7 +93,7 @@ function readRequestBody(request) {
 
 createServer(async (request, response) => {
   const requestUrl = new URL(request.url || '/', `http://${host}:${port}`)
-  if (requestUrl.pathname === '/api/power-grid') {
+  if (['/api/power-grid', '/api/pv-generation'].includes(requestUrl.pathname)) {
     await powerGridMiddleware(request, response, () => {})
     return
   }

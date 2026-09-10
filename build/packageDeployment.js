@@ -14,7 +14,7 @@ const sourceCommit = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf
 const tests = (await readdir('tests')).filter((name) => name.endsWith('.test.mjs')).map((name) => `tests/${name}`)
 execFileSync(process.execPath, ['--test', '--test-concurrency=1', ...tests], { stdio: 'inherit' })
 const version = JSON.parse(await readFile('package.json', 'utf8')).version.replace(/\.0$/, '')
-const buildDate = new Date().toISOString().slice(0, 10)
+const buildDate = process.env.VITE_BUILD_DATE || new Date().toISOString().slice(0, 10)
 await mkdir('outputs', { recursive: true })
 // Unique output directory: no recursive deletion or overwriting previous releases.
 const output = await mkdtemp(resolve('outputs', `v${version}-${buildDate}-`))

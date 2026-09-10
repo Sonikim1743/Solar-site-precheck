@@ -73,9 +73,11 @@ export function buildPowerGridOverpassQuery(lat, lon, radiusMeters = DEFAULT_RAD
   way(around:${radius},${queryLat},${queryLon})["power"="minor_line"];
   node(around:${radius},${queryLat},${queryLon})["power"="substation"];
   way(around:${radius},${queryLat},${queryLon})["power"="substation"];
+  relation(around:${radius},${queryLat},${queryLon})["power"="substation"];
 ${includeSupports ? `  node(around:${radius},${queryLat},${queryLon})["power"="tower"];
   node(around:${radius},${queryLat},${queryLon})["power"="pole"];` : ''}
 );
+(._; rel(bw)["route"="power"]; rel(bw)["power"="circuit"];);
 out body geom;`
 }
 
@@ -164,7 +166,7 @@ function nearestPointToGeometry(lat, lon, geometry) {
 }
 
 function displayName(tags, fallback) {
-  return tags?.name || tags?.ref || tags?.operator || fallback
+  return tags?.['name:ja'] || tags?.name || tags?.official_name || tags?.ref || fallback
 }
 
 export function equipmentPositionConfidence(equipment) {
@@ -219,7 +221,7 @@ function normalizePowerLine(element, siteLat, siteLon) {
 function normalizeSubstation(element, siteLat, siteLon) {
   const center = element.type === 'node'
     ? { lat: element.lat, lon: element.lon }
-    : geometryCenter(element.geometry)
+    : geometryCenter(element.geometry || (element.members || []).filter((member) => member.role !== 'inner').flatMap((member) => member.geometry || []))
   if (!Number.isFinite(center?.lat) || !Number.isFinite(center?.lon)) return null
   const voltageKv = parseVoltageKv(element.tags?.voltage)
   const result = {
@@ -265,7 +267,28 @@ export function parsePowerGridElements(elements, siteLat, siteLon, radiusMeters 
   const lines = []
   const substations = []
   const supports = []
-  for (const element of elements || []) {
+  const parents = new Map()
+  for (const relation of elements || []) {
+    if (relation.type !== 'relation' || !(relation.tags?.route === 'power' || relation.tags?.power === 'circuit')) continue
+    for (const member of relation.members || []) {
+      if (member.type !== 'way') continue
+      const list = parents.get(member.ref) || []
+      list.push(relation.tags)
+      parents.set(member.ref, list)
+    }
+  }
+  for (const original of elements || []) {
+    let element = original
+    const relations = original.type === 'way' ? parents.get(original.id) : null
+    // Accept only unanimous metadata across parent circuits, never an arbitrary one.
+    if (relations?.length && ['line', 'minor_line'].includes(original.tags?.power)) {
+      const tags = { ...original.tags }
+      for (const key of ['name', 'name:ja', 'official_name', 'ref', 'voltage', 'operator']) {
+        const values = relations.map(parent => parent[key]?.trim()).filter(Boolean)
+        if (!tags[key] && values.length === relations.length && new Set(values).size === 1) tags[key] = values[0]
+      }
+      element = { ...original, tags }
+    }
     if (element?.tags?.power === 'line' || element?.tags?.power === 'minor_line') {
       const line = normalizePowerLine(element, siteLat, siteLon)
       if (line) lines.push(line)

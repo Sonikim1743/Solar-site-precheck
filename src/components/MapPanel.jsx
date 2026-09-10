@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
+import GridEquipmentDetails from './GridEquipmentDetails.jsx'
 import L from 'leaflet'
 import { Circle, CircleMarker, GeoJSON, LayersControl, MapContainer, Marker, Polyline, Popup, Rectangle, ScaleControl, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet'
 import { parcelInfo } from '../services/cadastre.js'
@@ -312,11 +313,11 @@ function TerrainSectionMapOverlay({ analysis }) {
 }
 
 function powerLineColor(voltageKv) {
-  if (Number.isFinite(voltageKv) && voltageKv >= 100) return '#16a3a3'
-  if (Number.isFinite(voltageKv) && voltageKv >= 77) return '#10b8c9'
-  if (Number.isFinite(voltageKv) && voltageKv >= 66) return '#2680eb'
-  if (Number.isFinite(voltageKv) && voltageKv >= 33) return '#3454d1'
-  if (Number.isFinite(voltageKv)) return '#2f3f8f'
+  if (Number.isFinite(voltageKv) && voltageKv >= 110) return '#c74f35'
+  if (Number.isFinite(voltageKv) && voltageKv >= 77) return '#10b8a6'
+  if (Number.isFinite(voltageKv) && voltageKv >= 66) return '#0ab2cc'
+  if (Number.isFinite(voltageKv) && voltageKv >= 33) return '#3983ff'
+  if (Number.isFinite(voltageKv)) return '#254cda'
   return '#65756f'
 }
 
@@ -326,7 +327,7 @@ function formatMapDistance(distanceMeters) {
   return `約${Math.round(distanceMeters)}m`
 }
 
-function PowerGridOverlay({ data, capacityMatches }) {
+export function PowerGridOverlay({ data, capacityMatches, onEquipmentSelect, showNames = false, compact = false }) {
   const displayLine = powerGridDisplayLine(data)
   const lines = displayLine ? [displayLine, ...(data?.lines || []).filter((line) => line.id !== displayLine.id)] : data?.lines || []
   const substations = data?.substations || []
@@ -338,7 +339,7 @@ function PowerGridOverlay({ data, capacityMatches }) {
 
   return (
     <>
-      {lines.slice(0, 80).map((line) => {
+      {(onEquipmentSelect ? lines : lines.slice(0, 80)).map((line) => {
         const positions = (line.geometry || [])
           .filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lon))
           .map((point) => [point.lat, point.lon])
@@ -351,6 +352,7 @@ function PowerGridOverlay({ data, capacityMatches }) {
           return (
             <Polyline
               key={line.id}
+              eventHandlers={onEquipmentSelect ? { click: () => onEquipmentSelect({ equipment: line, capacity: capacityMatch?.capacity, match: capacityMatch?.match, kind: 'line' }) } : undefined}
               positions={positions}
               pathOptions={{
                 color: powerLineColor(line.voltageKv),
@@ -360,22 +362,25 @@ function PowerGridOverlay({ data, capacityMatches }) {
               }}
             >
               <Tooltip
-                sticky={!isNearest}
-                permanent={isNearest}
+                  sticky={compact || !isNearest}
+                  permanent={(!compact && isNearest) || (showNames && !line.name.includes('名称未記載'))}
                 direction="top"
                 className={`power-grid-tooltip ${isNearest ? 'power-grid-tooltip--nearest' : ''}`}
               >
-                <strong>{isNearest ? `${powerGridDisplayLineLabel(data)}：` : ''}{line.name}</strong><br />
+                {onEquipmentSelect ? <><strong>{line.name}</strong><br />{line.voltageLabel} / {formatMapDistance(line.distanceMeters)}</> : <><strong>{isNearest ? `${powerGridDisplayLineLabel(data)}：` : ''}{line.name}</strong><br />
                  {line.voltageLabel} / {line.voltageBand}<br />
                  候補地から{line.direction ? `${line.direction}側 ` : ''}{formatMapDistance(line.distanceMeters)}<br />
                  {line.positionConfidence?.label || '位置参考'}
                  {capacityMatch && <><br />公表照合：{capacityMatch.match?.label || '名称候補'} / 空容量 {capacityValueLabel(capacityMatch.capacity.availableCapacityMw)}</>}
-                 {flow.status === 'published' && <><br />予想潮流：{flow.label}<br />上位・下位：未確定</>}
+                 {flow.status === 'published' && <><br />公表の正方向：{flow.label}<br />予想潮流：{flow.expectedLabel}<br />上位・下位：未確定</>}</>}
               </Tooltip>
+              {!onEquipmentSelect && <Popup className="grid-equipment-popup" maxWidth={360}>
+                {capacityMatch ? <GridEquipmentDetails record={capacityMatch.capacity} /> : <><strong>{line.name}</strong><p>{line.voltageLabel} / {formatMapDistance(line.distanceMeters)}</p><p>公開DBとの設備一致は未確認です。下の設備検索から名称・設備番号で調べられます。</p></>}
+              </Popup>}
             </Polyline>
           )
         })}
-        {substations.slice(0, 60).map((substation) => {
+        {(onEquipmentSelect ? substations : substations.slice(0, 60)).map((substation) => {
           const targetVoltage = Number.isFinite(substation.voltageKv)
             ? substation.voltageKv >= 11 && substation.voltageKv <= 110
             : true
@@ -384,6 +389,7 @@ function PowerGridOverlay({ data, capacityMatches }) {
           return (
         <CircleMarker
             key={substation.id}
+            eventHandlers={onEquipmentSelect ? { click: () => onEquipmentSelect({ equipment: substation, capacity: capacityMatch?.capacity, match: capacityMatch?.match, kind: 'substation' }) } : undefined}
             center={[substation.position.lat, substation.position.lon]}
             radius={isNearest ? 10 : targetVoltage ? 8 : 5}
             pathOptions={{
@@ -394,8 +400,8 @@ function PowerGridOverlay({ data, capacityMatches }) {
             }}
           >
             <Tooltip
-              sticky={!isNearest}
-              permanent={isNearest}
+                sticky={compact || !isNearest}
+                permanent={(!compact && isNearest) || (showNames && !substation.name.includes('名称未記載'))}
               direction="top"
               className={`power-grid-tooltip power-grid-tooltip--substation ${isNearest ? 'power-grid-tooltip--nearest' : ''}`}
             >

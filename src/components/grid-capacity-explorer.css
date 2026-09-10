@@ -1,0 +1,14 @@
+.grid-capacity-explorer { margin-block: 20px; padding-block: 18px; border-block: 1px solid #d2e3dd; }
+.grid-capacity-explorer input { display: block; width: 100%; margin-block: 8px 12px; }
+.grid-capacity-explorer__results { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); gap: 8px; max-height: 260px; overflow-y: auto; }
+.grid-capacity-explorer button { padding: 10px 12px; background: #f3f8f6; color: #155d50; border: 1px solid #bfd8d0; border-radius: 8px; text-align: left; overflow-wrap: anywhere; cursor: pointer; }
+.grid-capacity-explorer button[aria-pressed=true] { background: #176b56; color: white; }
+.grid-capacity-explorer button span { display: block; font-size: 12px; margin-top: 4px; }
+.grid-equipment-detail { margin-top: 18px; color: #164d45; }
+.grid-equipment-detail dl { margin: 10px 0; }
+.grid-equipment-detail dl > div { display: grid; grid-template-columns: minmax(110px, 40%) minmax(0, 1fr); gap: 12px; padding: 8px 0; border-bottom: 1px solid #e1ece7; }
+.grid-equipment-detail dt { font-weight: normal; }
+.grid-equipment-detail dd { margin: 0; white-space: pre-line; overflow-wrap: anywhere; font-weight: 600; }
+.grid-capacity-explorer__connections > div { margin: 12px 0; }
+.grid-capacity-explorer__connections button { display: block; margin-top: 6px; }
+.grid-equipment-popup .leaflet-popup-content { max-height: 440px; overflow-y: auto; }

@@ -72,7 +72,7 @@ function normalizeName(value) {
 }
 
 function parseNumberCell(value) {
-  const text = String(value ?? '').replace(/,/g, '').replace(/[－—–-]/g, '').trim()
+  const text = String(value ?? '').normalize('NFKC').replace(/,/g, '').replace(/[−－]/g, '-').trim()
   if (!text) return null
   const match = text.match(/-?\d+(?:\.\d+)?/)
   if (!match) return null
@@ -116,6 +116,12 @@ export function parseCapacityCsv(text, sourceFile) {
       voltageKv: parseNumberCell(getCell(headers, row, type === 'line' ? ['電圧(kV)', '電圧（kV）'] : ['電圧(一次)', '電圧(一次)（kV）'])),
       secondaryVoltageKv: type === 'substation' ? parseNumberCell(getCell(headers, row, ['電圧(二次)', '電圧(二次)（kV）'])) : null,
       expectedFlowMw: parseNumberCell(getCell(headers, row, ['予想潮流'])),
+      circuitCount: parseNumberCell(getCell(headers, row, ['回線数'])),
+      installedCapacityMw: parseNumberCell(getCell(headers, row, ['設備容量'])),
+      operatingCapacityMw: parseNumberCell(getCell(headers, row, ['運用容量値'])),
+      capacityConstraint: getCell(headers, row, ['運用容量制約要因']).trim(),
+      controlledEquipment: getCell(headers, row, ['平常時出力制御が必要となりうる設備(当該設備)']).trim(),
+      controlledUpstream: getCell(headers, row, ['平常時出力制御が必要となりうる設備(上位系']).trim(),
       availableCapacityMw: parseNumberCell(getCell(headers, row, ['空容量(当該設備)', '空容量（当該設備）'])),
       upstreamAvailableCapacityMw: parseNumberCell(getCell(headers, row, ['空容量(上位系', '空容量（上位系'])),
       nMinusOne: getCell(headers, row, ['N-1電制適用可否']).trim(),
@@ -197,7 +203,8 @@ export async function loadBundledChugokuGridCapacity(areaId = '') {
   const targetUrl = area
     ? `/data/grid-capacity/chugoku/${area.id}.json`
     : '/data/grid-capacity/chugoku/index.json'
-  const response = await fetch(targetUrl, { cache: 'no-cache' })
+  // A schema revision also bypasses older service-worker cache entries.
+  const response = await fetch(`${targetUrl}?schema=2`, { cache: 'no-cache' })
   if (!response.ok) {
     throw new Error(`中国電力NW公開空容量DBを取得できませんでした（HTTP ${response.status}）。`)
   }
@@ -230,10 +237,13 @@ function normalizeEquipmentNo(value) {
   return String(value || '')
     .normalize('NFKC')
     .toUpperCase()
-    .replace(/[^0-9A-Z一-龠ぁ-んァ-ヶ]/g, '')
+    .replace(/\s+/g, '')
 }
 
 function equipmentMatch(source, capacity) {
+  const voltages = source?.voltageValuesKv?.length ? source.voltageValuesKv : [source?.voltageKv].filter(Number.isFinite)
+  if (voltages.length && Number.isFinite(capacity?.voltageKv)
+    && !voltages.some((value) => Math.abs(value - capacity.voltageKv) <= 0.5)) return null
   const nameScore = nameMatchScore(source?.name, capacity?.name)
   const sourceNo = normalizeEquipmentNo(source?.ref)
   const capacityNo = normalizeEquipmentNo(capacity?.no)
@@ -371,7 +381,7 @@ export function capacityValueStatusLabel(value, { upstream = false } = {}) {
 
 export function summarizeGridFlowDirection(record) {
   const raw = String(record?.flowDirection || '').trim()
-  if (!raw) {
+  if (!raw || /^[\s→⇒－—–-]+$/.test(raw)) {
     return {
       status: 'missing',
       raw: '',
@@ -386,12 +396,34 @@ export function summarizeGridFlowDirection(record) {
     .split(/\s*(?:→|⇒|->)\s*/)
     .map((part) => part.trim())
     .filter(Boolean)
+  const knownFlow = Number.isFinite(record?.expectedFlowMw) && record.expectedFlowMw !== 0 && parts.length === 2
+  const expected = knownFlow ? (record.expectedFlowMw < 0 ? [...parts].reverse() : parts) : []
   return {
     status: 'published',
     raw,
     from: parts.length >= 2 ? parts[0] : '',
     to: parts.length >= 2 ? parts.slice(1).join(' → ') : '',
     label: raw,
+    expectedLabel: expected.length ? expected.join(' → ') : '方向未確定（予想潮流が未記載または0）',
+    reversed: knownFlow && record.expectedFlowMw < 0,
     hierarchyLabel: '系統上位・下位は未確定',
   }
+}
+
+// Compare only complete, explicitly named endpoints, never proximity or substrings.
+function endpointKey(value) {
+  return String(value || '').normalize('NFKC').replace(/\s+/g, '').replace(/変電所$|\(変\)$/g, '')
+}
+
+export function findPublishedGridConnections(record, dataset) {
+  const flow = summarizeGridFlowDirection(record)
+  return [flow.from, flow.to].filter(Boolean).map((endpoint) => ({
+    endpoint,
+    substations: (dataset?.substations || []).filter((item) => endpointKey(item.name) === endpointKey(endpoint)),
+    lines: (dataset?.lines || []).filter((item) => {
+      if (item === record || (item.no === record.no && item.areaId === record.areaId)) return false
+      const other = summarizeGridFlowDirection(item)
+      return [other.from, other.to].some((value) => value && endpointKey(value) === endpointKey(endpoint))
+    }),
+  }))
 }

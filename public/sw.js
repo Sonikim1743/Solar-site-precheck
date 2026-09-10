@@ -1,4 +1,4 @@
-const CACHE_NAME = 'solar-site-precheck-v6'
+const CACHE_NAME = 'solar-site-precheck-v7'
 const APP_SHELL = [
   '/',
   '/manifest.json',
@@ -29,6 +29,11 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return
   if (url.origin !== self.location.origin) return
   if (url.pathname.startsWith('/api/')) return
+  // Capacity data must not silently fall back to obsolete operating values.
+  if (url.pathname.startsWith('/data/grid-capacity/')) {
+    event.respondWith(fetch(request))
+    return
+  }
   if (url.pathname.startsWith('/assets/')) {
     event.respondWith(fetch(request))
     return

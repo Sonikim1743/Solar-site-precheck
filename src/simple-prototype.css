@@ -1,0 +1,135 @@
+.prototype-switch { display:flex; justify-content:center; align-items:center; gap:16px; flex-wrap:wrap; background:#edf3ef; padding:7px 16px; color:#50665b; font-size:12px; }
+.prototype-switch button { border:0; background:transparent; color:#176b52; text-decoration:underline; padding:5px; }
+.simple-nav { display:flex; align-items:center; gap:24px; font-size:14px; }
+.simple-nav > button { border:0; background:none; color:#176b52; padding:10px 0; }
+.simple-tools { position:relative; }
+.simple-tools summary { cursor:pointer; padding:10px 0; color:#50665b; }
+.simple-tools-menu { position:absolute; right:0; top:100%; width:240px; background:white; border:1px solid #d9e4df; border-radius:8px; padding:8px; box-shadow:0 10px 30px #17322d14; z-index:3000; }
+.simple-tools-menu button,.simple-tools-menu a { display:block; width:100%; padding:10px 12px; border:0; background:white; color:#17322d; text-align:left; text-decoration:none; font-size:14px; border-radius:4px; }
+.simple-tools-menu button:hover,.simple-tools-menu a:hover { background:#f2f6f2; }
+@media screen {
+  .app--simple { background:#fff; --shadow:none; }
+  .app--simple .topbar { position:relative; height:auto; min-height:74px; padding:16px max(24px,calc((100vw - 1160px)/2)); background:#fff; backdrop-filter:none; }
+  .app--simple .brand-mark { background:none; color:var(--green); box-shadow:none; width:30px; height:32px; }
+  .app--simple .brand-name { font-size:19px; }
+  .app--simple .brand-subtitle { display:none; }
+  .app--simple main { max-width:1160px; padding:0 28px 44px; }
+  .app--simple .simple-hero { padding:36px 0 10px; }
+  .app--simple .simple-hero .eyebrow { color:var(--green); font-size:12px; letter-spacing:.08em; margin:0 0 8px; }
+  .app--simple .simple-hero h1 { font-size:34px; font-weight:600; letter-spacing:-.04em; margin:0 0 10px; }
+  .app--simple .simple-hero > p:last-of-type { color:var(--muted); font-size:15px; margin:0; }
+  .app--simple .simple-steps { display:flex; gap:30px; flex-wrap:wrap; padding:25px 0 8px; }
+  .app--simple .simple-steps a { color:var(--muted); font-size:13px; text-decoration:none; }
+  .app--simple .simple-steps a:first-child { color:var(--green); }
+  .app--simple .workflow { gap:8px; }
+  .app--simple .panel,.app--simple .report-section { border:0; border-radius:0; box-shadow:none; background:#fff; }
+  .app--simple .map-panel { padding:0; }
+  .app--simple .map-panel > .section-heading { display:none; }
+  .app--simple .cadastre-option { border:0; border-radius:0; background:#fff; }
+  .app--simple .cadastre-option > summary { padding:8px 0; }
+  .app--simple .cadastre-option > summary span { display:flex; gap:12px; align-items:center; }
+  .app--simple .cadastre-option > summary small { font-size:12px; }
+  .app--simple .power-grid-card { border:0; border-bottom:1px solid var(--line); border-radius:0; background:white; box-shadow:none; margin:0; }
+  .app--simple .power-grid-card__summary { padding:18px 0; }
+  .app--simple .power-grid-card__summary h3 { font-size:16px; font-weight:600; }
+  .app--simple .power-grid-card__summary p { font-size:12px; }
+  .app--simple .power-grid-card__badge { background:none; padding:0; color:var(--muted); }
+  .app--simple .power-grid-card__toggle,.app--simple .report-disclosure__toggle,.app--simple .manual-disclosure__toggle { background:none; color:var(--muted); font-size:12px; }
+  .app--simple .site-search-row { margin-top:0; }
+  .app--simple .address-search { border-radius:7px; box-shadow:none; background:#fff; }
+  .app--simple .address-search button[type=submit] { background:var(--green); color:#fff; border-radius:5px; }
+  .app--simple .map-shell { border-radius:8px; border:1px solid var(--line); }
+  .app--simple .map { height:440px; }
+  .app--simple .map-analysis-strip { background:#fff; border:0; border-bottom:1px solid var(--line); border-radius:0; padding:16px 0; margin:0; gap:18px; }
+  .app--simple .selected-point-mini { background:none; border:0; border-radius:0; flex-wrap:wrap; gap:7px 12px; padding:0; }
+  .app--simple .selected-point-mini span { color:var(--muted); font-size:12px; letter-spacing:0; }
+  .app--simple .selected-point-mini strong { font-size:13px; }
+  .app--simple .selected-point-mini small { font-size:12px; white-space:normal; overflow:visible; }
+  .app--simple .details-panel { padding:0; border-bottom:1px solid var(--line); scroll-margin-top:20px; }
+  .app--simple .simple-analysis-summary { padding:20px 0; display:flex; align-items:center; gap:12px; cursor:pointer; list-style:none; font-weight:600; }
+  .app--simple .simple-analysis-summary:after { content:'＋'; margin-left:auto; font-weight:400; color:var(--muted); }
+  .app--simple .simple-analysis[open] > summary:after { content:'−'; }
+  .app--simple .simple-analysis-summary small { color:var(--muted); font-size:12px; font-weight:400; }
+  .app--simple .simple-analysis > .section-heading { display:none; }
+  .app--simple .simple-analysis .form-stack { padding:8px 0 22px; }
+  .app--simple .terrain-box,.app--simple .snow-source-box,.app--simple .site-mini-summary { background:#f6f8f5; box-shadow:none; border-radius:7px; }
+  .app--simple .action-button { background:var(--green); color:#fff; box-shadow:none; border-radius:7px; }
+  .app--simple .action-button small { color:inherit; }
+  .app--simple .report-section { margin-top:8px; padding:0; }
+  .app--simple .report-disclosure { border-radius:0; border:0; background:white; box-shadow:none; }
+  .app--simple .report-disclosure__summary { padding:18px 0; background:white; }
+  .app--simple .report-disclosure__summary .step-number { display:none; }
+  .app--simple .report-disclosure__summary h2 { font-size:18px; font-weight:600; }
+  .app--simple .report-disclosure__summary p { font-size:12px; }
+  .app--simple .manual-section { border-top:1px solid var(--line); margin-top:18px; padding:14px 0; }
+  .app--simple .manual-disclosure__summary,.app--simple .knowledge-disclosure__summary { background:white; padding:12px 0; }
+  .app--simple .manual-disclosure__summary h2,.app--simple .knowledge-disclosure__summary h2 { font-size:16px; font-weight:600; }
+  .app--simple .manual-disclosure__summary p,.app--simple .knowledge-disclosure__summary p { display:none; }
+  .app--simple .manual-disclosure__summary .step-number,.app--simple .knowledge-disclosure__summary .step-number { display:none; }
+  .app--simple .knowledge-section { padding:0; border-top:1px solid var(--line); }
+  .app--simple .step-number { background:#eff5f0; color:var(--green); box-shadow:none; }
+  .app--simple footer { background:#fafbf9; border-top:1px solid var(--line); }
+  .app--simple .simple-hero { padding-top:30px; }
+  .app--simple .map-analysis-strip { align-items:start; padding:20px 0; grid-template-columns:minmax(0,1fr) minmax(260px,auto); }
+  .app--simple .simple-point { min-width:0; }
+  .app--simple .simple-point-title { display:grid; gap:5px; }
+  .app--simple .simple-point-title > span,.app--simple .simple-kicker { color:var(--muted); font-size:12px; letter-spacing:.04em; }
+  .app--simple .simple-point-title strong { font-size:18px; font-weight:600; overflow-wrap:anywhere; }
+  .app--simple .simple-point-meta { display:flex; gap:8px 18px; flex-wrap:wrap; color:var(--muted); font-size:13px; margin:8px 0; }
+  .app--simple .simple-point-meta b { color:var(--ink); font-weight:600; }
+  .app--simple .simple-point-actions { display:flex; gap:8px 18px; flex-wrap:wrap; align-items:center; }
+  .app--simple .simple-point-actions button,.app--simple .simple-point-actions a { color:var(--green); border:0; background:none; padding:4px 0; font-size:12px; text-decoration:none; }
+  .app--simple .simple-point-actions > span { color:var(--muted); font-size:12px; }
+  .app--simple .terrain-section-quick { background:#f5f7f4; border:0; border-radius:8px; padding:14px; }
+  .app--simple .simple-review { padding:24px 0 12px; }
+  .app--simple .simple-review-heading { display:flex; gap:15px; justify-content:space-between; align-items:center; margin-bottom:17px; }
+  .app--simple .simple-review-heading h2 { font-size:21px; font-weight:600; margin:4px 0 0; }
+  .app--simple .simple-review-heading > span { color:var(--green); font-size:12px; white-space:nowrap; }
+  .app--simple .simple-review-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+  .app--simple .simple-review-item { display:flex; flex-direction:column; align-items:flex-start; gap:9px; min-width:0; padding:20px; border:1px solid #dce5df; border-radius:9px; background:white; color:var(--ink); text-align:left; text-decoration:none; transition:background .15s,border-color .15s; }
+  .app--simple .simple-review-item:hover { background:#f7faf6; border-color:#83aa97; }
+  .app--simple .simple-review-item > span { font-size:12px; color:var(--muted); }
+  .app--simple .simple-review-item strong { font-size:17px; font-weight:600; overflow-wrap:anywhere; }
+  .app--simple .simple-review-item small { font-size:12px; color:var(--muted); }
+  .app--simple .simple-review-item em { font-size:12px; color:var(--green); font-style:normal; margin-top:auto; padding-top:7px; }
+  .app--simple #simple-horizon,.app--simple #simple-snow { scroll-margin-top:24px; }
+  .app--simple .report-disclosure__summary { background:#f3f7f2; padding:22px; border-radius:9px; }
+  .app--simple .report-disclosure__summary .section-heading { margin:0; }
+  .app--simple .report-disclosure__toggle { background:var(--green); color:white; border-radius:6px; padding:10px 16px; }
+  .app--simple .simple-experimental { margin:30px 0 6px; padding-top:20px; border-top:1px solid var(--line); }
+  .app--simple .simple-experimental-label { display:flex; align-items:center; flex-wrap:wrap; gap:8px 18px; }
+  .app--simple .simple-experimental-label > span { font-size:12px; font-weight:600; color:var(--muted); }
+  .app--simple .simple-experimental-label small { font-size:12px; color:var(--muted); }
+  .app--simple .power-grid-card { border-bottom:0; }
+  .app--simple .power-grid-card__summary { padding:12px 0; }
+  .app--simple .power-grid-card__badge { display:inline-block; font-size:11px; color:#725726; background:#f7f0df; padding:2px 7px; border-radius:4px; }
+  .app--simple .power-grid-card__summary p { display:none; }
+  .app--simple .support-sections { margin-top:20px; }
+  .app--simple .support-sections .panel { margin-top:0; }
+  .app--simple input,.app--simple select,.app--simple textarea { border-radius:6px; }
+  .app--simple .secondary-button,.app--simple .primary-button { border-radius:6px; box-shadow:none; }
+  @media (max-width:760px) {
+    .app--simple .topbar { padding:14px 20px; flex-wrap:wrap; gap:6px 18px; }
+    .app--simple .topbar-actions { width:auto; max-width:100%; }
+    .app--simple .simple-nav { gap:20px; flex-wrap:wrap; font-size:13px; }
+    .app--simple main { padding:0 18px 30px; }
+    .app--simple .simple-hero { padding-top:24px; }
+    .app--simple .simple-hero h1 { font-size:26px; }
+    .app--simple .simple-steps { gap:14px; }
+    .app--simple .map { height:340px; }
+    .app--simple .map-analysis-strip { grid-template-columns:1fr; gap:12px; }
+    .app--simple .terrain-section-quick { flex-wrap:wrap; min-width:0; }
+    .app--simple .simple-analysis-summary small { display:none; }
+    .app--simple .simple-tools-menu { position:fixed; top:auto; left:18px; right:18px; width:auto; }
+    .app--simple .simple-review-grid { grid-template-columns:1fr; gap:8px; }
+    .app--simple .simple-review-item { display:grid; grid-template-columns:minmax(0,1fr) auto; padding:15px; gap:5px 12px; }
+    .app--simple .simple-review-item > span { grid-column:1; }
+    .app--simple .simple-review-item strong { grid-column:1; font-size:16px; }
+    .app--simple .simple-review-item small { grid-column:1; }
+    .app--simple .simple-review-item em { grid-column:2; grid-row:1 / 4; align-self:center; font-size:11px; margin:0; padding:0; }
+    .app--simple .simple-review-heading h2 { font-size:19px; }
+    .app--simple .report-disclosure__summary { padding:17px; flex-wrap:wrap; gap:12px; }
+    .app--simple .report-disclosure__summary h2 { font-size:17px; }
+    .app--simple .map-hint { display:none; }
+  }
+}

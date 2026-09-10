@@ -1,7 +1,9 @@
 import { handlePowerGridRequest } from '../functions/api/power-grid.js'
+import { handleGenerationRequest } from '../functions/api/pv-generation.js'
 
 export async function powerGridMiddleware(request, response, next) {
-  if (new URL(request.url || '/', 'http://localhost').pathname !== '/api/power-grid') return next()
+  const pathname = new URL(request.url || '/', 'http://localhost').pathname
+  if (!['/api/power-grid', '/api/pv-generation'].includes(pathname)) return next()
   try {
     const chunks = []
     let size = 0
@@ -14,7 +16,8 @@ export async function powerGridMiddleware(request, response, next) {
       }
       chunks.push(chunk)
     }
-    const result = await handlePowerGridRequest(new Request(`http://${request.headers.host}${request.url}`, {
+    const handler = pathname === '/api/pv-generation' ? handleGenerationRequest : handlePowerGridRequest
+    const result = await handler(new Request(`http://${request.headers.host}${request.url}`, {
       method: request.method,
       headers: request.headers,
       ...(['GET', 'HEAD'].includes(request.method) ? {} : { body: Buffer.concat(chunks) }),

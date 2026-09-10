@@ -1,6 +1,6 @@
 import { fetchPowerGridPayload } from '../../shared/powerGrid.js'
 
-export const POWER_GRID_USER_AGENT = 'SolarSitePrecheck/1.23 (https://github.com/Sonikim1743/Solar-site-precheck)'
+export const POWER_GRID_USER_AGENT = 'SolarSitePrecheck/1.24 (https://github.com/Sonikim1743/Solar-site-precheck)'
 const allowedFields = new Set(['lat', 'lon', 'radius', 'supports'])
 let activeRequests = 0
 

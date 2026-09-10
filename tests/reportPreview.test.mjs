@@ -26,6 +26,20 @@ after(async () => {
   await viteServer?.close()
 })
 
+test('generation report keeps monthly values, assumptions and existing Solar Pro input together', () => {
+  const report = { position: { lat: 34.9, lon: 133.5 }, obstructionHeight: 20, snowBase: 1, solarProMemo: { annualYield: '57,000 kWh' }, generation: {
+    inputs: { peakpower: 50, angle: 20, aspect: 0, loss: 14 }, annualKwh: 60000,
+    monthly: Array.from({ length: 12 }, (_, i) => ({ month: i + 1, kwh: 5000 })), source: 'PVGIS 5.3 / PVGIS-ERA5', period: '2005–2023', fetchedAt: '2026-09-10T23:40:00Z',
+  } }
+  const html = renderToStaticMarkup(React.createElement(ReportPreview, { report }))
+  assert.match(html, /60,000/)
+  assert.match(html, /57,000 kWh/)
+  assert.match(html, /12月/)
+  assert.match(html, /DC 50 kWp/)
+  assert.match(html, /系統出力制御は未反映/)
+  assert.match(html, /取得 2026\/9\/11/)
+})
+
 test('66/77 report uses the preferred line, not unrelated capacity, and fits a far substation', () => {
   const reference = { id: 'ref', name: '参考500kV線', voltageKv: 500, voltageLabel: '500kV', distanceMeters: 500, nearestPoint: { lat: 35, lon: 139.005 } }
   const target = { id: 'target', name: '対象66kV線', voltageKv: 66, voltageLabel: '66kV', distanceMeters: 39000, direction: '北', bearing: 0, nearestPoint: { lat: 35.35, lon: 139 }, geometry: [{ lat: 35.35, lon: 138.98 }, { lat: 35.35, lon: 139.02 }] }
@@ -96,5 +110,5 @@ test('power-grid report does not render a stray zero and explains official DB ca
   assert.match(html, /66 kV/)
   assert.match(html, /0 MW（空容量なし）/)
   assert.match(html, /N-1 不可/)
-  assert.match(html, /公開予想潮流 庄原（変）→東城（変）/)
+  assert.match(html, /公表の正方向 庄原（変）→東城（変）/)
 })

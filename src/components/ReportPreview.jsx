@@ -3,7 +3,7 @@ import { toDegreeMinutes } from '../utils/coordinates.js'
 import { snowRateLevel } from '../utils/snowRates.js'
 import { evaluateSiteVerdict, primaryVerdictReasons, verdictCriteriaText } from '../utils/verdict.js'
 import { capacityValueStatusLabel, summarizeGridFlowDirection } from '../services/gridCapacity.js'
-import { powerGridDisplayLine, powerGridDisplayLineLabel, powerGridSearchSummary } from '../services/powerGrid.js'
+import { powerGridDisplayLine, powerGridDisplayLineLabel, powerGridSearchSummary } from '../../shared/powerGrid.js'
 import HorizonGraphPreview from './HorizonGraphPreview.jsx'
 import TerrainSectionPreview from './TerrainSectionPreview.jsx'
 
@@ -646,7 +646,7 @@ function PowerGridReportPage({ data, capacityData, capacityMatches, placeCapacit
                       {match.capacity.nMinusOne ? ` / N-1 ${match.capacity.nMinusOne}` : ''}
                     </small>
                     {flow.status === 'published' && (
-                      <small>公開予想潮流 {flow.label} / 系統上位・下位 未確定</small>
+                      <small>公表の正方向 {flow.label} / 予想潮流 {flow.expectedLabel} / 系統上位・下位 未確定</small>
                     )}
                     <small>地図候補: {match.source.name}（{formatReportGridDistance(match.source.distanceMeters)}）</small>
                         </>
@@ -681,7 +681,7 @@ function PowerGridReportPage({ data, capacityData, capacityMatches, placeCapacit
                             上位系 {capacityValueStatusLabel(record.upstreamAvailableCapacityMw, { upstream: true })}
                             {record.nMinusOne ? ` / N-1 ${record.nMinusOne}` : ''}
                           </small>
-                          {flow.status === 'published' && <small>公開予想潮流 {flow.label}</small>}
+                          {flow.status === 'published' && <small>公表の正方向 {flow.label} / 予想潮流 {flow.expectedLabel}</small>}
                           <small>位置座標なし / 最寄り設備とは未確定</small>
                         </>
                       )
@@ -941,6 +941,17 @@ export default function ReportPreview({ report }) {
           placeCapacityCandidates={report.placeCapacityCandidates}
         />
       )}
+      {(report.generation || report.solarProMemo?.annualYield) && <ReportPage page={report.powerGrid ? '6' : '5'} title="発電量と系統検討" subtitle="同じ候補地の発電条件・接続条件を整理">
+        <div className="report-data-block"><h3>参考発電量</h3>
+          {report.generation && <><dl>
+            <ValueRow label="参考年間発電量">{Math.round(report.generation.annualKwh).toLocaleString('ja-JP')} kWh/年</ValueRow>
+            <ValueRow label="計算条件">DC {report.generation.inputs.peakpower} kWp / 傾斜 {report.generation.inputs.angle}° / 南基準方位 {report.generation.inputs.aspect}° / 損失 {report.generation.inputs.loss}%</ValueRow>
+            <ValueRow label="出典・期間">{report.generation.source} / {report.generation.period || '出典で確認'} / 取得 {new Date(report.generation.fetchedAt).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}</ValueRow>
+          </dl><table><thead><tr><th>月</th><th>参考発電量（kWh）</th></tr></thead><tbody>{report.generation.monthly.map(row => <tr key={row.month}><td>{row.month}月</td><td>{Math.round(row.kwh).toLocaleString('ja-JP')}</td></tr>)}</tbody></table>
+          <p className="report-note">結晶シリコン・架台設置・固定式。PVGIS標準地平線を使用。アプリで調べた樹木・建物の日影、NEDO積雪係数、個別PCS制約、系統出力制御は未反映です。</p></>}
+          {report.solarProMemo?.annualYield && <p>Solar Pro年間発電量（入力値）：{report.solarProMemo.annualYield}</p>}
+        </div><div className="report-data-block"><h3>次の検討</h3><p>周辺設備の距離と名称・設備番号を確認し、電力会社の系統図・公表資料で接続点の候補を整理します。選択設備の番号・資料更新日は系統画面から「設備確認メモを保存」で別途記録できます。</p><p>発電量と系統空容量は別の確認項目です。空容量から出力制御率を算定せず、接続点・工事費・工期・制御条件を電力会社に確認してから事業性を検討します。</p></div>
+      </ReportPage>}
     </section>
   )
 }

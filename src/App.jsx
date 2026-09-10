@@ -1,5 +1,8 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import MapPanel from './components/MapPanel.jsx'
+import GridCapacityExplorer from './components/GridCapacityExplorer.jsx'
+import './simple-prototype.css'
+import './components/power-grid-page.css'
 import ReportPreview from './components/ReportPreview.jsx'
 import HorizonGraphPreview from './components/HorizonGraphPreview.jsx'
 import TerrainSectionPreview from './components/TerrainSectionPreview.jsx'
@@ -31,6 +34,7 @@ import {
   thirdMeshCode,
 } from './services/nedo.js'
 import { fetchNearbyPowerGrid, powerGridDisplayLine, powerGridDisplayLineLabel, powerGridSearchSummary } from './services/powerGrid.js'
+import { generationAtPosition } from '../shared/generation.js'
 import { capacityValueLabel, capacityValueStatusLabel, findCapacityCandidatesByPlaceName, loadBundledChugokuGridCapacity, matchPowerGridCapacity, parseGridCapacityFile, summarizeGridFlowDirection } from './services/gridCapacity.js'
 import { findChugokuGridAreaByAddress } from './services/chugokuGridSources.js'
 import { parseCoordinateInput, toDegreeMinutes } from './utils/coordinates.js'
@@ -48,6 +52,7 @@ import {
 } from './services/cadastre.js'
 
 const PdfToolsPage = lazy(() => import('./components/PdfToolsPage.jsx'))
+const PowerGridPage = lazy(() => import('./components/PowerGridPage.jsx'))
 
 const MONTHS = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月']
 const initialElevation = { status: 'idle', value: null, source: '', message: '' }
@@ -129,7 +134,7 @@ function PowerGridCheckPanel({ position, powerGrid, gridCapacity, capacityMatche
   const placeLineRows = placeCapacityCandidates?.lineCandidates || []
   const placeSubstationRows = placeCapacityCandidates?.substationCandidates || []
   const hasPlaceCandidates = Boolean(placeLineRows.length || placeSubstationRows.length)
-  const capacityAreaLabel = gridCapacity.data?.areaLabel || matchedCapacityArea?.label || '中国電力NW'
+  const capacityAreaLabel = gridCapacity.data?.areaLabel || (gridCapacity.data?.areas?.length ? `中国電力NW（${gridCapacity.data.areas.length}県）` : matchedCapacityArea?.label) || '中国電力NW'
   const firstCapacityMatch = lineCapacityRows[0] || substationCapacityRows[0] || null
   const hasPowerGridResult = Boolean(data)
   const attemptedRadii = data?.search?.attemptedRadiiMeters || []
@@ -301,7 +306,7 @@ function PowerGridCheckPanel({ position, powerGrid, gridCapacity, capacityMatche
                       </span>
                       {flow.status === 'published' && (
                         <div className="power-grid-flow-detail">
-                          <span>公開予想潮流 {flow.label}</span>
+                          <span>公表の正方向 {flow.label} / 予想潮流 {flow.expectedLabel}</span>
                           {flow.from && flow.to && <small>潮流元 {flow.from} / 潮流先 {flow.to}</small>}
                           <small>{flow.hierarchyLabel}（潮流方向だけでは判定しません）</small>
                         </div>
@@ -348,6 +353,7 @@ function PowerGridCheckPanel({ position, powerGrid, gridCapacity, capacityMatche
         </div>
       )}
 
+      <GridCapacityExplorer dataset={gridCapacity.data} />
       {gridCapacity.message && (
         <p className={`power-grid-message power-grid-message--${gridCapacity.status}`}>
           {gridCapacity.message}
@@ -552,6 +558,18 @@ function Icon({ children }) {
 }
 
 export default function App() {
+  const [simpleDesign, setSimpleDesign] = useState(() => new URLSearchParams(window.location.search).get('design') === 'simple')
+  const prototypeEnabled = simpleDesign || new URLSearchParams(window.location.search).get('prototype') === '1'
+  const AnalysisContainer = simpleDesign ? 'details' : 'div'
+  function toggleSimpleDesign() {
+    const next = !simpleDesign
+    const url = new URL(window.location.href)
+    url.searchParams.set('prototype', '1')
+    if (next) url.searchParams.set('design', 'simple')
+    else url.searchParams.delete('design')
+    window.history.replaceState(null, '', url)
+    setSimpleDesign(next)
+  }
   const [draftSeed] = useState(loadDraft)
   const [position, setPosition] = useState(draftSeed.position || null)
   const [elevation, setElevation] = useState(draftSeed.elevation || initialElevation)
@@ -563,6 +581,8 @@ export default function App() {
   const [terrainSectionOpen, setTerrainSectionOpen] = useState(false)
   const [terrainSectionRange, setTerrainSectionRange] = useState(100)
   const [powerGrid, setPowerGrid] = useState({ status: 'idle', data: null, message: '' })
+  const powerGridRequestSeq = useRef(0)
+  const [generation, setGeneration] = useState(() => generationAtPosition(draftSeed.generation, draftSeed.position) ? draftSeed.generation : null)
   const [gridCapacity, setGridCapacity] = useState({ status: 'idle', data: null, message: '' })
   const [pointActionStatus, setPointActionStatus] = useState('')
   const [obstructionHeight, setObstructionHeight] = useState(draftSeed.obstructionHeight ?? 20)
@@ -637,6 +657,7 @@ export default function App() {
     if (typeof window === 'undefined') return 'solar'
     if (window.location.hash === '#inheritance-check') return 'inheritance'
     if (window.location.hash === '#pdf-tools') return 'pdf'
+    if (window.location.hash === '#power-grid') return 'power'
     return 'solar'
   })
   const [solarManualActive, setSolarManualActive] = useState(
@@ -663,6 +684,7 @@ export default function App() {
           snowStation: snowData.station,
           snowBase,
           solarProMemo,
+          generation,
         }))
       } catch {
         // Storage can be unavailable or full; the app should continue to work without draft persistence.
@@ -670,7 +692,7 @@ export default function App() {
     }, 200)
 
     return () => window.clearTimeout(draftSaveTimer.current)
-  }, [position, elevation, terrain, obstructionHeight, detailedHorizon, snowData.station, snowBase, solarProMemo])
+  }, [position, elevation, terrain, obstructionHeight, detailedHorizon, snowData.station, snowBase, solarProMemo, generation])
 
   useEffect(() => {
     if (position && placeInfo.status === 'idle') schedulePlaceInfo(position)
@@ -687,6 +709,7 @@ export default function App() {
       setSolarManualActive(hash === '#solar-manual')
       if (hash === '#inheritance-check') setActivePage('inheritance')
       else if (hash === '#pdf-tools') setActivePage('pdf')
+      else if (hash === '#power-grid') setActivePage('power')
       else setActivePage('solar')
     }
     window.addEventListener('hashchange', syncPageFromHash)
@@ -817,6 +840,7 @@ export default function App() {
   }
 
   function resetCandidateInputs() {
+    setSolarProMemo({ ...initialSolarProMemo })
     setSiteName('')
     setSiteNameTouched(false)
     setMemo('')
@@ -834,6 +858,8 @@ export default function App() {
   }
 
   function resetWorkTools() {
+    powerGridRequestSeq.current += 1
+    setGeneration(null)
     window.clearTimeout(placeRequestTimer.current)
     placeRequestSeq.current += 1
     resetCandidateInputs()
@@ -872,6 +898,8 @@ export default function App() {
   }
 
   async function selectPosition(nextPosition, options = {}) {
+    powerGridRequestSeq.current += 1
+    setGeneration(null)
     const { resetCandidate = true } = options
     if (resetCandidate) resetCandidateInputs()
     setPosition(nextPosition)
@@ -1061,7 +1089,8 @@ export default function App() {
     }
   }
 
-  async function handlePowerGridCheck() {
+  async function handlePowerGridCheck({ prefer66Or77 = false, radiusMeters = 10000 } = {}) {
+    const requestSeq = ++powerGridRequestSeq.current
     if (!position) {
       setPowerGrid({ status: 'error', data: null, message: '先に候補地点を選択してください。' })
       return
@@ -1069,10 +1098,11 @@ export default function App() {
     setPowerGrid({ status: 'loading', data: null, message: '公開電力データを取得しています…' })
     try {
       const data = await fetchNearbyPowerGrid(position.lat, position.lon, {
-        progressive: true,
-        prefer66Or77: true,
+        progressive: prefer66Or77,
+        prefer66Or77,
+        radiusMeters,
         radiiMeters: [5000, 10000, 20000, 50000],
-        onProgress: ({ type, radiusMeters }) => setPowerGrid({
+        onProgress: ({ type, radiusMeters }) => requestSeq === powerGridRequestSeq.current && setPowerGrid({
           status: 'loading',
           data: null,
           message: type === 'fallback'
@@ -1080,6 +1110,7 @@ export default function App() {
             : `公開電力データを取得しています…（周辺${radiusMeters / 1000}km）`,
         }),
       })
+      if (requestSeq !== powerGridRequestSeq.current) return
       const lineCount = data.summary?.lineCount || 0
       const substationCount = data.summary?.substationCount || 0
       const identifiableLineCount = (data.lines || []).filter((line) => (
@@ -1092,9 +1123,10 @@ export default function App() {
       setPowerGrid({
         status: 'success',
         data,
-        message: `${data.search?.attemptedRadiiMeters?.map((radius) => `${Math.round(radius / 1000)}km`).join(' → ') || '周辺'}を段階検索し、系統線 ${lineCount}件、変電所 ${substationCount}件を取得しました。${notes.length ? `${notes.join('。')}。` : '名称・設備番号・電圧で公式DBと照合しました。'}`,
+        message: `${Math.round(data.radiusMeters / 1000)}km圏を取得しました。${notes.filter(Boolean).map((note) => note.replace(/。+$/, '')).join('。')}${notes.some(Boolean) ? '。' : ''}`,
       })
     } catch (error) {
+      if (requestSeq !== powerGridRequestSeq.current) return
       setPowerGrid({
         status: 'error',
         data: null,
@@ -1138,11 +1170,11 @@ export default function App() {
       message: `${areaLabel}の公開空容量DBを読み込んでいます…`,
     }))
     try {
-      const data = await loadBundledChugokuGridCapacity(matchedArea?.id || '')
+      const data = await loadBundledChugokuGridCapacity('')
       setGridCapacity({
         status: 'success',
         data,
-        message: `${data.areaLabel || areaLabel} DBを読み込みました（送電線 ${data.lines.length}件、変電所 ${data.substations.length}件）。`,
+        message: '中国電力NW（広島・岡山・島根・鳥取）の公開DBを準備しました。設備名・設備番号で検索できます。',
       })
     } catch (error) {
       setGridCapacity((current) => ({
@@ -2509,11 +2541,12 @@ export default function App() {
     memo,
     fieldMemo,
     solarProMemo,
+    generation,
     powerGrid: powerGrid.data,
     gridCapacity: gridCapacity.data,
     capacityMatches,
     placeCapacityCandidates,
-  }), [position, elevation, terrain, terrainSection, siteName, selectedParcel, confirmedSnowStation, expectedSnowMesh, meshBoundary, snowBase, obstructionHeight, solarReference, selectedPlaceLabel, memo, fieldMemo, solarProMemo, powerGrid.data, gridCapacity.data, capacityMatches, placeCapacityCandidates])
+  }), [position, elevation, terrain, terrainSection, siteName, selectedParcel, confirmedSnowStation, expectedSnowMesh, meshBoundary, snowBase, obstructionHeight, solarReference, selectedPlaceLabel, memo, fieldMemo, solarProMemo, generation, powerGrid.data, gridCapacity.data, capacityMatches, placeCapacityCandidates])
 
   function downloadCsv() {
     const rows = [
@@ -2745,7 +2778,7 @@ export default function App() {
         ? '#inheritance-check'
         : nextPage === 'pdf'
           ? '#pdf-tools'
-          : '#site-select'
+          : nextPage === 'power' ? '#power-grid' : '#site-select'
       window.history.replaceState(null, '', hash)
       window.scrollTo({ top: 0, behavior: 'smooth' })
     }
@@ -2757,13 +2790,32 @@ export default function App() {
     if (typeof window !== 'undefined') {
       window.history.replaceState(null, '', '#solar-manual')
       window.setTimeout(() => {
+        if (simpleDesign) {
+          const manual = document.querySelector('.manual-disclosure')
+          if (manual) manual.open = true
+        }
         document.getElementById('solar-manual')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
       }, 0)
     }
   }
 
+  function openSimpleSection(target) {
+    const analysis = document.getElementById('simple-analysis')
+    if (analysis) analysis.open = true
+    requestAnimationFrame(() => document.getElementById(target)?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+  }
+
+  const powerPanel = <PowerGridCheckPanel
+    position={position} powerGrid={powerGrid} gridCapacity={gridCapacity}
+    capacityMatches={capacityMatches} placeCapacityCandidates={placeCapacityCandidates}
+    matchedCapacityArea={matchedCapacityArea} onCheck={handlePowerGridCheck}
+    onBundledCapacity={handleBundledGridCapacity} onCapacityFile={handleGridCapacityFile}
+  />
+  const analysisCount = Number(terrainSectionStatus === 'success') + Number(['success', 'manual'].includes(terrainStatus)) + Number(Boolean(confirmedSnowStation))
+
   return (
-    <div className="app">
+    <div className={`app${simpleDesign ? ' app--simple' : ''}`}>
+      {prototypeEnabled && <div className="prototype-switch no-print"><span>デザイン比較 · プロトタイプ</span><button type="button" onClick={toggleSimpleDesign}>{simpleDesign ? '従来の画面を見る' : 'シンプル画面を見る'}</button></div>}
       <header className="topbar">
         <div className="brand">
           <button type="button" className="brand-mark" onClick={scrollToPageTop} aria-label="ページの先頭へ戻る">
@@ -2775,7 +2827,21 @@ export default function App() {
           </div>
         </div>
         <div className="topbar-actions">
-          <nav className="page-switcher" aria-label="画面切替">
+          {simpleDesign ? <nav className="simple-nav" aria-label="画面切替">
+            <button type="button" onClick={() => switchPage('solar')}>候補地を調べる</button>
+            <button type="button" onClick={() => switchPage('power')}>系統確認</button>
+            <details className="simple-tools"><summary>業務ツール</summary><div className="simple-tools-menu" onClick={(event) => { if (event.target.closest('button, a')) event.currentTarget.parentElement.open = false }}>
+              <button type="button" onClick={() => switchPage('pdf')}>PDFツール</button>
+              <button type="button" onClick={() => switchPage('inheritance')}>相続登記チェック</button>
+              <button type="button" onClick={openSolarManual}>Solar Pro入力ガイド</button>
+              <button type="button" onClick={() => { switchPage('solar'); window.setTimeout(() => { const section = document.querySelector('.knowledge-disclosure'); if (section) section.open = true; document.getElementById('solar-tips')?.scrollIntoView({ behavior: 'smooth' }) }, 0) }}>資料・リンク集</button>
+              <button type="button" onClick={() => { switchPage('solar'); setDrawingPanelOpen(true); window.setTimeout(() => document.getElementById('drawing-utility')?.scrollIntoView({ behavior: 'smooth' }), 0) }}>図面PDF → JPG</button>
+              <a href={SITE_OPERATION_GUIDE_URL} target="_blank" rel="noreferrer">操作マニュアル PDF ↗</a>
+              <a href={GROUNDY_URL} target="_blank" rel="noreferrer">Groundy ↗</a>
+              <a href={SOLAR_PRO_PORTAL_URL} target="_blank" rel="noreferrer">Solar Pro 管理・DL ↗</a>
+              <button type="button" onClick={resetWorkTools}>作業内容を初期化</button>
+            </div></details>
+          </nav> : <nav className="page-switcher" aria-label="画面切替">
             <button
               type="button"
               className={activePage === 'solar' && !solarManualActive ? 'page-switcher__button page-switcher__button--active' : 'page-switcher__button'}
@@ -2783,6 +2849,7 @@ export default function App() {
             >
               太陽光チェック
             </button>
+            <button type="button" className={activePage === 'power' ? 'page-switcher__button page-switcher__button--active' : 'page-switcher__button'} onClick={() => switchPage('power')}>系統確認</button>
             <button
               type="button"
               className={activePage === 'solar' && solarManualActive ? 'page-switcher__button page-switcher__button--active' : 'page-switcher__button'}
@@ -2804,18 +2871,33 @@ export default function App() {
             >
               PDFツール
             </button>
-          </nav>
-          <button type="button" className="reset-work-button" onClick={resetWorkTools}>
+          </nav>}
+          {!simpleDesign && <button type="button" className="reset-work-button" onClick={resetWorkTools}>
             初期化
-          </button>
-          <div className="status-pill"><span></span>作業補助ツール</div>
+          </button>}
+          {!simpleDesign && <div className="status-pill"><span></span>作業補助ツール</div>}
         </div>
       </header>
 
       <main>
+        {activePage === 'power' && <Suspense fallback={<p>系統確認マップを読み込んでいます…</p>}><PowerGridPage
+          position={position} placeLabel={selectedPlaceLabel} powerGrid={powerGrid} gridCapacity={gridCapacity} capacityMatches={capacityMatches}
+          annualYield={solarProMemo.annualYield} generation={generation} onGenerationChange={setGeneration}
+          onCheck={handlePowerGridCheck} onLoadCapacity={handleBundledGridCapacity} onBack={() => switchPage('solar')}
+          onReport={() => { switchPage('solar'); window.setTimeout(() => { const report = document.querySelector('.report-disclosure'); if (report) report.open = true; document.getElementById('report-preview')?.scrollIntoView({ behavior: 'smooth' }) }, 100) }}
+        /></Suspense>}
         {activePage === 'solar' && (
           <>
-        <section className="hero">
+        {simpleDesign ? <section className="simple-hero">
+          <p className="eyebrow">太陽光の候補地調査</p>
+          <h1>この土地を、次の検討へ。</h1>
+          <p>地形・日影・積雪を確認して、Solar Pro入力と候補地レポートへ。</p>
+          <nav className="simple-steps" aria-label="調査の手順">
+            <a href="#site-select">① 地点を選ぶ</a>
+            <a href="#site-details" onClick={() => { const detail = document.getElementById('simple-analysis'); if (detail) detail.open = true }}>② 条件を確認</a>
+            <a href="#report-section" onClick={() => { const detail = document.querySelector('.report-disclosure'); if (detail) detail.open = true }}>③ レポート作成</a>
+          </nav>
+        </section> : <section className="hero">
           <div className="hero-layout">
             <div>
               <p className="eyebrow">候補地一次確認ワークスペース</p>
@@ -2844,9 +2926,9 @@ export default function App() {
               </a>
             </div>
           </div>
-        </section>
+        </section>}
 
-        <section className={`utility-panel no-print ${drawingPanelOpen ? 'utility-panel--open' : 'utility-panel--collapsed'}`}>
+        {(!simpleDesign || drawingPanelOpen) && <section id="drawing-utility" className={`utility-panel no-print ${drawingPanelOpen ? 'utility-panel--open' : 'utility-panel--collapsed'}`}>
           <div>
             <div className="utility-title-with-help">
               <strong>補助ツール：図面PDF→JPG</strong>
@@ -2896,7 +2978,7 @@ export default function App() {
               </div>
             </div>
           )}
-        </section>
+        </section>}
 
         <div className="workflow">
           <section className="panel map-panel" id="site-select">
@@ -3043,7 +3125,11 @@ export default function App() {
             />
 
             <div className="map-analysis-strip">
-              <div className="selected-point-mini">
+              {simpleDesign ? <div className="simple-point">
+                <div className="simple-point-title"><span>選択地点</span><strong>{position ? selectedPlaceLabel || '住所を確認中' : '住所検索または地図で地点を選択'}</strong></div>
+                <div className="simple-point-meta"><span>{position ? selectedCoordinateText : '緯度・経度 —'}</span><span>標高 <b>{elevation.status === 'success' ? `${elevation.value.toFixed(1)} m` : elevation.status === 'loading' ? '取得中…' : '—'}</b></span></div>
+                <div className="simple-point-actions">{position && <><button type="button" onClick={copySelectedCoordinates}>緯度経度コピー</button><a href={googleMapsUrl} target="_blank" rel="noreferrer">Google マップ ↗</a></>}{pointActionStatus && <span role="status">{pointActionStatus}</span>}</div>
+              </div> : <div className="selected-point-mini">
                 <span>選択地点</span>
                 <strong>{position ? `${toDegreeMinutes(position.lat, 'lat')} / ${toDegreeMinutes(position.lon, 'lon')}` : '地図で地点を選択'}</strong>
                 <small>
@@ -3059,7 +3145,7 @@ export default function App() {
                   </button>
                 )}
                 {pointActionStatus && <em>{pointActionStatus}</em>}
-              </div>
+              </div>}
               <div className="terrain-section-quick">
                 <div>
                   <strong>
@@ -3102,17 +3188,7 @@ export default function App() {
               )}
               {terrainSectionOpen && <TerrainSectionPreview analysis={terrainSection} />}
             </div>
-            <PowerGridCheckPanel
-              position={position}
-              powerGrid={powerGrid}
-              gridCapacity={gridCapacity}
-              capacityMatches={capacityMatches}
-              placeCapacityCandidates={placeCapacityCandidates}
-              matchedCapacityArea={matchedCapacityArea}
-              onCheck={handlePowerGridCheck}
-              onBundledCapacity={handleBundledGridCapacity}
-              onCapacityFile={handleGridCapacityFile}
-            />
+            <button type="button" className="power-page-link" disabled={!position} onClick={() => switchPage('power')}>この地点の系統を確認 →</button>
             {selectedParcel && (
               <div className="selected-parcel-card">
                 <div>
@@ -3130,6 +3206,16 @@ export default function App() {
           </section>
 
           <section className="panel details-panel" id="site-details">
+            {simpleDesign && <div className="simple-review">
+              <div className="simple-review-heading"><div><span className="simple-kicker">候補地の確認</span><h2>必要な情報を、順番に。</h2></div><span>{analysisCount} / 3 取得済み</span></div>
+              <div className="simple-review-grid">
+                <a href="#site-select" className="simple-review-item"><span>01　地形断面</span><strong>{terrainSectionStatus === 'success' ? `周辺${terrainSectionRange}m · 取得済み` : terrainSectionStatus === 'loading' ? '標高を取得中…' : terrainSectionStatus === 'error' ? '再取得が必要' : '未取得'}</strong><small>東西・南北の高低差を確認</small><em>地図・断面へ ↑</em></a>
+                <button type="button" className="simple-review-item" onClick={() => openSimpleSection('simple-horizon')}><span>02　地平線・日影</span><strong>{terrainStatus === 'loading' ? '地平線を分析中…' : ['success', 'manual'].includes(terrainStatus) ? '分析済み' : terrainStatus === 'error' ? '再分析が必要' : '未分析'}</strong><small>周辺地形と冬の太陽を比較</small><em>分析・結果を確認 →</em></button>
+                <button type="button" className="simple-review-item" onClick={() => openSimpleSection('simple-snow')}><span>03　NEDO積雪</span><strong>{confirmedSnowStation ? '同一メッシュ確認済み' : snowData.status === 'loading' ? '積雪データを取得中…' : snowData.status === 'error' ? '取得結果を確認' : '未取得'}</strong><small>月別の積雪補正値を確認</small><em>取得・入力値を確認 →</em></button>
+              </div>
+            </div>}
+            <AnalysisContainer id="simple-analysis" className="simple-analysis">
+            {simpleDesign && <summary className="simple-analysis-summary"><span>分析の詳細・入力値</span><small>グラフ、補正値、候補地名・メモを編集</small></summary>}
             <div className="section-heading">
               <div className="step-number">2</div>
               <div><h2>候補地情報を確認</h2><p>自動取得値は原資料で補正できます</p></div>
@@ -3158,7 +3244,7 @@ export default function App() {
                   {elevation.status === 'idle' && '標高 —'}
                 </small>
               </div>
-              <div className="field-block">
+              <div className="field-block" id="simple-horizon">
                 <div className="field-label-row">
                   <span>地平線仰角</span>
                   <div className="field-label-actions">
@@ -3315,7 +3401,7 @@ export default function App() {
                 )}
               </div>
 
-              <div className="field-block snow-block">
+              <div className="field-block snow-block" id="simple-snow">
                 <div className="field-label-row">
                   <span>NEDO 積雪10cm以上出現率</span>
                   <div className="field-label-actions">
@@ -3543,6 +3629,7 @@ export default function App() {
               <label><span>候補地メモ</span><textarea value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="土地利用、接道、系統連系、周辺施設など" rows="3" /></label>
               <label><span>現地確認メモ</span><textarea value={fieldMemo} onChange={(e) => setFieldMemo(e.target.value)} placeholder="樹木・建物などの遮蔽物、傾斜、搬入路、写真番号など" rows="4" /></label>
             </div>
+            </AnalysisContainer>
           </section>
         </div>
 
@@ -3609,6 +3696,7 @@ export default function App() {
             </div>
           </details>
         </section>
+
 
         <div className="support-sections">
           <section className="manual-section panel" id="solar-manual">

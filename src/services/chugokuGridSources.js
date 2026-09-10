@@ -2,6 +2,14 @@ export const CHUGOKU_GRID_SOURCE_PAGE = 'https://www.energia.co.jp/nw/service/re
 
 export const CHUGOKU_GRID_AREAS = Object.freeze([
   {
+    id: 'yamaguchi',
+    label: '山口県',
+    prefectures: ['山口県'],
+    pdfUrl: 'https://www.energia.co.jp/nw/service/retailer/keitou/access/pdf/mapping_yama.pdf',
+    mappingUrl: 'https://www.energia.co.jp/nw/service/retailer/keitou/access/pdf/mapping_yama.pdf',
+    dataUrl: 'https://www.energia.co.jp/nw/service/retailer/keitou/access/zip/csv_yama.zip',
+  },
+  {
     id: 'hiroshima',
     label: '広島県',
     prefectures: ['広島県'],

@@ -70,7 +70,8 @@ test('power grid parser handles voltage labels and 11-110kV target summary', () 
 })
 
 test('Chugoku NW grid source definitions cover target prefectures and official ZIP URLs', () => {
-  assert.equal(CHUGOKU_GRID_AREAS.length, 4)
+  assert.equal(CHUGOKU_GRID_AREAS.length, 5)
+  assert.equal(findChugokuGridAreaByAddress('山口県 宇部市')?.id, 'yamaguchi')
   assert.equal(findChugokuGridAreaByAddress('広島県 神石高原町')?.id, 'hiroshima')
   assert.equal(findChugokuGridAreaByAddress('岡山県 真庭市')?.id, 'okayama')
   assert.equal(findChugokuGridAreaByAddress('島根県 邑智郡')?.id, 'shimane')
@@ -121,7 +122,8 @@ test('power grid Overpass query stays scoped to line, substation and support dat
   assert.match(query, /node\(around:5000,35\.0000000,139\.0000000\)\["power"="substation"\]/)
   assert.match(query, /node\(around:5000,35\.0000000,139\.0000000\)\["power"="tower"\]/)
   assert.match(query, /node\(around:5000,35\.0000000,139\.0000000\)\["power"="pole"\]/)
-  assert.doesNotMatch(query, /relation/)
+  assert.match(query, /relation\(around:5000.*\["power"="substation"\]/)
+  assert.match(query, /rel\(bw\)\["route"="power"\]/)
 })
 
 test('power grid progressive search expands until both line and substation are found', async () => {
