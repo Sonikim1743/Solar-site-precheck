@@ -2,7 +2,8 @@ import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { cp, mkdir, mkdtemp, readdir, readFile, writeFile, rm } from 'node:fs/promises'
 import { join, resolve, relative, sep } from 'node:path'
-import { createRequire } from 'node:module'
+import { builtinModules } from 'node:module'
+import { build as validateWithVite } from 'vite'
 import { zipSync, unzipSync } from 'fflate'
 import { verifyBrowserAssets } from './verifyBrowserAssets.js'
 
@@ -32,8 +33,13 @@ async function files(directory, prefix = '') {
 }
 
 run('build/buildRuntimeServer.js')
-const require = createRequire(import.meta.url)
-const { build: bundle } = require(createRequire(require.resolve('vite/package.json')).resolve('esbuild'))
+const nodeBuiltins = new Set(builtinModules.map((name) => name.replace(/^node:/, '')))
+const edgeRuntimeGuard = {
+  name: 'validate-edge-runtime',
+  resolveId(id) {
+    if (id.startsWith('node:') || nodeBuiltins.has(id)) this.error(`Node-only dependency in Cloudflare function: ${id}`)
+  },
+}
 const packages = []
 for (const target of ['cloudflare', 'portable']) {
   const directory = join(output, target)
@@ -60,7 +66,12 @@ for (const target of ['cloudflare', 'portable']) {
     await copy('shared', join(directory, 'shared'))
     await copy('wrangler.pages.toml', join(directory, 'wrangler.toml'))
     const entries = (await readdir(join(directory, 'functions/api'))).filter((name) => name.endsWith('.js'))
-    for (const entry of entries) await bundle({ entryPoints: [join(directory, 'functions/api', entry)], bundle: true, write: false, platform: 'browser', format: 'esm', target: 'es2022' })
+    // Use the project's library bundler. Direct esbuild file resolution can fail
+    // while walking protected parent directories in Windows sandbox accounts.
+    for (const entry of entries) await validateWithVite({
+      configFile: false, publicDir: false, logLevel: 'error', plugins: [edgeRuntimeGuard],
+      build: { write: false, minify: false, target: 'es2022', lib: { entry: join(directory, 'functions/api', entry), formats: ['es'] } },
+    })
   } else {
     for (const file of ['RUN_PORTABLE.cmd', 'UPDATE_APP_FROM_RELEASE.cmd', 'UPDATE_APP_FROM_RELEASE.ps1', 'work/serve-dist.mjs', 'work/inheritance-server.mjs']) {
       await copy(file, join(directory, file))
