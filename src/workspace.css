@@ -1,0 +1,82 @@
+.workspace-nav { display:flex; align-items:center; gap:8px; }
+.workspace-nav > button,.workspace-tools > summary { border:0; background:transparent; color:#526a61; font-size:14px; font-weight:600; padding:10px 14px; border-radius:7px; white-space:nowrap; cursor:pointer; }
+.workspace-nav > button[aria-current=page] { color:#12563f; background:#e7f2eb; }
+.workspace-tools { position:relative; }
+.workspace-tools > summary { list-style:none; border:1px solid #d9e4df; }
+.workspace-tools > summary::after { content:'⌄'; margin-left:10px; }
+.workspace-tools-menu { position:absolute; top:calc(100% + 8px); right:0; width:270px; max-height:70vh; overflow:auto; display:grid; padding:10px; background:white; border:1px solid #d9e4df; border-radius:10px; box-shadow:0 12px 32px #173e331c; z-index:1100; }
+.workspace-tools-menu button,.workspace-tools-menu a { display:block; width:100%; text-align:left; border:0; border-radius:5px; background:white; color:#244f3f; padding:10px 12px; font-size:14px; text-decoration:none; }
+.workspace-tools-menu button:hover,.workspace-tools-menu a:hover { background:#f0f6f2; }
+.workspace-tools-menu hr { width:100%; border:0; border-top:1px solid #e3eae6; }
+.workspace-nav button:focus-visible,.workspace-tools summary:focus-visible,.workspace-tools-menu a:focus-visible,.candidate-workflow button:focus-visible { outline:3px solid #3d9677; outline-offset:2px; }
+.workspace-heading { padding:4px 0 18px; }
+.workspace-heading h1 { margin:0 0 5px; font-size:26px; line-height:1.4; letter-spacing:-.02em; }
+.workspace-heading p { margin:0; font-size:16px; color:#61726c; }
+.candidate-workflow { margin:22px 0; background:white; border:1px solid #d9e4df; border-radius:10px; overflow:hidden; }
+.candidate-workflow__context { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:13px 18px; background:#f7faf8; border-bottom:1px solid #e0e8e3; }
+.candidate-workflow__context > div { min-width:0; }
+.candidate-workflow__context > div > span { color:#63786e; font-size:12px; margin-right:12px; }
+.candidate-workflow__context strong { font-size:15px; font-weight:600; overflow-wrap:anywhere; }
+.candidate-workflow__context p { font-size:12px; color:#63786e; margin:0; }
+.candidate-workflow__context p span { margin:0 8px; }
+.candidate-workflow__steps { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); }
+.candidate-workflow__steps button { display:flex; align-items:center; gap:10px; min-width:0; padding:16px; border:0; border-right:1px solid #e0e8e3; background:white; color:#244f3f; text-align:left; }
+.candidate-workflow__steps button:last-child { border-right:0; }
+.candidate-workflow__steps button:hover:not(:disabled) { background:#eef6f1; }
+.candidate-workflow__steps button > span:nth-child(2) { min-width:0; }
+.candidate-workflow__steps b { display:block; font-size:15px; }
+.candidate-workflow__steps small { display:block; font-size:12px; color:#657b70; margin-top:3px; overflow-wrap:anywhere; }
+.candidate-workflow__number { color:#6c887a; font-size:13px; }
+.candidate-workflow__arrow { margin-left:auto; color:#6c887a; }
+.solar-generation { margin:22px 0; padding:22px; background:white; border:1px solid #d9e4df; border-radius:10px; }
+.solar-generation__heading { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.solar-generation h2 { font-size:22px; margin:0 0 5px; }
+.solar-generation p { margin:6px 0; }
+.solar-generation .generation-panel { margin-bottom:0; }
+.generation-panel label { display:flex; flex-direction:column; gap:6px; font-size:14px; color:#435e70; }
+.generation-panel select { width:100%; min-height:44px; border:1px solid #cbd8df; border-radius:6px; background:white; padding:10px; color:inherit; }
+.generation-panel form > button { font-size:14px; padding:11px 16px; border:1px solid #cbd8df; border-radius:7px; background:white; }
+.generation-panel form > button.power-page__primary { background:#126a64; border-color:#126a64; color:white; }
+.generation-panel .power-page__footnote { font-size:13px; line-height:1.7; }
+.report-readiness { display:flex; align-items:center; justify-content:space-between; gap:18px; padding:16px; background:#f6f9f7; border:1px solid #dce7e0; border-radius:8px; margin-bottom:16px; }
+.report-readiness strong { font-size:16px; }
+.report-readiness p { font-size:14px; color:#596f63; margin:5px 0 0; }
+.report-readiness__actions { display:flex; flex-wrap:wrap; gap:8px; flex-shrink:0; }
+.report-readiness__actions button { font-size:14px; }
+.app #site-select,.app #site-details,.app #solar-generation,.app #report-section,.app #solar-manual,.app #solar-tips,.app #generation-panel { scroll-margin-top:100px; }
+@media screen {
+  .app:not(.app--simple) .topbar { height:auto; min-height:76px; padding-top:12px; padding-bottom:12px; gap:12px; }
+  .app:not(.app--simple) .topbar-actions { flex:none; width:auto; max-width:100%; }
+  .power-page__map { height:clamp(390px,62vh,620px); }
+  .power-page__inspector { max-height:calc(clamp(390px,62vh,620px) + 75px); }
+}
+@media(max-width:1000px) {
+  .candidate-workflow__context { align-items:flex-start; flex-direction:column; gap:4px; }
+  .candidate-workflow__steps button { padding:13px 10px; gap:7px; }
+  .candidate-workflow__arrow { display:none; }
+}
+@media(max-width:760px) {
+  .app:not(.app--simple) .topbar { padding:12px 20px; flex-wrap:wrap; }
+  .workspace-nav { gap:4px; flex-wrap:wrap; }
+  .workspace-nav > button,.workspace-tools > summary { padding:8px 10px; }
+  .workspace-heading h1 { font-size:23px; }
+  .candidate-workflow { margin:16px 0; }
+  .candidate-workflow__context { padding:12px; }
+  .candidate-workflow__context > div > span { display:block; margin-bottom:3px; }
+  .candidate-workflow__steps { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .candidate-workflow__steps button:nth-child(2) { border-right:0; }
+  .candidate-workflow__steps button:nth-child(-n+2) { border-bottom:1px solid #e0e8e3; }
+  .candidate-workflow__steps b { font-size:14px; }
+  .solar-generation { padding:16px; }
+  .solar-generation__heading,.report-readiness { flex-direction:column; align-items:flex-start; }
+  .power-page__map { height:380px; }
+  .power-page__inspector { max-height:none; }
+  .app #site-select,.app #site-details,.app #solar-generation,.app #report-section,.app #solar-manual,.app #solar-tips,.app #generation-panel { scroll-margin-top:145px; }
+}
+@media(max-width:480px) {
+  .workspace-tools-menu { position:fixed; top:132px; right:18px; left:18px; width:auto; }
+}
+@media print { .solar-generation { display:none !important; } }
+
+.candidate-workflow__notice { margin:0; padding:12px 18px; background:#fff8e9; color:#765c24; font-size:14px; }
+@media(max-width:480px) { .workspace-tools-menu { max-height:calc(100dvh - 148px); } }
