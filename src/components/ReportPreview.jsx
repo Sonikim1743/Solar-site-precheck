@@ -776,6 +776,7 @@ export default function ReportPreview({ report }) {
   return (
     <section className="report-card report-card--print-set" id="report-preview">
       <ReportPage page="1" title="候補地チェックレポート" subtitle={reportTitle} className="report-cover-page">
+        {report.reviewRecordInfo && <p className="report-note">保存記録から再開：{new Date(report.reviewRecordInfo.savedAt).toLocaleString('ja-JP')} / 元のアプリ v{report.reviewRecordInfo.appVersion}。出典の再取得・原本との再照合前の記録です。{report.reviewRecordInfo.kind === 'example' && ' 仮条件の操作練習例です。'}</p>}
         <div className="report-cover-layout">
           <div>
             <p className="report-cover-kicker">Solar Site Precheck</p>
@@ -890,6 +891,7 @@ export default function ReportPreview({ report }) {
               <p className="report-source-line">
                 {station.name} / 北緯 {station.latDeg}度 {station.latMin.toFixed(1)}分 / 東経 {station.lonDeg}度 {station.lonMin.toFixed(1)}分 / 標高 {Number.isFinite(station.elevation) ? `${station.elevation}m` : 'PDF読取未確定'}
               </p>
+              {station.mode === 'manual-corrected' && <p>月別値は手動補正あり。NEDO原本の年・季節集計値とは一致しない場合があります。</p>}
               <SnowCompactTable station={station} snowBase={report.snowBase} />
               <p className="formula-note formula-note--with-legend">
                 <span className="formula-note__main">発電量係数 = {report.snowBase.toFixed(2)} − 積雪深10cm以上の出現率</span>
@@ -906,7 +908,7 @@ export default function ReportPreview({ report }) {
           <dl>
             <div>
               <dt>標高</dt>
-              <dd>{report.elevationSource || '未取得'} / 取得 {buildDate}</dd>
+              <dd>{report.elevationSource || '未取得'} / 取得日時は記録対象外（アプリビルド {buildDate}）</dd>
             </div>
             <div>
               <dt>標高精度</dt>
@@ -950,8 +952,12 @@ export default function ReportPreview({ report }) {
           </dl><table><thead><tr><th>月</th><th>参考発電量（kWh）</th></tr></thead><tbody>{report.generation.monthly.map(row => <tr key={row.month}><td>{row.month}月</td><td>{Math.round(row.kwh).toLocaleString('ja-JP')}</td></tr>)}</tbody></table>
           <p className="report-note">結晶シリコン・架台設置・固定式。PVGIS標準地平線を使用。アプリで調べた樹木・建物の日影、NEDO積雪係数、個別PCS制約、系統出力制御は未反映です。</p></>}
           {report.solarProMemo?.annualYield && <p>Solar Pro年間発電量（入力値）：{report.solarProMemo.annualYield}</p>}
-        </div><div className="report-data-block"><h3>次の検討</h3><p>周辺設備の距離と名称・設備番号を確認し、電力会社の系統図・公表資料で接続点の候補を整理します。選択設備の番号・資料更新日は系統画面から「設備確認メモを保存」で別途記録できます。</p><p>発電量と系統空容量は別の確認項目です。空容量から出力制御率を算定せず、接続点・工事費・工期・制御条件を電力会社に確認してから事業性を検討します。</p></div>
+        </div><div className="report-data-block"><h3>次の検討</h3><p>周辺設備の距離と名称・設備番号を確認し、電力会社の系統図・公表資料で接続点の候補を整理します。選択設備の番号・資料更新日は系統画面から「設備確認メモを保存」で記録できます。保存したメモはこのレポートの末尾に表示します。</p><p>発電量と系統空容量は別の確認項目です。空容量から出力制御率を算定せず、接続点・工事費・工期・制御条件を電力会社に確認してから事業性を検討します。</p></div>
       </ReportPage>}
+      {(report.gridNotes || []).map((note, index) => <ReportPage key={note.id} page={String(5 + (report.powerGrid ? 1 : 0) + (report.generation || report.solarProMemo?.annualYield ? 1 : 0) + index)} title="設備確認記録" subtitle={note.title}>
+        <p className="report-note">保存時の確認内容です。現在の公表資料との再照合は行っていません。記録日時：{new Date(note.recordedAt).toLocaleString('ja-JP')}</p>
+        <pre className="report-saved-grid-note">{note.text}</pre>
+      </ReportPage>)}
     </section>
   )
 }

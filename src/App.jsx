@@ -9,6 +9,10 @@ import CandidateWorkflow from './components/CandidateWorkflow.jsx'
 import { createCandidateRequests } from './utils/candidateRequests.js'
 import { generationCsvRows } from './utils/generationCsv.js'
 import './workspace.css'
+import './review-records.css'
+import ReviewRecordsPanel from './components/ReviewRecordsPanel.jsx'
+import UseCasesGuide from './components/UseCasesGuide.jsx'
+import { createReviewRecord, parseReviewRecord, reviewRecordFilename, exampleReviewRecord, MAX_REVIEW_BYTES } from './utils/reviewRecord.js'
 import HorizonGraphPreview from './components/HorizonGraphPreview.jsx'
 import TerrainSectionPreview from './components/TerrainSectionPreview.jsx'
 import SolarProPreviewButton from './components/SolarProPreviewButton.jsx'
@@ -581,15 +585,20 @@ export default function App() {
   const [terrain, setTerrain] = useState(
     draftSeed.terrainAnalysisVersion === TERRAIN_ANALYSIS_VERSION ? (draftSeed.terrain || null) : null,
   )
-  const [terrainSection, setTerrainSection] = useState(null)
-  const [terrainSectionStatus, setTerrainSectionStatus] = useState('idle')
+  const [terrainSection, setTerrainSection] = useState(draftSeed.terrainSection || null)
+  const [terrainSectionStatus, setTerrainSectionStatus] = useState(draftSeed.terrainSection ? 'success' : 'idle')
   const [terrainSectionOpen, setTerrainSectionOpen] = useState(false)
-  const [terrainSectionRange, setTerrainSectionRange] = useState(100)
+  const [terrainSectionRange, setTerrainSectionRange] = useState(draftSeed.terrainSection?.rangeMeters || 100)
   const [powerGrid, setPowerGrid] = useState({ status: 'idle', data: null, message: '' })
   const powerGridRequestSeq = useRef(0)
   const candidateRequests = useRef(createCandidateRequests())
   const [candidateRevision, setCandidateRevision] = useState(0)
   const [generationNotice, setGenerationNotice] = useState('')
+  const [gridNotes, setGridNotes] = useState(Array.isArray(draftSeed.gridNotes) ? draftSeed.gridNotes : [])
+  const [recordInfo, setRecordInfo] = useState(draftSeed.reviewRecordInfo || null)
+  const [pendingRecord, setPendingRecord] = useState(null)
+  const [undoRecord, setUndoRecord] = useState(null)
+  const [recordStatus, setRecordStatus] = useState({ message: '', error: false })
   const [generation, setGeneration] = useState(() => generationAtPosition(draftSeed.generation, draftSeed.position) ? draftSeed.generation : null)
   const [generationInputs, setGenerationInputs] = useState(() => draftSeed.generationInputs || draftSeed.generation?.inputs || { peakpower: 50, angle: 20, aspect: 0, loss: 14 })
   const [gridCapacity, setGridCapacity] = useState({ status: 'idle', data: null, message: '' })
@@ -598,7 +607,7 @@ export default function App() {
   const [detailedHorizon, setDetailedHorizon] = useState(
     draftSeed.detailedHorizon ?? (draftSeed.terrain?.samples?.length > HORIZON_DIRECTIONS.length),
   )
-  const [terrainStatus, setTerrainStatus] = useState('idle')
+  const [terrainStatus, setTerrainStatus] = useState(draftSeed.terrainAnalysisVersion === TERRAIN_ANALYSIS_VERSION && draftSeed.terrain ? 'success' : 'idle')
   const [horizonPanelOpen, setHorizonPanelOpen] = useState(false)
   const [horizonExportMessage, setHorizonExportMessage] = useState('')
   const [address, setAddress] = useState('')
@@ -606,12 +615,12 @@ export default function App() {
   const [searchStatus, setSearchStatus] = useState('idle')
   const [currentLocation, setCurrentLocation] = useState(null)
   const [locationStatus, setLocationStatus] = useState({ status: 'idle', message: '' })
-  const [placeInfo, setPlaceInfo] = useState(initialPlaceInfo)
+  const [placeInfo, setPlaceInfo] = useState(draftSeed.reviewRecordInfo && draftSeed.recordPlaceLabel ? { status: 'success', data: { label: draftSeed.recordPlaceLabel, source: '検討記録（保存時）' }, message: '', positionKey: analysisPositionKey(draftSeed.position) } : initialPlaceInfo)
   const [placeApiStatus, setPlaceApiStatus] = useState(initialPlaceApiStatus)
   const [parcelData, setParcelData] = useState(null)
   const [parcelQuery, setParcelQuery] = useState('')
   const [parcelStatus, setParcelStatus] = useState({ status: 'idle', message: '' })
-  const [selectedParcel, setSelectedParcel] = useState(null)
+  const [selectedParcel, setSelectedParcel] = useState(draftSeed.selectedParcel || null)
   const [focusParcelId, setFocusParcelId] = useState(null)
   const [siteName, setSiteName] = useState(typeof draftSeed.siteName === 'string' ? draftSeed.siteName : '')
   const [siteNameTouched, setSiteNameTouched] = useState(Boolean(draftSeed.siteNameTouched))
@@ -695,6 +704,8 @@ export default function App() {
           solarProMemo,
           generation,
           generationInputs, siteName, siteNameTouched, memo, fieldMemo,
+          gridNotes, reviewRecordInfo: recordInfo, terrainSection, selectedParcel,
+          recordPlaceLabel: placeInfo.status === 'success' ? placeInfo.data.label : '',
         }))
       } catch {
         // Storage can be unavailable or full; the app should continue to work without draft persistence.
@@ -702,7 +713,7 @@ export default function App() {
     }, 200)
 
     return () => window.clearTimeout(draftSaveTimer.current)
-  }, [position, elevation, terrain, obstructionHeight, detailedHorizon, snowData.station, snowBase, solarProMemo, generation, generationInputs, siteName, siteNameTouched, memo, fieldMemo])
+  }, [position, elevation, terrain, obstructionHeight, detailedHorizon, snowData.station, snowBase, solarProMemo, generation, generationInputs, siteName, siteNameTouched, memo, fieldMemo, gridNotes, recordInfo, terrainSection, selectedParcel, placeInfo])
 
   useEffect(() => {
     if (position && placeInfo.status === 'idle') schedulePlaceInfo(position)
@@ -854,6 +865,11 @@ export default function App() {
   }
 
   function resetCandidateInputs() {
+    setGridNotes([])
+    setRecordInfo(null)
+    setPendingRecord(null)
+    setUndoRecord(null)
+    setRecordStatus({ message: '', error: false })
     setSolarProMemo({ ...initialSolarProMemo })
     setSiteName('')
     setSiteNameTouched(false)
@@ -925,6 +941,10 @@ export default function App() {
     setPdfProgress('')
     powerGridRequestSeq.current += 1
     setGeneration(null)
+    setGridNotes([])
+    setRecordInfo(null)
+    setPendingRecord(null)
+    setUndoRecord(null)
     const { resetCandidate = true } = options
     if (resetCandidate) resetCandidateInputs()
     setPosition(nextPosition)
@@ -954,6 +974,19 @@ export default function App() {
     }
   }
 
+  async function fetchMissingElevation() {
+    if (!position) return
+    const isCurrent = candidateRequests.current.start('elevation')
+    setElevation({ status: 'loading', value: null, source: '', message: '' })
+    try {
+      const result = await fetchElevation(position.lat, position.lon)
+      if (!isCurrent()) return
+      setElevation({ status: 'success', value: result.value, source: result.dataSource, message: '' })
+    } catch (error) {
+      if (isCurrent()) setElevation({ status: 'error', value: null, source: '', message: '標高を取得できませんでした。もう一度お試しください。' })
+    }
+  }
+
   async function handleAddressSearch(event) {
     event.preventDefault()
     const query = address.trim()
@@ -968,14 +1001,16 @@ export default function App() {
       return
     }
 
+    const isCurrent = candidateRequests.current.start('address-search')
     setSearchStatus('loading')
     setAddressResults([])
     try {
       const results = await searchAddress(query)
+      if (!isCurrent()) return
       setAddressResults(results)
       setSearchStatus(results.length ? 'success' : 'empty')
     } catch {
-      setSearchStatus('error')
+      if (isCurrent()) setSearchStatus('error')
     }
   }
 
@@ -1000,9 +1035,11 @@ export default function App() {
       return
     }
 
+    const isCurrent = candidateRequests.current.start('geolocation')
     setLocationStatus({ status: 'loading', message: '位置情報の許可を確認しています…' })
     navigator.geolocation.getCurrentPosition(
       (result) => {
+        if (!isCurrent()) return
         const nextLocation = {
           lat: result.coords.latitude,
           lon: result.coords.longitude,
@@ -1018,6 +1055,7 @@ export default function App() {
         selectPosition({ lat: nextLocation.lat, lon: nextLocation.lon })
       },
       (error) => {
+        if (!isCurrent()) return
         const message = error.code === error.PERMISSION_DENIED
           ? '位置情報の利用が許可されませんでした。ブラウザ設定を確認してください。'
           : error.code === error.TIMEOUT
@@ -1033,11 +1071,13 @@ export default function App() {
     const file = event.target.files?.[0]
     event.target.value = ''
     if (!file) return
+    const isCurrent = candidateRequests.current.start('cadastre-import')
     setParcelStatus({ status: 'loading', message: '地番データを読み込んでいます…' })
     try {
       const data = await readCadastreFile(file, (message) => {
-        setParcelStatus({ status: 'loading', message })
+        if (isCurrent()) setParcelStatus({ status: 'loading', message })
       }, { focus: position, radiusKm: 3 })
+      if (!isCurrent()) return
       setParcelData(data)
       setParcelQuery('')
       setSelectedParcel(null)
@@ -1049,6 +1089,7 @@ export default function App() {
           (data.summary.conversionSkipped ? ` / 変換不可 ${data.summary.conversionSkipped.toLocaleString()}ファイル` : ''),
       })
     } catch (error) {
+      if (!isCurrent()) return
       setParcelData(null)
       setParcelStatus({ status: 'error', message: error.message })
     }
@@ -1171,6 +1212,7 @@ export default function App() {
   async function handleGridCapacityFile(event) {
     const file = event.target.files?.[0]
     if (!file) return
+    const isCurrent = candidateRequests.current.start('grid-capacity')
     setGridCapacity((current) => ({
       status: 'loading',
       data: current.data,
@@ -1178,12 +1220,14 @@ export default function App() {
     }))
     try {
       const data = await parseGridCapacityFile(file)
+      if (!isCurrent()) return
       setGridCapacity({
         status: 'success',
         data,
         message: `公開空容量資料を読み込みました（送電線 ${data.lines.length}件、変電所 ${data.substations.length}件）。`,
       })
     } catch (error) {
+      if (!isCurrent()) return
       setGridCapacity((current) => ({
         status: 'error',
         data: current.data,
@@ -1195,6 +1239,7 @@ export default function App() {
   }
 
   async function handleBundledGridCapacity() {
+    const isCurrent = candidateRequests.current.start('grid-capacity')
     const matchedArea = findChugokuGridAreaByAddress([selectedPlaceLabel, siteName].filter(Boolean).join(' '))
     const areaLabel = matchedArea?.label || '中国電力NW'
     setGridCapacity((current) => ({
@@ -1204,12 +1249,14 @@ export default function App() {
     }))
     try {
       const data = await loadBundledChugokuGridCapacity('')
+      if (!isCurrent()) return
       setGridCapacity({
         status: 'success',
         data,
         message: '中国電力NW（広島・岡山・島根・鳥取）の公開DBを準備しました。設備名・設備番号で検索できます。',
       })
     } catch (error) {
+      if (!isCurrent()) return
       setGridCapacity((current) => ({
         status: 'error',
         data: current.data,
@@ -2601,11 +2648,112 @@ export default function App() {
     fieldMemo,
     solarProMemo,
     generation,
+    gridNotes,
+    reviewRecordInfo: recordInfo,
     powerGrid: powerGrid.data,
     gridCapacity: gridCapacity.data,
     capacityMatches,
     placeCapacityCandidates,
-  }), [position, elevation, terrain, terrainSection, siteName, selectedParcel, confirmedSnowStation, expectedSnowMesh, meshBoundary, snowBase, obstructionHeight, solarReference, selectedPlaceLabel, memo, fieldMemo, solarProMemo, generation, powerGrid.data, gridCapacity.data, capacityMatches, placeCapacityCandidates])
+  }), [position, elevation, terrain, terrainSection, siteName, selectedParcel, confirmedSnowStation, expectedSnowMesh, meshBoundary, snowBase, obstructionHeight, solarReference, selectedPlaceLabel, memo, fieldMemo, solarProMemo, generation, gridNotes, recordInfo, powerGrid.data, gridCapacity.data, capacityMatches, placeCapacityCandidates])
+
+  function currentReviewRecord() {
+    return createReviewRecord({ report, generationDraft: generationInputs, detailedHorizon, gridNotes, kind: recordInfo?.kind || 'review' })
+  }
+
+  function saveReviewRecord() {
+    try {
+      const record = currentReviewRecord()
+      const url = URL.createObjectURL(new Blob([JSON.stringify(record, null, 2) + '\n'], { type: 'application/json' }))
+      const link = document.createElement('a'); link.href = url; link.download = reviewRecordFilename(record); link.click()
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+      setRecordStatus({ message: '検討記録の保存を開始しました。ダウンロード先のファイルから再開できます。PDF原本・全設備地図・公式DB本体は含みません。', error: false })
+    } catch (error) { setRecordStatus({ message: error.message, error: true }) }
+  }
+
+  async function readReviewRecord(event) {
+    const file = event.target.files?.[0]; event.target.value = ''
+    if (!file) return
+    const isCurrent = candidateRequests.current.start('record-import')
+    setPendingRecord(null)
+    setRecordStatus({ message: '検討記録の内容を確認しています…', error: false })
+    try {
+      if (file.size > MAX_REVIEW_BYTES) throw new Error('検討記録は2MB以下のJSONファイルを選んでください。')
+      const parsed = parseReviewRecord(await file.text())
+      if (!isCurrent()) return
+      setPendingRecord(parsed)
+      setRecordStatus({ message: '内容を確認しました。候補地と記録を確認してから開いてください。', error: false })
+    } catch (error) { if (isCurrent()) setRecordStatus({ message: error.message + ' 現在の作業は変更していません。', error: true }) }
+  }
+
+  function cancelCandidateWork() {
+    candidateRequests.current.invalidateAll(); powerGridRequestSeq.current += 1; placeRequestSeq.current += 1
+    window.clearTimeout(placeRequestTimer.current); window.clearTimeout(pointActionTimer.current)
+    setCandidateRevision(current => current + 1)
+  }
+
+  function restoreReviewRecord(record) {
+    cancelCandidateWork()
+    const { candidate, inputs, results } = record
+    setPosition(candidate.position)
+    setSiteName(candidate.name); setSiteNameTouched(true); setMemo(candidate.memo); setFieldMemo(candidate.fieldMemo)
+    setSelectedParcel(candidate.parcel); setParcelData(null); setFocusParcelId(null); setParcelQuery(''); setParcelStatus({ status: 'idle', message: '' })
+    setAddress(''); setAddressResults([]); setSearchStatus('idle')
+    setCurrentLocation(null); setLocationStatus({ status: 'idle', message: '' })
+    setPlaceInfo({ status: 'success', data: { label: candidate.placeLabel || candidate.name || '保存記録の候補地', source: '検討記録（保存時）' }, message: '', positionKey: analysisPositionKey(candidate.position) })
+    setPlaceApiStatus(initialPlaceApiStatus)
+    setElevation({ status: results.elevation.value === null ? 'idle' : 'success', value: results.elevation.value, source: results.elevation.source, message: '' })
+    setTerrain(results.terrain); setTerrainStatus(results.terrain ? 'success' : 'idle'); setHorizonPanelOpen(false); setHorizonExportMessage('')
+    setTerrainSection(results.terrainSection); setTerrainSectionStatus(results.terrainSection ? 'success' : 'idle'); setTerrainSectionRange(results.terrainSection?.rangeMeters || 100); setTerrainSectionOpen(false)
+    setObstructionHeight(inputs.obstructionHeight); setDetailedHorizon(inputs.detailedHorizon); setSnowBase(inputs.snowBase)
+    setSnowData(results.snowStation ? { status: 'success', station: results.snowStation, message: '保存時の積雪記録です。原本との再照合は行っていません。' } : initialSnow)
+    setAdjacentMeshCompare({ status: 'idle', stations: [], message: '' }); setPdfProgress('')
+    setSolarProMemo(inputs.solarProMemo); setGenerationInputs(inputs.generation); setGeneration(results.generation); setGenerationNotice('')
+    setPowerGrid({ status: 'idle', data: null, message: '' }); setGridNotes(record.gridNotes)
+    setGridCapacity(current => current.status === 'loading' ? { ...current, status: current.data ? 'success' : 'idle', message: '' } : current)
+    setPointActionStatus(''); setPendingRecord(null)
+    setRecordInfo({ savedAt: record.savedAt, appVersion: record.appVersion, kind: record.kind })
+    switchPage('solar')
+  }
+
+  function applyPendingRecord() {
+    if (!pendingRecord) return
+    try {
+      const previous = { position, elevation, terrain, terrainSection, terrainSectionRange, obstructionHeight, detailedHorizon, snowBase, snowData, solarProMemo, generationInputs, generation, gridNotes, recordInfo, siteName, siteNameTouched, memo, fieldMemo, selectedParcel, parcelData, focusParcelId, parcelQuery, parcelStatus, powerGrid, placeInfo, placeApiStatus, currentLocation, locationStatus, address, addressResults, searchStatus, gridCapacity, adjacentMeshCompare, generationNotice }
+      restoreReviewRecord(pendingRecord); setUndoRecord(previous)
+      setRecordStatus({ message: '記録を開きました。結果は保存当時の値です。新しい条件で計算すると更新されます。', error: false })
+    } catch (error) { setRecordStatus({ message: error.message, error: true }) }
+  }
+
+  function undoOpenedRecord() {
+    if (!undoRecord) return
+    cancelCandidateWork()
+    const prior = undoRecord
+    const settled = state => state.status === 'loading' ? { ...state, status: state.data || Number.isFinite(state.value) ? 'success' : 'idle', message: '開く前の取得処理は中止しました。必要に応じて再取得してください。' } : state
+    setPosition(prior.position); setElevation(settled(prior.elevation)); setTerrain(prior.terrain); setTerrainStatus(prior.terrain ? 'success' : 'idle')
+    setTerrainSection(prior.terrainSection); setTerrainSectionStatus(prior.terrainSection ? 'success' : 'idle'); setTerrainSectionRange(prior.terrainSectionRange)
+    setObstructionHeight(prior.obstructionHeight); setDetailedHorizon(prior.detailedHorizon); setSnowBase(prior.snowBase); setSnowData(settled(prior.snowData))
+    setSolarProMemo(prior.solarProMemo); setGenerationInputs(prior.generationInputs); setGeneration(prior.generation); setGenerationNotice('')
+    setGridNotes(prior.gridNotes); setRecordInfo(prior.recordInfo); setSiteName(prior.siteName); setSiteNameTouched(prior.siteNameTouched); setMemo(prior.memo); setFieldMemo(prior.fieldMemo)
+    setSelectedParcel(prior.selectedParcel); setParcelData(prior.parcelData); setFocusParcelId(prior.focusParcelId); setParcelQuery(prior.parcelQuery); setParcelStatus(settled(prior.parcelStatus))
+    setPowerGrid(settled(prior.powerGrid)); setGridCapacity(settled(prior.gridCapacity)); setAdjacentMeshCompare(settled(prior.adjacentMeshCompare)); setGenerationNotice(prior.generationNotice); setPlaceInfo(settled(prior.placeInfo)); setPlaceApiStatus(prior.placeApiStatus)
+    setCurrentLocation(prior.currentLocation); setLocationStatus(settled(prior.locationStatus)); setAddress(prior.address); setAddressResults(prior.addressResults); setSearchStatus(prior.searchStatus === 'loading' ? 'idle' : prior.searchStatus)
+    setHorizonPanelOpen(false); setTerrainSectionOpen(false); setHorizonExportMessage(''); setPdfProgress(''); setPointActionStatus('')
+    setPendingRecord(null); setUndoRecord(null); switchPage('solar')
+    setRecordStatus({ message: '開く前の候補地・条件・結果に戻しました。', error: false })
+  }
+
+  function previewExampleRecord() {
+    candidateRequests.current.start('record-import')
+    setPendingRecord(exampleReviewRecord(APP_VERSION))
+    setRecordStatus({ message: '操作練習の仮条件です。実案件・計算結果は含みません。', error: false })
+    openReviewSection('site-select')
+    window.setTimeout(() => { const panel = document.querySelector('.review-records__preview'); if (panel) { panel.tabIndex = -1; panel.focus({ preventScroll: true }); panel.scrollIntoView({ behavior: 'smooth', block: 'center' }) } }, 0)
+  }
+
+  function addGridNote(note) {
+    setGridNotes(current => [...current.filter(item => item.id !== note.id), note].slice(-20))
+    setRecordStatus({ message: '設備確認メモを検討記録に追加しました。ファイルに残すには「検討記録を保存」を押してください。', error: false })
+  }
 
   function downloadCsv() {
     const rows = [
@@ -2902,13 +3050,14 @@ export default function App() {
             <button type="button" aria-current={activePage === 'power' ? 'page' : undefined} onClick={() => switchPage('power')}>系統確認</button>
             <details className="workspace-tools"><summary>{activePage === 'pdf' ? 'PDFツール' : activePage === 'inheritance' ? '登記チェック' : solarManualActive ? 'Solar Pro入力' : '業務ツール'}</summary>
               <div className="workspace-tools-menu" onClick={event => { if (event.target.closest('button, a')) { event.currentTarget.parentElement.open = false; event.currentTarget.parentElement.querySelector('summary')?.focus() } }}>
+                <button type="button" onClick={() => openReviewSection('use-cases')}>活用例・資料案内</button>
                 <button type="button" onClick={openSolarManual}>Solar Pro入力ガイド</button>
                 <button type="button" onClick={() => switchPage('pdf')}>PDFツール</button>
                 <button type="button" onClick={() => switchPage('inheritance')}>登記チェック</button>
                 <button type="button" onClick={() => { setDrawingPanelOpen(true); openReviewSection('drawing-utility') }}>図面PDF → JPG</button>
                 <button type="button" onClick={() => { openReviewSection('solar-tips'); window.setTimeout(() => { const section = document.querySelector('.knowledge-disclosure'); if (section) section.open = true }, 0) }}>資料・リンク集</button>
                 <hr />
-                <a href={SITE_OPERATION_GUIDE_URL} target="_blank" rel="noreferrer">操作マニュアル PDF ↗</a>
+                <a href={SITE_OPERATION_GUIDE_URL} target="_blank" rel="noreferrer">v1.23 操作マニュアル PDF ↗</a>
                 <a href={GROUNDY_URL} target="_blank" rel="noreferrer">Groundy ↗</a>
                 <a href={SOLAR_PRO_PORTAL_URL} target="_blank" rel="noreferrer">Solar Pro 管理・DL ↗</a>
                 <hr />
@@ -2925,9 +3074,10 @@ export default function App() {
           onSite={() => openReviewSection('site-select')} onGeneration={() => openReviewSection('solar-generation')}
           onGrid={() => switchPage('power')} onReport={() => openReviewSection('report-section')}
         />}
+        {(activePage === 'solar' || activePage === 'power') && <ReviewRecordsPanel position={position} onSave={saveReviewRecord} onRead={readReviewRecord} pending={pendingRecord} status={recordStatus} recordInfo={recordInfo} onApply={applyPendingRecord} onDismiss={() => { candidateRequests.current.start('record-import'); setPendingRecord(null); setRecordStatus({ message: '', error: false }) }} onUndo={undoOpenedRecord} canUndo={Boolean(undoRecord)} notesCount={gridNotes.length} />}
         {activePage === 'power' && <Suspense fallback={<p>系統確認マップを読み込んでいます…</p>}><PowerGridPage
           position={position} placeLabel={selectedPlaceLabel} powerGrid={powerGrid} gridCapacity={gridCapacity} capacityMatches={capacityMatches}
-          annualYield={solarProMemo.annualYield} generation={generation} onGenerationChange={setGeneration} generationInputs={generationInputs} onGenerationInputsChange={setGenerationInputs} candidateRevision={candidateRevision} onGenerationNotice={setGenerationNotice}
+          annualYield={solarProMemo.annualYield} generation={generation} onGenerationChange={setGeneration} generationInputs={generationInputs} onGenerationInputsChange={setGenerationInputs} candidateRevision={candidateRevision} onGenerationNotice={setGenerationNotice} onSaveGridNote={addGridNote} savedGridNotes={gridNotes}
           onCheck={handlePowerGridCheck} onLoadCapacity={handleBundledGridCapacity} onBack={() => switchPage('solar')}
           onReport={() => openReviewSection('report-section')}
         /></Suspense>}
@@ -3156,6 +3306,7 @@ export default function App() {
                 )}
                 {pointActionStatus && <em>{pointActionStatus}</em>}
               </div>}
+              {position && !Number.isFinite(elevation.value) && <button className="secondary-button" disabled={elevation.status === 'loading'} onClick={fetchMissingElevation}>{elevation.status === 'loading' ? '標高を取得中…' : 'この地点の標高を取得'}</button>}
               <div className="terrain-section-quick">
                 <div>
                   <strong>
@@ -3659,9 +3810,11 @@ export default function App() {
               <span className="report-disclosure__toggle">クリックして開く</span>
             </summary>
             <div className="report-disclosure__body">
-            <div className="report-readiness no-print"><div><strong>出力前に確認する内容</strong><p>発電量：{generation ? '計算済み' : '未計算'} ／ 地平線：{terrain?.samples?.length ? '分析済み' : '未分析'} ／ NEDO積雪：{confirmedSnowStation ? '確認済み' : '未取得'} ／ 系統設備：{powerGrid.data ? '取得済み（接続可否は未確認）' : '未取得'}</p><p>未取得の項目は未確認として出力します。選択設備の詳細は系統画面の「設備確認メモを保存」で残せます。</p></div><div className="report-readiness__actions"><button type="button" className="secondary-button" disabled={!position} onClick={() => openReviewSection('solar-generation')}>発電量を確認</button><button type="button" className="secondary-button" onClick={() => { openReviewSection('site-details'); const analysis = document.getElementById('simple-analysis'); if (analysis) analysis.open = true }}>地形・積雪を確認</button></div></div>
+            <div className="report-readiness no-print"><div><strong>出力前に確認する内容</strong><p>発電量：{generation ? '計算済み' : '未計算'} ／ 地平線：{terrain?.samples?.length ? '分析済み' : '未分析'} ／ NEDO積雪：{confirmedSnowStation ? '確認済み' : '未取得'} ／ 系統設備：{powerGrid.data ? '取得済み（接続可否は未確認）' : '未取得'}</p><p>未取得の項目は未確認として出力します。設備確認メモは系統画面で保存すると検討記録とレポートに追加されます。</p></div><div className="report-readiness__actions"><button type="button" className="secondary-button" disabled={!position} onClick={() => openReviewSection('solar-generation')}>発電量を確認</button><button type="button" className="secondary-button" onClick={() => { openReviewSection('site-details'); const analysis = document.getElementById('simple-analysis'); if (analysis) analysis.open = true }}>地形・積雪を確認</button></div></div>
             <div className="action-row no-print">
               <button type="button" className="secondary-button" onClick={downloadCsv}>チェックCSV出力</button>
+              <button type="button" className="secondary-button" disabled={!position} onClick={saveReviewRecord}>検討記録を保存</button>
+              <button type="button" className="secondary-button" onClick={() => openReviewSection('use-cases')}>資料の使い方を見る</button>
               <button type="button" className="primary-button" onClick={() => window.print()}>PDF印刷</button>
             </div>
             <details className="solarpro-memo-panel no-print">
@@ -3717,6 +3870,8 @@ export default function App() {
           </details>
         </section>
 
+
+        <UseCasesGuide onExample={previewExampleRecord} onReport={() => openReviewSection('report-section')} />
 
         <div className="support-sections">
           <section className="manual-section panel" id="solar-manual">
@@ -3835,14 +3990,14 @@ export default function App() {
 
             <article className="knowledge-card">
               <span className="knowledge-card__label">報告書テンプレート</span>
-              <h3>Solar Pro用テンプレートの確認</h3>
-              <p>社内テンプレート（.spt）はアプリに同梱せず、各自のPCまたは社内共有フォルダーから選択して確認します。</p>
+              <h3>手元のテンプレート名を控える</h3>
+              <p>Solar Proテンプレート（.spt）を選ぶとファイル名を表示します。内容の表示・検証やレポートへの適用は行いません。内容はSolar Proで開いて確認してください。</p>
               <label className="template-download-button template-download-button--file">
-                ローカル .spt を選択
+                .sptのファイル名を表示
                 <input type="file" accept=".spt" onChange={handleTemplateFile} />
               </label>
               {templateFileName && <small>選択中：{templateFileName}</small>}
-              <small>配置先例：Solar Pro 5.0 / Samples / レポートテンプレート。内部テンプレートは公開用ZIPやGitHubには含めないでください。</small>
+              <small>テンプレートは同梱していません。ご自身が利用できるファイルをご用意ください。</small>
             </article>
 
             <article className="knowledge-card">
@@ -4176,7 +4331,7 @@ export default function App() {
 
       <footer>
         <div>
-          <span>Solar Site Precheck — 候補地・メモ・計算条件をこのブラウザに保存（PDF・地形断面・系統の一時結果は対象外）</span>
+          <span>Solar Site Precheck — 候補地・メモ・計算条件をこのブラウザに保存（PDF原本・系統の全設備地図は対象外）</span>
           <span>Version {APP_VERSION} / Build {BUILD_DATE} / 地図・標高：国土地理院 / 積雪出現率：NEDO MONSOLA-11</span>
         </div>
         <DiagnosticPanel placeApiStatus={placeApiStatus} />

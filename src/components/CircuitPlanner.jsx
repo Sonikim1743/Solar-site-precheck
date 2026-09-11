@@ -153,7 +153,7 @@ export default function CircuitPlanner() {
               setActiveHelp={setActiveHelp}
             />
           </div>
-          <p>Solar Proの「PCS台数 × 最大並列数 × 最大直列数」が、設置モジュール枚数以上になる最小構成を提案します。</p>
+          <p>入力したPCS台数・モジュール枚数を収める直並列構成を整理します。初期値は操作例です。参考発電量の容量には自動反映されないため、同じ案件では入力条件をそろえてください。MPPT電流などの機器制約はメーカー資料で別途確認します。</p>
         </div>
         <div className={plan.isEnough ? 'circuit-status circuit-status--ok' : 'circuit-status circuit-status--warn'}>
           <strong>{plan.maxCircuitModules.toLocaleString()} 枚</strong>

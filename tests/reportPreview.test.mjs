@@ -112,3 +112,12 @@ test('power-grid report does not render a stray zero and explains official DB ca
   assert.match(html, /N-1 不可/)
   assert.match(html, /公表の正方向 庄原（変）→東城（変）/)
 })
+
+test('reopened records print original provenance and saved equipment notes as escaped text', () => {
+  const report = { position: {lat:34.9,lon:133.5}, obstructionHeight:20, snowBase:.95, buildDate:'2026-09-11', reviewRecordInfo:{savedAt:'2026-08-01T00:00:00Z',appVersion:'1.24'}, gridNotes:[{id:'memo',title:'確認設備',recordedAt:'2026-08-01T00:00:00Z',text:'公表空容量: 0 MW\n<script>alert(1)</script>'}] }
+  const html = renderToStaticMarkup(React.createElement(ReportPreview, {report}))
+  assert.match(html,/保存記録から再開/);assert.match(html,/元のアプリ v1.24/)
+  assert.match(html,/設備確認記録/);assert.match(html,/現在の公表資料との再照合は行っていません/)
+  assert.match(html,/&lt;script&gt;/);assert.doesNotMatch(html,/<script>/)
+  assert.doesNotMatch(html,/取得 2026-09-11/)
+})
