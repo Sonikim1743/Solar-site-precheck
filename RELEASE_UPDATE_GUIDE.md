@@ -1,5 +1,12 @@
 # Release更新運用メモ
 
+## 2026-09-11: v1.25 候補地記録の保存・再開
+
+今回のPC用ファイルは SolarSitePrecheck_v1.25_release_light.zip です。既存のruntime/node.exeを使う更新用で、Node.js本体を同梱していません。現在の検討記録をJSONへ保存し、起動中のローカルサーバーを終了、既存のdist・workをバックアップしてから同名フォルダーを更新します。runtime/node.exeと個人データを維持し、RUN_PORTABLE.cmdで起動してください。更新後は画面下部のVersion 1.25と記録ファイルの読み込みを確認します。
+
+今回の公開先への配信は別作業です。オンライン更新は公開済みのGitHubファイルを参照するため、手元のZIPを受け取っただけではオンライン版は変わりません。以下には以前からの運用記録を残しています。
+
+
 ## 2026-08-31: Cloudflare / ローカル別ビルド
 
 最新の配布物は、変更をコミットして作業ツリーをクリーンにした後、`node build/packageDeployment.js` で作成します。テスト・CSP・同梱PDF/OCR・ZIP内SHA-256を検証し、`outputs/v1.23-日付-…/` にCloudflare用とローカル更新用のZIPを別々に出力します。GitHubへのpushや本番への配布は行いません。
