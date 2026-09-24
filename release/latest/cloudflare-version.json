@@ -1,16 +1,16 @@
 {
   "app": "Solar Site Precheck",
-  "version": "1.27.1",
+  "version": "1.27.2",
   "buildDate": "2026-09-24",
-  "sourceCommit": "655eec45e03a57d0560bae03335e5957d9933bbf",
+  "sourceCommit": "dfe7bb70a784acff1527856bc971e6d0f857e150",
   "target": "cloudflare",
-  "buildId": "1.27.1-2026-09-24-f329438de78c",
-  "packageName": "SolarSitePrecheck_v1.27.1_2026-09-24_cloudflare.zip",
-  "zipUrl": "https://raw.githubusercontent.com/Sonikim1743/Solar-site-precheck/main/release/latest/SolarSitePrecheck_v1.27.1_2026-09-24_cloudflare.zip",
-  "sha256": "f329438de78c014b0e930edb41ee4add68a8a0383847833865f4e8c9d02fa7f4",
-  "etag": "f329438de78c014b",
-  "bundleName": "index-BAyOgCG3.js",
+  "buildId": "1.27.2-2026-09-24-68b9ae012aa6",
+  "packageName": "SolarSitePrecheck_v1.27.2_2026-09-24_cloudflare.zip",
+  "zipUrl": "https://raw.githubusercontent.com/Sonikim1743/Solar-site-precheck/main/release/latest/SolarSitePrecheck_v1.27.2_2026-09-24_cloudflare.zip",
+  "sha256": "68b9ae012aa66c3d948e24617030fd041df1ab946358adb1bc03a4c49eb050fc",
+  "etag": "68b9ae012aa66c3d",
+  "bundleName": "index-C0Scqynr.js",
   "minRequiredRuntime": "1.2",
   "notes": "Cloudflare Pages: deploy from extracted root including functions and shared. Not a dashboard drag-and-drop ZIP.",
-  "sizeBytes": 14206932
+  "sizeBytes": 14207876
 }
