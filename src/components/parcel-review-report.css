@@ -1,0 +1,66 @@
+.parcel-report-page { min-width: 0; }
+.parcel-report-map { margin: 0 0 16px; }
+.parcel-report-map svg { display: block; width: 100%; max-height: 300px; border: 1px solid #dce5dc; border-radius: 8px; }
+.parcel-report-map figcaption { margin-top: 7px; color: #67776d; font-size: 10px; line-height: 1.6; }
+.parcel-report-shape { stroke-width: 1.8; stroke-linejoin: round; }
+.parcel-report-shape--target { fill: #efc951; fill-opacity: .26; stroke: #a77e1c; }
+.parcel-report-shape--reference { fill: #80b7dd; fill-opacity: .15; stroke: #5489b4; stroke-dasharray: 6 3; }
+.parcel-report-shape--boundary { fill: #3c9b73; fill-opacity: .10; stroke: #1c7653; stroke-width: 2.5; }
+.parcel-report-shape--exclusion { fill: #d77474; fill-opacity: .32; stroke: #b84747; stroke-width: 2; stroke-dasharray: 5 3; }
+.parcel-report-legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 9px; color: #486353; font-size: 10px; }
+.parcel-report-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.parcel-report-legend i { width: 15px; height: 9px; border: 1.5px solid #a77e1c; background: #f9eab6; }
+.parcel-report-legend .is-reference { background: #dfecf6; border-color: #5489b4; border-style: dashed; }
+.parcel-report-legend .is-boundary { background: #e1efe8; border-color: #1c7653; }
+.parcel-report-legend .is-exclusion { background: #edcbcb; border-color: #b84747; border-style: dashed; }
+.parcel-report-legend .is-position { width: 8px; height: 8px; background: #ab3434; border-color: #ab3434; border-radius: 50%; }
+.parcel-report-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 16px 0; }
+.parcel-report-metrics > div { min-width: 0; padding: 12px; border: 1px solid #d9e5dd; border-radius: 7px; background: #f4f8f4; }
+.parcel-report-metrics > div:last-child { background: #eaf4ec; border-color: #bcd7c4; }
+.parcel-report-metrics dt { color: #637368; font-size: 10px; }
+.parcel-report-metrics dd { margin: 7px 0 0; color: #274b36; font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.parcel-report-metrics small { font-size: 10px; font-weight: 500; white-space: nowrap; }
+.parcel-report-conditions { border-top: 1px solid #dce6df; padding-top: 3px; }
+.parcel-report-conditions h3 { margin: 13px 0 4px; color: #3b5946; font-size: 12px; }
+.parcel-report-conditions p, .parcel-report-note { margin: 5px 0; color: #5b6d60; font-size: 11px; line-height: 1.75; overflow-wrap: anywhere; }
+.parcel-report-table { border-collapse: collapse; width: 100%; table-layout: fixed; font-size: 11px; }
+.parcel-report-table caption { text-align: left; padding: 0 0 10px; color: #5e7163; font-size: 11px; }
+.parcel-report-col-index { width: 5%; }
+.parcel-report-col-role { width: 8%; }
+.parcel-report-col-number { width: 17%; }
+.parcel-report-col-address { width: 34%; }
+.parcel-report-col-source { width: 36%; }
+.parcel-report-table th, .parcel-report-table td { text-align: left; vertical-align: top; padding: 9px 7px; border-bottom: 1px solid #dae4dc; line-height: 1.65; overflow-wrap: anywhere; word-break: break-word; }
+.parcel-report-table th { background: #f1f6f1; color: #3e6149; font-size: 10px; }
+.parcel-report-table td { color: #425749; }
+.parcel-report-table small { display: block; margin-top: 4px; color: #718073; font-size: 9px; }
+.parcel-report-page--list .parcel-report-note { margin-top: 14px; }
+@media screen and (max-width: 640px) {
+  .parcel-report-page { padding: 16px; }
+  .parcel-report-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .parcel-report-metrics dd { font-size: 18px; }
+  .parcel-report-table, .parcel-report-table tbody, .parcel-report-table tr, .parcel-report-table td { display: block; width: 100%; }
+  .parcel-report-table caption { display: block; }
+  .parcel-report-table colgroup, .parcel-report-table thead { display: none; }
+  .parcel-report-table tr { margin-bottom: 12px; padding: 7px; border: 1px solid #dce6df; border-radius: 6px; }
+  .parcel-report-table td { display: grid; grid-template-columns: 80px minmax(0, 1fr); gap: 5px; padding: 6px 3px; border: 0; }
+  .parcel-report-table td::before { content: attr(data-label); color: #718073; font-size: 10px; }
+  .parcel-report-table td small { grid-column: 2; margin: 0; }
+}
+@media print {
+  .parcel-report-page .report-page-header h2 { font-size: 18px; }
+  .parcel-report-page .report-page-header p:not(.eyebrow) { font-size: 10px; }
+  .parcel-report-page .report-page-body { padding-top: 3mm; }
+  .parcel-report-map { margin-bottom: 10px; }
+  .parcel-report-map svg { max-height: 76mm; }
+  .parcel-report-map figcaption, .parcel-report-legend { font-size: 9px; }
+  .parcel-report-metrics { gap: 7px; margin: 12px 0; }
+  .parcel-report-metrics > div { padding: 10px; }
+  .parcel-report-metrics dd { font-size: 19px; }
+  .parcel-report-conditions h3 { margin-top: 10px; font-size: 11px; }
+  .parcel-report-conditions p, .parcel-report-note { font-size: 10px; line-height: 1.55; }
+  .parcel-report-table { font-size: 10px; }
+  .parcel-report-table td, .parcel-report-table th { padding: 7px 6px; line-height: 1.45; }
+  .parcel-report-table tbody tr { break-inside: avoid; page-break-inside: avoid; }
+  .parcel-report-table thead { display: table-header-group; }
+}

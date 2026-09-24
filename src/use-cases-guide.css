@@ -1,0 +1,43 @@
+.use-cases-guide {
+  scroll-margin-top: 110px;
+  margin: 20px 0 8px;
+  border-top: 1px solid #d9e4df;
+  border-bottom: 1px solid #d9e4df;
+  color: #244f3f;
+}
+.use-cases-guide > summary { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; padding: 17px 2px; cursor: pointer; font-size: 16px; line-height: 1.5; list-style: none; }
+.use-cases-guide > summary::-webkit-details-marker { display: none; }
+.use-cases-guide > summary > span { font-weight: 600; }
+.use-cases-guide > summary small { color: #61766c; font-size: 13px; }
+.use-cases-guide > summary::after { content: '＋'; margin-left: auto; color: #61766c; }
+.use-cases-guide[open] > summary::after { content: '−'; }
+.use-cases-guide > summary:focus,.use-cases-guide__topic > summary:focus-visible,.use-cases-guide button:focus-visible { outline: 3px solid #31836a; outline-offset: 3px; border-radius: 3px; }
+.use-cases-guide__body { max-width: 1040px; padding: 12px 2px 6px; }
+.use-cases-guide__intro { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 20px; margin: 0 0 22px; }
+.use-cases-guide__intro p { flex: 1 1 460px; margin: 0; }
+.use-cases-guide__intro button { flex: 0 0 auto; }
+.use-cases-guide h3 { font-size: 16px; margin: 0 0 10px; }
+.use-cases-guide p,.use-cases-guide li,.use-cases-guide dd { font-size: 15px; line-height: 1.8; overflow-wrap: anywhere; }
+.use-cases-guide dl { margin: 0; }
+.use-cases-guide dt { font-weight: 600; font-size: 15px; line-height: 1.7; }
+.use-cases-guide dd { margin: 4px 0 0; }
+.use-cases-guide__outputs dl > div { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(0, 2.6fr); gap: 8px 20px; padding: 12px 0; border-bottom: 1px solid #e8eeeb; }
+.use-cases-guide__outputs dd { margin: 0; }
+.use-cases-guide__outputs dd small { display: block; margin-top: 2px; color: #61766c; font-size: 13px; }
+.use-cases-guide .use-cases-guide__note { margin: 14px 0 22px; color: #61766c; font-size: 13px; }
+.use-cases-guide__topic { border-top: 1px solid #d9e4df; }
+.use-cases-guide__topic > summary { padding: 16px 2px; cursor: pointer; font-size: 15px; line-height: 1.6; font-weight: 500; }
+.use-cases-guide__topic > div { padding: 0 2px 12px; }
+.use-cases-guide__topic dl > div { margin: 14px 0; }
+.use-cases-guide__topic ol { padding-left: 24px; }
+.use-cases-guide__topic li { margin: 10px 0; }
+.use-cases-guide__example-label { padding-left: 12px; border-left: 3px solid #ad8746; color: #735b32; }
+@media (max-width: 600px) {
+  .use-cases-guide { margin-top: 16px; scroll-margin-top: 150px; }
+  .use-cases-guide > summary { gap: 6px 10px; }
+  .use-cases-guide > summary small { font-size: 12px; }
+  .use-cases-guide__intro { margin-bottom: 18px; }
+  .use-cases-guide__outputs dl > div { grid-template-columns: minmax(0, 1fr); gap: 3px; }
+  .use-cases-guide__intro button { max-width: 100%; }
+}
+@media print { .use-cases-guide { display: none !important; } }

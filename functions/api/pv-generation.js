@@ -8,8 +8,10 @@ export async function handleGenerationRequest(request, { fetchImpl = fetch } = {
   if (request.method !== 'GET') return json({ error: 'GET required' }, 405)
   const origin = request.headers.get('Origin')
   if (origin && origin !== url.origin) return json({ error: 'Same-origin requests only' }, 403)
-  const keys = ['lat', 'lon', 'peakpower', 'loss', 'angle', 'aspect']
-  if (url.search.length > 512 || [...url.searchParams.keys()].some(key => !keys.includes(key) || url.searchParams.getAll(key).length !== 1)) return json({ error: 'Invalid parameters' }, 400)
+  const keys = ['lat', 'lon', 'peakpower', 'loss', 'angle', 'aspect', 'userhorizon']
+  // Thirty-six full-precision DEM angles can exceed the normal query limit.
+  const maxQueryLength = url.searchParams.has('userhorizon') ? 2048 : 512
+  if (url.search.length > maxQueryLength || [...url.searchParams.keys()].some(key => !keys.includes(key) || url.searchParams.getAll(key).length !== 1)) return json({ error: 'Invalid parameters' }, 400)
   let inputs
   try { inputs = generationInputs(Object.fromEntries(url.searchParams)) } catch (error) { return json({ error: error.message }, 400) }
   const sourceUrl = generationUrl(inputs)

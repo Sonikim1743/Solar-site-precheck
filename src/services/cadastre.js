@@ -118,10 +118,11 @@ export async function readCadastreGeoJson(file, sourceData = null, options = {})
       outsideFocus += 1
       return
     }
+    const { __parcelReviewId, __parcelSourceName, ...publicProperties } = feature.properties || {}
     features.push({
       ...feature,
       id: feature.id ?? index,
-      properties: { ...feature.properties, __parcelId: String(feature.id ?? index) },
+      properties: { ...publicProperties, __parcelId: String(feature.id ?? index) },
     })
   })
 

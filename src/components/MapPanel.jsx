@@ -1,14 +1,26 @@
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import GridEquipmentDetails from './GridEquipmentDetails.jsx'
 import L from 'leaflet'
-import { Circle, CircleMarker, GeoJSON, LayersControl, MapContainer, Marker, Polyline, Popup, Rectangle, ScaleControl, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet'
+import { Circle, CircleMarker, GeoJSON, LayersControl, MapContainer, Marker, Polygon, Polyline, Popup, Rectangle, ScaleControl, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet'
 import { parcelInfo } from '../services/cadastre.js'
+import { featureInteriorPoint, validatePolygonGeometry } from '../services/parcelGeometry.js'
+import { getParcelKey } from '../utils/parcelReview.js'
 import { capacityValueLabel, summarizeGridFlowDirection } from '../services/gridCapacity.js'
 import { normalizeDisplayText } from '../utils/text.js'
 import { powerGridDisplayLine, powerGridDisplayLineLabel } from '../services/powerGrid.js'
+import '../parcel-review.css'
 
 const INITIAL_MAP_CENTER = [36.2048, 138.2529]
 const INITIAL_MAP_ZOOM = 5
+const EMPTY_PARCEL_REVIEW = { version: 1, parcels: [], boundary: null, exclusions: [] }
+const EMPTY_FEATURE_COLLECTION = { type: 'FeatureCollection', features: [] }
+const PARCEL_MODE_HINTS = {
+  point: '地図をクリックして計算地点を指定',
+  target: '筆をクリックして対象に追加・変更',
+  reference: '筆をクリックして参考に追加・変更',
+  boundary: '検討範囲の角を順に指定し「確定」',
+  exclusion: '除外範囲の角を順に指定し「確定」',
+}
 
 const markerIcon = L.divIcon({
   className: 'site-marker-wrapper',
@@ -24,10 +36,21 @@ const currentLocationIcon = L.divIcon({
   iconAnchor: [12, 12],
 })
 
-function ClickHandler({ onSelect }) {
+function ClickHandler({ onSelect, mode, locked, onAddVertex, onFinish }) {
   useMapEvents({
     click(event) {
-      onSelect({ lat: event.latlng.lat, lon: event.latlng.lng })
+      if (locked) return
+      if (mode === 'point') onSelect?.({ lat: event.latlng.lat, lon: event.latlng.lng })
+      else if (mode === 'boundary' || mode === 'exclusion') {
+        // A double-click emits two click events before dblclick. Keep one vertex.
+        if (event.originalEvent?.detail > 1) return
+        onAddVertex(event.latlng, event.originalEvent?.timeStamp)
+      }
+    },
+    dblclick(event) {
+      if (locked || !['boundary', 'exclusion'].includes(mode)) return
+      if (event.originalEvent) L.DomEvent.stop(event.originalEvent)
+      onFinish()
     },
   })
   return null
@@ -47,7 +70,7 @@ function MapController({ position }) {
   return null
 }
 
-function MapInteractionController({ locked }) {
+function MapInteractionController({ locked, drawing }) {
   const map = useMap()
 
   useEffect(() => {
@@ -63,7 +86,8 @@ function MapInteractionController({ locked }) {
       if (locked) handler.disable()
       else handler.enable()
     })
-  }, [map, locked])
+    if (drawing) map.doubleClickZoom.disable()
+  }, [map, locked, drawing])
 
   return null
 }
@@ -418,54 +442,155 @@ export function PowerGridOverlay({ data, capacityMatches, onEquipmentSelect, sho
   )
 }
 
-function ParcelLayer({ data, selectedParcelId, focusParcelId, onParcelSelect }) {
+function parcelPathStyle(role, selected) {
+  if (role === 'target') return { color: '#f0b429', weight: 3.5, fillColor: '#f0b429', fillOpacity: 0.22, dashArray: null }
+  if (role === 'reference') return { color: '#83c6ff', weight: 3, fillColor: '#5ca9e8', fillOpacity: 0.12, dashArray: '7 4' }
+  return { color: selected ? '#f5b940' : '#f8f1a7', weight: selected ? 4 : 1.5, fillColor: selected ? '#f5b940' : '#e8ef67', fillOpacity: selected ? 0.28 : 0.08, dashArray: null }
+}
+
+function parcelTooltipContent(info, role) {
+  const element = document.createElement('span')
+  element.textContent = `${role === 'target' ? '対象 · ' : role === 'reference' ? '参考 · ' : ''}${info.number || '地番未記載'}`
+  return element
+}
+
+function displayParcelKey(feature, sourceName) {
+  // Original files may contain IDs beyond the review envelope. Keep the map
+  // usable; validation on adding a parcel will report the unsupported value.
+  try { return getParcelKey(feature, sourceName) } catch { return null }
+}
+
+function restoredParcelFeature(entry) {
+  return {
+    type: 'Feature',
+    id: entry.info?.id || entry.id,
+    geometry: entry.geometry,
+    properties: {
+      __parcelId: entry.info?.id || entry.id,
+      __parcelReviewId: entry.id,
+      __parcelSourceName: entry.source?.fileName || '',
+      地番: entry.info?.number || '',
+      所在: entry.info?.area || '',
+      市区町村名: entry.info?.municipality || '',
+      座標系: entry.info?.mapType || '',
+    },
+  }
+}
+
+function ParcelLayer({ data, review, selectedParcelId, focusParcelId, onParcelSelect, mode, locked, onDrawingPoint, onDrawingFinish, onError }) {
   const map = useMap()
   const layerRef = useRef(null)
+  const previousDataRef = useRef(undefined)
+  const initialBoundsShownRef = useRef(false)
+  const sourceName = data?.summary?.fileName || ''
+  const entries = review?.parcels || []
+  const roleById = useMemo(() => new Map(entries.map((entry) => [entry.id, entry.role])), [entries])
+  const latestRef = useRef(null)
+  latestRef.current = { onParcelSelect, mode, locked, onDrawingPoint, onDrawingFinish, onError, roleById, sourceName, selectedParcelId }
+  const combinedData = useMemo(() => {
+    // Review metadata belongs to restored entries, never to imported properties.
+    const features = (data?.features || []).map((feature) => {
+      if (!feature.properties || (!('__parcelReviewId' in feature.properties) && !('__parcelSourceName' in feature.properties))) return feature
+      const { __parcelReviewId, __parcelSourceName, ...properties } = feature.properties
+      return { ...feature, properties }
+    })
+    const originalIds = new Set(features.map((feature) => displayParcelKey(feature, sourceName)).filter(Boolean))
+    return { type: 'FeatureCollection', features: [...features, ...entries.filter((entry) => entry.geometry && !originalIds.has(entry.id)).map(restoredParcelFeature)] }
+  }, [data, entries, sourceName])
 
   useEffect(() => {
-    const bounds = layerRef.current?.getBounds()
-    if (bounds?.isValid()) map.fitBounds(bounds, { padding: [24, 24], maxZoom: 17 })
-  }, [data, map])
+    const group = layerRef.current
+    if (!group) return
+    // react-leaflet's GeoJSON data is immutable; explicitly replace the layers.
+    group.clearLayers()
+    group.addData(combinedData)
+    const bounds = group.getBounds()
+    if (bounds?.isValid() && (data !== previousDataRef.current || !initialBoundsShownRef.current)) {
+      map.fitBounds(bounds, { padding: [24, 24], maxZoom: 17 })
+      initialBoundsShownRef.current = true
+    }
+    previousDataRef.current = data
+  }, [combinedData, data, map])
 
   useEffect(() => {
     layerRef.current?.eachLayer((layer) => {
-      const selected = parcelInfo(layer.feature).id === selectedParcelId
-      layer.setStyle({
-        color: selected ? '#f5b940' : '#f8f1a7',
-        weight: selected ? 4 : 1.5,
-        fillColor: selected ? '#f5b940' : '#e8ef67',
-        fillOpacity: selected ? 0.28 : 0.08,
-      })
+      const info = parcelInfo(layer.feature)
+      const id = layer.feature.properties?.__parcelReviewId || displayParcelKey(layer.feature, sourceName)
+      const role = roleById.get(id)
+      layer.setStyle(parcelPathStyle(role, info.id === selectedParcelId))
+      layer.setTooltipContent(parcelTooltipContent(info, role))
     })
-  }, [selectedParcelId])
+  }, [combinedData, roleById, sourceName, selectedParcelId])
 
   useEffect(() => {
     if (!focusParcelId) return
+    let exact = null, original = null, restored = null
     layerRef.current?.eachLayer((layer) => {
-      if (parcelInfo(layer.feature).id !== focusParcelId) return
-      const bounds = layer.getBounds?.()
-      if (bounds?.isValid()) map.fitBounds(bounds, { padding: [80, 80], maxZoom: 19 })
-      layer.openTooltip?.()
+      const id = layer.feature.properties?.__parcelReviewId || displayParcelKey(layer.feature, sourceName)
+      if (id === focusParcelId) exact = layer
+      else if (parcelInfo(layer.feature).id === focusParcelId) {
+        if (layer.feature.properties?.__parcelReviewId) restored ||= layer
+        else original ||= layer
+      }
     })
-  }, [focusParcelId, map])
+    const layer = exact || original || restored
+    const bounds = layer?.getBounds?.()
+    if (bounds?.isValid()) map.fitBounds(bounds, { padding: [80, 80], maxZoom: 19 })
+    layer?.openTooltip?.()
+  }, [focusParcelId, data, map])
 
-  if (!data) return null
   return (
     <GeoJSON
       ref={layerRef}
-      data={data}
+      data={EMPTY_FEATURE_COLLECTION}
       style={{ color: '#f8f1a7', weight: 1.5, fillColor: '#e8ef67', fillOpacity: 0.08 }}
       bubblingMouseEvents={false}
       onEachFeature={(feature, layer) => {
         const info = parcelInfo(feature)
-        layer.bindTooltip(info.number, { sticky: true, direction: 'top', className: 'parcel-tooltip' })
-        layer.on('click', () => {
-          const center = layer.getBounds?.().getCenter()
-          onParcelSelect(feature, center ? { lat: center.lat, lon: center.lng } : null)
+        const state = latestRef.current
+        const id = feature.properties?.__parcelReviewId || displayParcelKey(feature, state.sourceName)
+        layer.setStyle(parcelPathStyle(state.roleById.get(id), info.id === state.selectedParcelId))
+        layer.bindTooltip(parcelTooltipContent(info, state.roleById.get(id)), { sticky: true, direction: 'top', className: 'parcel-tooltip' })
+        layer.on('click', (event) => {
+          const current = latestRef.current
+          if (current.locked) return
+          if (['boundary', 'exclusion'].includes(current.mode)) {
+            if (!(event.originalEvent?.detail > 1)) current.onDrawingPoint(event.latlng, event.originalEvent?.timeStamp)
+            return
+          }
+          const center = featureInteriorPoint(feature)
+          if (!center) {
+            current.onError?.('この筆の内部点を確認できません。形状を確認し、地図から計算地点を指定してください。')
+            return
+          }
+          current.onParcelSelect?.(feature, center)
+        })
+        layer.on('dblclick', (event) => {
+          const current = latestRef.current
+          if (current.locked || !['boundary', 'exclusion'].includes(current.mode)) return
+          if (event.originalEvent) L.DomEvent.stop(event.originalEvent)
+          current.onDrawingFinish()
         })
       }}
     />
   )
+}
+
+function ReviewGeometryLayers({ review, vertices }) {
+  const boundary = review?.boundary
+  return <>
+    {boundary && <GeoJSON key={`boundary-${JSON.stringify(boundary)}`} data={boundary} interactive={false} style={{ color: '#ffffff', weight: 3.5, fillColor: '#27b890', fillOpacity: 0.12 }}>
+      <Tooltip permanent direction="center" className="parcel-tooltip">検討範囲</Tooltip>
+    </GeoJSON>}
+    {(review?.exclusions || []).map((geometry, index) => <GeoJSON key={`exclusion-${index}-${JSON.stringify(geometry)}`} data={geometry} interactive={false} style={{ color: '#fb8686', weight: 3, dashArray: '6 4', fillColor: '#e75757', fillOpacity: 0.28 }}>
+      <Tooltip permanent direction="center" className="parcel-tooltip">除外範囲 {index + 1}</Tooltip>
+    </GeoJSON>)}
+    {vertices.length > 2 && <Polygon positions={vertices} interactive={false} pathOptions={{ color: '#ffffff', weight: 2, dashArray: '5 4', fillColor: '#32d1ae', fillOpacity: 0.2 }} />}
+    {vertices.length === 2 && <Polyline positions={vertices} interactive={false} pathOptions={{ color: '#ffffff', weight: 3, dashArray: '5 4' }} />}
+    {vertices.map((point, index) => <CircleMarker key={`${index}-${point[0]}-${point[1]}`} center={point} radius={5} interactive={false} pathOptions={{ color: '#183d35', fillColor: '#ffffff', fillOpacity: 1, weight: 2 }}>
+      <Tooltip permanent direction="top" className="parcel-draft-tooltip">{index + 1}</Tooltip>
+    </CircleMarker>)}
+  </>
 }
 
 export default function MapPanel({
@@ -479,6 +604,11 @@ export default function MapPanel({
   selectedParcelId,
   focusParcelId,
   onParcelSelect,
+  parcelReview = EMPTY_PARCEL_REVIEW,
+  parcelMode = 'point',
+  onReviewGeometry,
+  onParcelDrawingError,
+  onParcelModeChange,
   terrainSection,
   powerGrid,
   capacityMatches,
@@ -487,7 +617,73 @@ export default function MapPanel({
   const hasTerrainOverlay = !!terrainSection?.lines?.length
   const [isCompactMap, setIsCompactMap] = useState(false)
   const [mapInteractionEnabled, setMapInteractionEnabled] = useState(false)
+  const [draftVertices, setDraftVertices] = useState([])
+  const draftRef = useRef([])
+  const lastVertexEventRef = useRef(null)
+  const [drawingMessage, setDrawingMessage] = useState('')
   const mapLocked = isCompactMap && !mapInteractionEnabled
+  const isDrawing = parcelMode === 'boundary' || parcelMode === 'exclusion'
+
+  function replaceDraft(vertices) {
+    draftRef.current = vertices
+    setDraftVertices(vertices)
+  }
+
+  function reportDrawingError(message) {
+    setDrawingMessage(message)
+    onParcelDrawingError?.(message)
+  }
+
+  function addDraftVertex(latlng, timeStamp = 0) {
+    if (mapLocked || !isDrawing || !latlng) return
+    const point = [latlng.lat, latlng.lng]
+    const last = lastVertexEventRef.current
+    // Touch browsers may omit click.detail. Ignore the duplicate final tap only.
+    if (last && timeStamp > 0 && timeStamp - last.timeStamp < 400 && Math.abs(last.point[0] - point[0]) < 0.000002 && Math.abs(last.point[1] - point[1]) < 0.000002) return
+    if (draftRef.current.length >= 200) {
+      reportDrawingError('1つの範囲は200点までです。「確定」するか、点を戻してください。')
+      return
+    }
+    lastVertexEventRef.current = { point, timeStamp }
+    replaceDraft([...draftRef.current, point])
+    setDrawingMessage('')
+  }
+
+  function finishDrawing() {
+    if (!isDrawing || mapLocked) return
+    if (draftRef.current.length < 3) {
+      reportDrawingError('範囲には3点以上必要です。角を順に指定してください。')
+      return
+    }
+    try {
+      const ring = draftRef.current.map(([lat, lon]) => [lon, lat])
+      const geometry = validatePolygonGeometry({ type: 'Polygon', coordinates: [[...ring, [...ring[0]]]] })
+      if (!onReviewGeometry || onReviewGeometry(geometry, parcelMode) === false) return
+      replaceDraft([])
+      setDrawingMessage('')
+      onParcelModeChange?.('point')
+    } catch (error) {
+      reportDrawingError(error?.message || '範囲を確定できません。点の交差や重なりを確認してください。')
+    }
+  }
+
+  function cancelDrawing() {
+    replaceDraft([])
+    setDrawingMessage('')
+    onParcelModeChange?.('point')
+  }
+
+  function undoDraftVertex() {
+    replaceDraft(draftRef.current.slice(0, -1))
+    lastVertexEventRef.current = null
+    setDrawingMessage('')
+  }
+
+  useEffect(() => {
+    replaceDraft([])
+    lastVertexEventRef.current = null
+    setDrawingMessage('')
+  }, [parcelMode, parcelReview])
 
   useEffect(() => {
     if (typeof window === 'undefined' || !window.matchMedia) return undefined
@@ -499,7 +695,12 @@ export default function MapPanel({
   }, [])
 
   return (
-    <div className="map-shell">
+    <>
+    <div className={`map-shell${isDrawing ? ' map-shell--parcel-drawing' : ''}`} onKeyDown={(event) => {
+      if (!isDrawing || event.target.closest?.('input, textarea, select, button, a')) return
+      if (event.key === 'Escape') { event.preventDefault(); cancelDrawing() }
+      if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); finishDrawing() }
+    }}>
       <MapContainer
         center={INITIAL_MAP_CENTER}
         zoom={INITIAL_MAP_ZOOM}
@@ -523,21 +724,28 @@ export default function MapPanel({
           </LayersControl.BaseLayer>
         </LayersControl>
         <ScaleControl position="bottomleft" metric imperial={false} />
-        <ClickHandler onSelect={onSelect} />
+        <ClickHandler onSelect={onSelect} mode={parcelMode} locked={mapLocked} onAddVertex={addDraftVertex} onFinish={finishDrawing} />
         <MapController position={position} />
-        <MapInteractionController locked={mapLocked} />
+        <MapInteractionController locked={mapLocked} drawing={isDrawing} />
         <ParcelLayer
           data={parcelData}
           selectedParcelId={selectedParcelId}
           focusParcelId={focusParcelId}
           onParcelSelect={onParcelSelect}
+          review={parcelReview}
+          mode={parcelMode}
+          locked={mapLocked}
+          onDrawingPoint={addDraftVertex}
+          onDrawingFinish={finishDrawing}
+          onError={reportDrawingError}
         />
         <PowerGridOverlay data={powerGrid} capacityMatches={capacityMatches} />
         <CurrentLocationLayer currentLocation={currentLocation} />
         <TerrainSectionMapOverlay analysis={terrainSection} />
-        <SiteMarker position={position} placeInfo={placeInfo} suppressPopup={hasTerrainOverlay} />
+        <SiteMarker position={position} placeInfo={placeInfo} suppressPopup={hasTerrainOverlay || parcelMode !== 'point'} />
+        <ReviewGeometryLayers review={parcelReview} vertices={draftVertices} />
       </MapContainer>
-      <div className="map-hint">地図をクリックして候補地点を指定</div>
+      <div className="map-hint">{PARCEL_MODE_HINTS[parcelMode] || PARCEL_MODE_HINTS.point}</div>
       {googleMapsUrl && (
         <a className="map-google-open" href={googleMapsUrl} target="_blank" rel="noreferrer">
           Googleマップで開く
@@ -563,5 +771,23 @@ export default function MapPanel({
       </div>
       {parcelData && <div className="parcel-map-badge">地番レイヤー {parcelData.features.length.toLocaleString()}筆</div>}
     </div>
+    {isDrawing && <div className="parcel-drawing-toolbar" aria-label="範囲の作図操作">
+      <div className="parcel-drawing-toolbar__instruction">
+        <strong>{parcelMode === 'boundary' ? '検討範囲' : '除外範囲'}を作図</strong>
+        <span aria-live="polite">{draftVertices.length}点を指定 · 3点以上で確定</span>
+        {mapLocked && <small>先に「地図操作を有効化」を押してください。</small>}
+      </div>
+      <div className="parcel-drawing-toolbar__buttons">
+        <button type="button" onClick={undoDraftVertex} disabled={!draftVertices.length}>1点戻す</button>
+        <button type="button" onClick={cancelDrawing}>取消</button>
+        <button type="button" className="parcel-button--primary" onClick={finishDrawing} disabled={draftVertices.length < 3 || mapLocked || !onReviewGeometry}>確定</button>
+      </div>
+      <small>角を順にタップしてください。最後は「確定」。パソコンではダブルクリックでも確定できます。</small>
+    </div>}
+    {drawingMessage && <p className="parcel-review-message parcel-review-message--error" role="alert">{drawingMessage}</p>}
+    {!!(parcelReview?.parcels?.length || parcelReview?.boundary || parcelReview?.exclusions?.length) && <div className="parcel-map-legend" aria-label="地図の凡例">
+      <span><i className="parcel-map-legend__target" />対象</span><span><i className="parcel-map-legend__reference" />参考</span><span><i className="parcel-map-legend__boundary" />検討範囲</span><span><i className="parcel-map-legend__exclusion" />除外</span>
+    </div>}
+    </>
   )
 }

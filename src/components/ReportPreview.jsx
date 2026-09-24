@@ -5,6 +5,9 @@ import { evaluateSiteVerdict, primaryVerdictReasons, verdictCriteriaText } from 
 import { capacityValueStatusLabel, summarizeGridFlowDirection } from '../services/gridCapacity.js'
 import { powerGridDisplayLine, powerGridDisplayLineLabel, powerGridSearchSummary } from '../../shared/powerGrid.js'
 import HorizonGraphPreview from './HorizonGraphPreview.jsx'
+import GenerationResults from './GenerationResults.jsx'
+import ParcelReviewReport, { parcelReviewReportPageCount } from './ParcelReviewReport.jsx'
+import './generation-report.css'
 import TerrainSectionPreview from './TerrainSectionPreview.jsx'
 
 const MONTHS = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月']
@@ -746,6 +749,40 @@ function PowerGridReportPage({ data, capacityData, capacityMatches, placeCapacit
   )
 }
 
+function GenerationReportPage({ report, page }) {
+  const generation = report.generation
+  const scenario = generation?.scenario
+  const format = value => Math.round(value).toLocaleString('ja-JP')
+  const date = value => new Date(value).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })
+  const months = generation ? [...generation.monthly].sort((a, b) => a.month - b.month) : []
+  return <ReportPage page={page} title="参考発電量" subtitle="年間の目安と月別の流れ" className="report-generation-overview">
+    {generation && <>
+      <GenerationResults result={generation} reportMode />
+      <div className="report-generation-months"><table>
+        <caption>月別の数値（kWh・四捨五入）<span className="report-generation-scroll-hint no-print">横にスクロールできます →</span></caption>
+        <thead><tr><th scope="col">月</th>{months.map(row => <th scope="col" key={row.month}>{row.month}月</th>)}</tr></thead>
+        <tbody><tr><th scope="row">基本値</th>{months.map(row => <td key={row.month}>{format(row.kwh)}</td>)}</tr>
+          {scenario && <tr><th scope="row">試算</th>{months.map(row => <td key={row.month}>{format(scenario.monthly.find(item => item.month === row.month).kwh)}</td>)}</tr>}
+          {scenario?.snow && <tr><th scope="row">積雪損失</th>{months.map(row => <td key={row.month}>{(scenario.snow.rates[row.month - 1] * scenario.snow.weight).toLocaleString('ja-JP', { maximumFractionDigits: 2 })}%</td>)}</tr>}
+        </tbody>
+      </table></div>
+      <div className="report-generation-evidence">
+        <h3>この結果の条件</h3>
+        <p>DC {generation.inputs.peakpower} kWp / 傾斜 {generation.inputs.angle}° / 南基準方位 {generation.inputs.aspect}° / 損失 {generation.inputs.loss}%。結晶シリコン・架台設置・固定式。基本値はPVGIS標準の地形地平線を使用。</p>
+        <p>出典：{generation.source} / {generation.period || '期間は出典で確認'} / 取得 {date(generation.fetchedAt)}（日本時間）。</p>
+        {scenario && <>
+          <p>試算日時：{date(scenario.calculatedAt)}（日本時間）。{scenario.differencePercent == null && '率は算出不可（基準値0）。'}</p>
+          {scenario.snow ? <p>積雪：3次メッシュ {scenario.snow.mesh} / {scenario.snow.source} / 影響係数 {scenario.snow.weight}%。月別損失率＝積雪出現率×影響係数÷100。パネル被覆率の実測ではなく仮定です。システム損失を重ねて乗算していません。</p> : <p>積雪の仮定による損失は適用していません。</p>}
+          {scenario.terrain ? <p>周辺地形：{scenario.terrain.inputs.userhorizon.length} 方位の地平線でPVGIS標準地形地平線を置換。基準より増える場合もあります。分析範囲外の地形や近接影は要確認。{scenario.terrain.source} / {scenario.terrain.period || '期間は出典で確認'} / 取得 {date(scenario.terrain.fetchedAt)}（日本時間）。</p> : <p>周辺地形は基準値と同じPVGIS標準地形地平線を使用しています。</p>}
+        </>}
+        <p className="report-note">長期平均の参考値です。試算は選択した仮定を加えた値で、個別PCS制約・系統出力制御は未反映です。実測・確定売電量・売上ではありません。月別・年間値はそれぞれ丸めています。</p>
+      </div>
+    </>}
+    {report.solarProMemo?.annualYield && <p className="report-generation-solarpro">Solar Pro年間発電量（入力値）：{report.solarProMemo.annualYield}</p>}
+    <p className="report-generation-next">次に確認：接続点・工事費・工期・制御条件を電力会社に確認します。設備確認メモがある場合は次ページ以降に記載します。</p>
+  </ReportPage>
+}
+
 export default function ReportPreview({ report }) {
   const terrain = report.terrain
   const station = report.snowStation
@@ -766,6 +803,8 @@ export default function ReportPreview({ report }) {
   const verdictReasons = primaryVerdictReasons(verdict, 3)
   const buildDate = report.buildDate || '—'
   const appVersion = report.appVersion || '—'
+  const parcelReviewStartPage = 5 + (report.powerGrid ? 1 : 0) + (report.generation || report.solarProMemo?.annualYield ? 1 : 0)
+  const parcelReviewPageCount = parcelReviewReportPageCount(report.parcelReview)
   const editHints = {
     siteName: '2. 候補地情報確認の「候補地名」で編集できます。',
     parcel: '地番ファイルを読み込み、地図上の筆界クリックまたは地番検索で選択できます。',
@@ -943,18 +982,9 @@ export default function ReportPreview({ report }) {
           placeCapacityCandidates={report.placeCapacityCandidates}
         />
       )}
-      {(report.generation || report.solarProMemo?.annualYield) && <ReportPage page={report.powerGrid ? '6' : '5'} title="発電量と系統検討" subtitle="同じ候補地の発電条件・接続条件を整理">
-        <div className="report-data-block"><h3>参考発電量</h3>
-          {report.generation && <><dl>
-            <ValueRow label="参考年間発電量">{Math.round(report.generation.annualKwh).toLocaleString('ja-JP')} kWh/年</ValueRow>
-            <ValueRow label="計算条件">DC {report.generation.inputs.peakpower} kWp / 傾斜 {report.generation.inputs.angle}° / 南基準方位 {report.generation.inputs.aspect}° / 損失 {report.generation.inputs.loss}%</ValueRow>
-            <ValueRow label="出典・期間">{report.generation.source} / {report.generation.period || '出典で確認'} / 取得 {new Date(report.generation.fetchedAt).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}</ValueRow>
-          </dl><table><thead><tr><th>月</th><th>参考発電量（kWh）</th></tr></thead><tbody>{report.generation.monthly.map(row => <tr key={row.month}><td>{row.month}月</td><td>{Math.round(row.kwh).toLocaleString('ja-JP')}</td></tr>)}</tbody></table>
-          <p className="report-note">結晶シリコン・架台設置・固定式。PVGIS標準地平線を使用。アプリで調べた樹木・建物の日影、NEDO積雪係数、個別PCS制約、系統出力制御は未反映です。</p></>}
-          {report.solarProMemo?.annualYield && <p>Solar Pro年間発電量（入力値）：{report.solarProMemo.annualYield}</p>}
-        </div><div className="report-data-block"><h3>次の検討</h3><p>周辺設備の距離と名称・設備番号を確認し、電力会社の系統図・公表資料で接続点の候補を整理します。選択設備の番号・資料更新日は系統画面から「設備確認メモを保存」で記録できます。保存したメモはこのレポートの末尾に表示します。</p><p>発電量と系統空容量は別の確認項目です。空容量から出力制御率を算定せず、接続点・工事費・工期・制御条件を電力会社に確認してから事業性を検討します。</p></div>
-      </ReportPage>}
-      {(report.gridNotes || []).map((note, index) => <ReportPage key={note.id} page={String(5 + (report.powerGrid ? 1 : 0) + (report.generation || report.solarProMemo?.annualYield ? 1 : 0) + index)} title="設備確認記録" subtitle={note.title}>
+      {(report.generation || report.solarProMemo?.annualYield) && <GenerationReportPage report={report} page={report.powerGrid ? '6' : '5'} />}
+      <ParcelReviewReport review={report.parcelReview} metrics={report.parcelMetrics} position={report.position} startPage={parcelReviewStartPage} />
+      {(report.gridNotes || []).map((note, index) => <ReportPage key={note.id} page={String(parcelReviewStartPage + parcelReviewPageCount + index)} title="設備確認記録" subtitle={note.title}>
         <p className="report-note">保存時の確認内容です。現在の公表資料との再照合は行っていません。記録日時：{new Date(note.recordedAt).toLocaleString('ja-JP')}</p>
         <pre className="report-saved-grid-note">{note.text}</pre>
       </ReportPage>)}

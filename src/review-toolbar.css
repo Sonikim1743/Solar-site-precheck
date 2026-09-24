@@ -1,0 +1,60 @@
+.review-toolbar {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0 10px;
+  margin: 14px 0 18px;
+  padding: 10px 14px;
+  border: 1px solid #d9e4df;
+  border-radius: 8px;
+  background: #fff;
+  color: #244f3f;
+}
+.review-toolbar__context { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 18px; min-width: 0; }
+.review-toolbar__candidate { display: flex; align-items: baseline; gap: 8px; min-width: 0; max-width: 100%; }
+.review-toolbar__candidate > span { flex: 0 0 auto; color: #61766c; font-size: 12px; }
+.review-toolbar__candidate strong { font-size: 14px; font-weight: 600; line-height: 1.5; min-width: 0; overflow-wrap: anywhere; }
+.review-toolbar__status { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; color: #61766c; font-size: 14px; line-height: 1.5; }
+.review-toolbar__menu { position: relative; min-width: 0; }
+.review-toolbar__menu > summary { padding: 7px 8px; cursor: pointer; font-size: 14px; line-height: 1.5; white-space: nowrap; border-radius: 5px; }
+.review-toolbar__menu > summary:hover,.review-toolbar__menu[open] > summary { background: #edf4f1; }
+.review-toolbar__menu > summary small { margin-left: 6px; font-size: 12px; color: #61766c; }
+.review-toolbar__popover { position: absolute; z-index: 700; top: calc(100% + 8px); right: 0; width: min(32rem, calc(100vw - 64px)); padding: 16px; border: 1px solid #cdded4; border-radius: 8px; box-shadow: 0 8px 24px #153c2924; background: #fff; }
+.review-toolbar__menu--flow .review-toolbar__popover { width: min(42rem, calc(100vw - 64px)); }
+.review-toolbar__steps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.review-toolbar__steps button { display: flex; align-items: flex-start; gap: 10px; min-width: 0; padding: 12px; border: 1px solid #dce6e0; border-radius: 5px; background: #fff; color: #244f3f; text-align: left; }
+.review-toolbar__steps button:hover:not(:disabled) { background: #edf4f1; }
+.review-toolbar__steps button > span:last-child { min-width: 0; }
+.review-toolbar__steps b { display: block; font-size: 14px; font-weight: 600; }
+.review-toolbar__steps small { display: block; margin-top: 4px; color: #61766c; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.review-toolbar__number { color: #61766c; font-size: 12px; line-height: 1.8; }
+.review-toolbar__support { margin: 12px 0 0; color: #61766c; font-size: 13px; line-height: 1.6; }
+.review-toolbar .review-records--toolbar { display: contents; margin: 0; padding: 0; border: 0; background: none; }
+.review-toolbar .review-records__actions { gap: 8px; }
+.review-toolbar .review-records__actions > * { min-width: 0; }
+.review-toolbar .review-records__notice { margin: 12px 0 0; line-height: 1.6; overflow-wrap: anywhere; }
+.review-toolbar__feedback { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 8px; padding-top: 9px; border-top: 1px solid #e4ece7; }
+.review-toolbar__feedback .review-records__notice { flex: 1 1 280px; margin: 0; }
+.review-toolbar__feedback button { flex: 0 0 auto; padding: 6px 10px; }
+.review-toolbar .review-toolbar__error { color: #9b332e; }
+.review-toolbar .review-records__preview { grid-column: 1 / -1; margin-top: 10px; padding: 16px; min-width: 0; overflow-wrap: anywhere; }
+.review-toolbar .review-records__preview h2 { font-size: 18px; }
+.review-toolbar .review-records__preview p { line-height: 1.6; }
+.review-toolbar__notice { grid-column: 1 / -1; margin: 8px 0 0; padding: 9px 12px; background: #fff8e9; color: #765c24; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
+.review-toolbar summary:focus-visible,.review-toolbar button:focus-visible { outline: 3px solid #31836a; outline-offset: 2px; }
+@media (max-width: 760px) {
+  .review-toolbar { grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px; padding: 10px 12px; }
+  .review-toolbar__context { grid-column: 1 / -1; }
+  .review-toolbar__menu--flow { grid-column: 1; justify-self: start; }
+  .review-toolbar__menu--records { grid-column: 2; justify-self: end; }
+  .review-toolbar__menu--flow .review-toolbar__popover { left: 0; right: auto; }
+  .review-toolbar__feedback { margin-top: 0; }
+  .review-toolbar__feedback button { max-width: 100%; white-space: normal; }
+  .review-toolbar .review-records__preview { margin-top: 2px; padding: 12px; }
+}
+@media (max-width: 400px) {
+  .review-toolbar__popover { padding: 12px; }
+  .review-toolbar__steps { grid-template-columns: minmax(0, 1fr); }
+}
+@media print { .review-toolbar { display: none !important; } }

@@ -1,7 +1,7 @@
 {
   "name": "solar-site-precheck",
   "private": true,
-  "version": "1.25.0",
+  "version": "1.27.0",
   "type": "module",
   "scripts": {
     "dev": "vite build --configLoader runner && vite preview --configLoader runner --host 127.0.0.1 --port 5173",
@@ -22,6 +22,7 @@
     "fflate": "^0.8.3",
     "leaflet": "^1.9.4",
     "pdfjs-dist": "^6.0.227",
+    "polygon-clipping": "0.15.7",
     "proj4": "^2.20.9",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

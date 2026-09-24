@@ -1,0 +1,56 @@
+.report-generation-overview .generation-overview { margin:0 0 16px }
+.generation-overview--report .generation-overview__hero { padding:20px 24px;gap:22px;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);border-radius:10px }
+.generation-overview--report .generation-overview__hero:not(:has(.generation-overview__comparison)) { grid-template-columns:1fr }
+.generation-overview--report .generation-overview__value { margin:10px 0 6px }
+.generation-overview--report .generation-overview__value>strong { font-size:48px }
+.generation-overview--report .generation-overview__exact { font-size:12px;margin:0 0 12px;color:#587268 }
+.generation-overview--report .generation-overview__eyebrow { font-size:12px }
+.generation-overview--report .generation-overview__comparison { padding-left:22px }
+.generation-overview--report .generation-overview__comparison p { margin:5px 0;color:#5b7068;font-size:12px;line-height:1.5 }
+.generation-overview--report .generation-overview__comparison .generation-overview__delta { display:flex;align-items:baseline;gap:7px;flex-wrap:wrap;color:#625137 }
+.generation-overview--report .generation-overview__delta strong { font-size:28px }
+.generation-overview--report .generation-season { margin-top:18px }
+.generation-overview--report .generation-season figcaption { margin-bottom:12px }
+.generation-overview--report .generation-season h3 { font-size:14px;margin:0 0 4px }
+.generation-overview--report .generation-season figcaption p { margin:0;font-size:11px;color:#6b7d73 }
+.generation-overview--report .generation-season__axis,.generation-overview--report .generation-season__columns { height:130px }
+.generation-overview--report .generation-season__bars { background-size:100% 65px;gap:7px }
+.generation-overview--report .generation-season__month { gap:7px }
+.generation-overview--report .generation-season__month-label { font-size:10px }
+.generation-overview--report .generation-season__bar { transition:none }
+.generation-overview--report .generation-season__month:hover .generation-season__bar { background:#6d9c84 }
+.generation-overview--report .generation-season__month:hover .generation-season__bar.is-scenario { background:#ceaf80 }
+.report-generation-months { overflow-x:auto;max-width:100%;margin:10px 0 16px }
+.report-generation-months table { width:100%;border-collapse:collapse;min-width:600px;font-variant-numeric:tabular-nums;white-space:nowrap }
+.report-generation-months caption { text-align:left;font-size:11px;color:#607369;padding:0 0 7px }
+.report-generation-months th,.report-generation-months td { border-bottom:1px solid #dce6df;padding:6px 4px;text-align:right;font-size:10px;line-height:1.45 }
+.report-generation-months th { font-weight:600;background:#f4f8f5;color:#3c5b4b }
+.report-generation-months tr>*:first-child { text-align:left }
+.report-generation-scroll-hint { display:none }
+.report-generation-evidence { border-top:1px solid #dae6de;padding-top:12px }
+.report-generation-evidence h3 { margin:0 0 7px;font-size:13px;color:#345441 }
+.report-generation-evidence p,.report-generation-solarpro,.report-generation-next { margin:6px 0;font-size:11px;line-height:1.6;color:#596d61;overflow-wrap:anywhere }
+.report-generation-next { margin-top:12px;padding:9px 12px;background:#f4f7f2;border-radius:5px }
+@media screen and (max-width:720px) {
+ .report-generation-scroll-hint { display:block;margin-top:3px;font-size:10px;color:#71857a }
+ .report-generation-overview { padding:16px }
+ .generation-overview--report .generation-overview__hero { grid-template-columns:1fr;padding:16px;gap:12px }
+ .generation-overview--report .generation-overview__value>strong { font-size:40px }
+ .generation-overview--report .generation-overview__comparison { padding:14px 0 0 }
+ .generation-overview--report .generation-season__plot { grid-template-columns:30px minmax(0,1fr);gap:5px }
+ .generation-overview--report .generation-season__bars { gap:3px }
+}
+@media print {
+ html:root { background:#fff }
+ .report-generation-overview .generation-overview__hero { grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);padding:16px 20px;gap:20px }
+ .report-generation-overview .generation-overview__comparison { border-top:0;border-left:1px solid #d9e5dc;padding:0 0 0 20px }
+ .report-generation-overview .generation-overview__value>strong { font-size:44px }
+ .report-generation-overview .generation-overview__chips>span { font-size:9px;padding:4px 6px }
+ .report-generation-overview .generation-season figcaption { flex-direction:row;align-items:center }
+ .report-generation-overview .generation-season__month-label small { display:inline }
+ .report-generation-overview .generation-season__plot { grid-template-columns:42px minmax(0,1fr);gap:8px }
+ .report-generation-overview .report-generation-months { overflow:visible }
+ .report-generation-overview .report-generation-months table { min-width:0 }
+ .report-generation-overview .report-generation-evidence p,.report-generation-overview .report-generation-solarpro,.report-generation-overview .report-generation-next { font-size:10px;line-height:1.45;margin:5px 0 }
+ .report-generation-overview .report-generation-evidence { padding-top:9px }
+}

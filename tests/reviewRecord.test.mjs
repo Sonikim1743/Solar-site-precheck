@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { exampleReviewRecord, parseReviewRecord, validateReviewRecord, createReviewRecord, MAX_REVIEW_BYTES, reviewRecordFilename } from '../src/utils/reviewRecord.js'
 import { thirdMeshCode, thirdMeshCenter } from '../src/services/nedo.js'
 import { escapeCsv } from '../src/utils/csv.js'
+import { generationCsvRows } from '../src/utils/generationCsv.js'
 
 const fresh = () => exampleReviewRecord('1.25')
 function complete() {
@@ -84,4 +85,83 @@ test('imported text stays text in spreadsheet exports while negative numbers sta
   assert.equal(escapeCsv('=HYPERLINK("bad")'),"\"'=HYPERLINK(\"\"bad\"\")\"")
   assert.equal(escapeCsv(' +cmd'),"\"' +cmd\"")
   assert.equal(escapeCsv('-10.5'),'"-10.5"');assert.equal(escapeCsv(-10.5),'"-10.5"')
+})
+
+function withScenario() {
+  const record = complete(), base = record.results.generation
+  base.scenario = {
+    version: 1,
+    calculatedAt: '2026-08-02T23:30:00Z',
+    snow: { rates: [.5, ...Array(11).fill(0)], weight: 40, mesh: thirdMeshCode(base.inputs.lat, base.inputs.lon), source: 'NEDO月別出現率を使う利用者の仮定' },
+    terrain: {
+      ...structuredClone(base),
+      inputs: { ...base.inputs, userhorizon: Array(8).fill(5) },
+      annualKwh: 72000,
+      monthly: Array.from({ length: 12 }, (_, i) => ({ month: i + 1, kwh: 6000 })),
+      sourceUrl: 'javascript:alert(1)', fetchedAt: '2026-08-02T00:00:00Z',
+    },
+    annualKwh: -999, monthly: [{ month: 99, kwh: -999 }], differenceKwh: 999, differencePercent: 999,
+  }
+  return record
+}
+
+test('optional scenario roundtrips saved assumptions and dates while rebuilding untrusted totals', () => {
+  const record = parseReviewRecord(JSON.stringify(withScenario()))
+  const { generation } = record.results, scenario = generation.scenario
+  assert.equal(generation.annualKwh, 60000)
+  assert.equal(generation.inputs.loss, 14)
+  assert.equal(scenario.annualKwh, 70800)
+  assert.equal(scenario.monthly[0].kwh, 4800)
+  assert.equal(scenario.differenceKwh, 10800)
+  assert.equal(scenario.differencePercent, 18)
+  assert.equal(scenario.calculatedAt, '2026-08-02T23:30:00.000Z')
+  assert.equal(scenario.terrain.fetchedAt, '2026-08-02T00:00:00.000Z')
+  assert.equal(scenario.snow.weight, 40)
+  assert.deepEqual(scenario.terrain.inputs.userhorizon, Array(8).fill(5))
+  assert.equal(new URL(scenario.terrain.sourceUrl).origin, 'https://re.jrc.ec.europa.eu')
+  assert.equal(new URL(scenario.terrain.sourceUrl).searchParams.get('userhorizon'), Array(8).fill(5).join(','))
+  assert.equal(record.gridNotes[0].text, complete().gridNotes[0].text)
+  assert.deepEqual(parseReviewRecord(JSON.stringify(record)), record)
+  assert.equal(validateReviewRecord(complete()).results.generation.scenario, undefined)
+})
+
+test('scenario rejects mismatched candidates, conditions, mesh and malformed primary data', () => {
+  for (const mutate of [
+    x => x.version = 2,
+    x => x.calculatedAt = 'invalid',
+    x => x.snow.mesh = '00000000',
+    x => x.snow.rates.pop(),
+    x => x.snow.rates[0] = '0.5',
+    x => x.snow.rates[0] = 1.1,
+    x => x.snow.weight = 101,
+    x => x.terrain.inputs.lat = 35,
+    x => x.terrain.inputs.peakpower = 100,
+    x => x.terrain.inputs.loss = 15,
+    x => x.terrain.inputs.userhorizon = Array(7).fill(5),
+    x => x.terrain.inputs.userhorizon[0] = -1,
+    x => x.terrain.monthly[0].month = 2,
+    x => x.terrain.monthly[0].kwh = -1,
+    x => x.terrain.fetchedAt = 'invalid',
+  ]) {
+    const record = withScenario(); mutate(record.results.generation.scenario)
+    assert.throws(() => validateReviewRecord(record))
+  }
+  const incorrectBase = complete(); incorrectBase.results.generation.inputs.userhorizon = Array(8).fill(5)
+  assert.throws(() => validateReviewRecord(incorrectBase))
+})
+
+test('scenario CSV keeps baseline, experimental values and saved conditions distinguishable', () => {
+  const record = validateReviewRecord(withScenario()), generation = record.results.generation
+  const rows = generationCsvRows(generation, record.candidate.position), values = new Map(rows)
+  assert.equal(values.get('PVGIS参考年間発電量(kWh)'), 60000)
+  assert.equal(values.get('試験比較の年間発電量(kWh)'), 70800)
+  assert.equal(values.get('試験比較の基準との差(%)'), 18)
+  assert.equal(values.get('1月 試験比較の発電量(kWh)'), 4800)
+  assert.equal(rows.filter(([key]) => /月 試験比較の発電量/.test(key)).length, 12)
+  assert.equal(values.get('試験比較の積雪メッシュ'), generation.scenario.snow.mesh)
+  assert.equal(values.get('試験比較の積雪影響係数(%)'), 40)
+  assert.match(values.get('PVGIS基準値の地平線'), /標準/)
+  assert.match(values.get('試験比較の地平線'), /置換/)
+  assert.match(values.get('試験比較の積雪仮定'), /実測ではなく/)
+  assert.equal(values.get('試験比較の計算日時(UTC)'), '2026-08-02T23:30:00.000Z')
 })

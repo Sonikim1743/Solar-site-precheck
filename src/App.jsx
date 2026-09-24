@@ -1,5 +1,9 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import MapPanel from './components/MapPanel.jsx'
+import ParcelReviewPanel from './components/ParcelReviewPanel.jsx'
+import { createEmptyParcelReview, normalizeParcelReview, setReviewParcel, removeReviewParcel, measureParcelReview, getParcelKey } from './utils/parcelReview.js'
+import { featureInteriorPoint, pointInGeometry } from './services/parcelGeometry.js'
+import './parcel-review.css'
 import GridCapacityExplorer from './components/GridCapacityExplorer.jsx'
 import './simple-prototype.css'
 import './components/power-grid-page.css'
@@ -8,6 +12,7 @@ import GenerationPanel from './components/GenerationPanel.jsx'
 import CandidateWorkflow from './components/CandidateWorkflow.jsx'
 import { createCandidateRequests } from './utils/candidateRequests.js'
 import { generationCsvRows } from './utils/generationCsv.js'
+import { geonexParcelUrl, parcelReviewCsvRows } from './utils/parcelPresentation.js'
 import './workspace.css'
 import './review-records.css'
 import ReviewRecordsPanel from './components/ReviewRecordsPanel.jsx'
@@ -54,7 +59,6 @@ import { snowRateLevel } from './utils/snowRates.js'
 import { normalizeDisplayText } from './utils/text.js'
 import { APP_VERSION, BUILD_DATE, detectRuntimeEnvironment, pdfLimitMb } from './utils/buildInfo.js'
 import {
-  featureCenter,
   parcelInfo,
   readCadastreFile,
   searchParcels,
@@ -622,6 +626,10 @@ export default function App() {
   const [parcelStatus, setParcelStatus] = useState({ status: 'idle', message: '' })
   const [selectedParcel, setSelectedParcel] = useState(draftSeed.selectedParcel || null)
   const [focusParcelId, setFocusParcelId] = useState(null)
+  const [parcelReview, setParcelReview] = useState(() => { try { return normalizeParcelReview(draftSeed.parcelReview) } catch { return createEmptyParcelReview() } })
+  const [parcelMode, setParcelMode] = useState('point')
+  const [parcelReviewStatus, setParcelReviewStatus] = useState('')
+  const parcelMetrics = useMemo(() => measureParcelReview(parcelReview), [parcelReview])
   const [siteName, setSiteName] = useState(typeof draftSeed.siteName === 'string' ? draftSeed.siteName : '')
   const [siteNameTouched, setSiteNameTouched] = useState(Boolean(draftSeed.siteNameTouched))
   const [snowData, setSnowData] = useState(isConfirmedSnowStation(draftSeed.snowStation)
@@ -704,7 +712,7 @@ export default function App() {
           solarProMemo,
           generation,
           generationInputs, siteName, siteNameTouched, memo, fieldMemo,
-          gridNotes, reviewRecordInfo: recordInfo, terrainSection, selectedParcel,
+          gridNotes, reviewRecordInfo: recordInfo, terrainSection, selectedParcel, parcelReview,
           recordPlaceLabel: placeInfo.status === 'success' ? placeInfo.data.label : '',
         }))
       } catch {
@@ -713,7 +721,7 @@ export default function App() {
     }, 200)
 
     return () => window.clearTimeout(draftSaveTimer.current)
-  }, [position, elevation, terrain, obstructionHeight, detailedHorizon, snowData.station, snowBase, solarProMemo, generation, generationInputs, siteName, siteNameTouched, memo, fieldMemo, gridNotes, recordInfo, terrainSection, selectedParcel, placeInfo])
+  }, [position, elevation, terrain, obstructionHeight, detailedHorizon, snowData.station, snowBase, solarProMemo, generation, generationInputs, siteName, siteNameTouched, memo, fieldMemo, gridNotes, recordInfo, terrainSection, selectedParcel, parcelReview, placeInfo])
 
   useEffect(() => {
     if (position && placeInfo.status === 'idle') schedulePlaceInfo(position)
@@ -898,6 +906,8 @@ export default function App() {
     window.clearTimeout(placeRequestTimer.current)
     placeRequestSeq.current += 1
     resetCandidateInputs()
+    setParcelReview(createEmptyParcelReview()); setParcelMode('point'); setParcelReviewStatus('')
+    setParcelData(null); setParcelStatus({ status: 'idle', message: '' })
     setPosition(null)
     setAddress('')
     setAddressResults([])
@@ -945,8 +955,9 @@ export default function App() {
     setRecordInfo(null)
     setPendingRecord(null)
     setUndoRecord(null)
-    const { resetCandidate = true } = options
+    const { resetCandidate = true, preserveParcelReview = false } = options
     if (resetCandidate) resetCandidateInputs()
+    if (!preserveParcelReview) { setParcelReview(createEmptyParcelReview()); setParcelMode('point'); setParcelReviewStatus('') }
     setPosition(nextPosition)
     setTerrain(null)
     setTerrainStatus('idle')
@@ -1080,7 +1091,7 @@ export default function App() {
       if (!isCurrent()) return
       setParcelData(data)
       setParcelQuery('')
-      setSelectedParcel(null)
+      setParcelMode('target')
       setParcelStatus({
         status: 'success',
         message: `${data.summary.fileName}: ${data.summary.displayable.toLocaleString()}筆を表示` +
@@ -1095,12 +1106,54 @@ export default function App() {
     }
   }
 
-  function chooseParcel(feature, centerOverride = null) {
-    const info = parcelInfo(feature)
-    const center = centerOverride || featureCenter(feature)
-    setSelectedParcel(info)
-    setFocusParcelId(info.id)
-    if (center) selectPosition(center, { resetCandidate: false })
+  function updateParcelReview(next) {
+    try {
+      const valid = normalizeParcelReview(next)
+      measureParcelReview(valid)
+      setParcelReview(valid)
+      setParcelReviewStatus('')
+      return true
+    } catch (error) { setParcelReviewStatus(error.message); return false }
+  }
+
+  function chooseParcel(feature) {
+    try {
+      const sourceName = feature.properties?.__parcelSourceName || parcelData?.summary.fileName || ''
+      const selectedKey = feature.properties?.__parcelReviewId || getParcelKey(feature, sourceName)
+      const restored = parcelReview.parcels.find(entry => entry.id === selectedKey)
+      if (parcelMode === 'target' || parcelMode === 'reference') {
+        const next = restored
+          ? { ...parcelReview, parcels: parcelReview.parcels.map(entry => entry.id === restored.id ? { ...entry, role: parcelMode } : entry) }
+          : setReviewParcel(parcelReview, feature, parcelMode, { fileName: feature.properties?.__parcelSourceName || parcelData?.summary.fileName || '', importedAt: new Date().toISOString() })
+        updateParcelReview(next)
+        return
+      }
+      if (parcelMode !== 'point') return
+      const center = featureInteriorPoint(feature)
+      if (!center) throw new Error('この筆の内部に計算地点を設定できません。形状を確認してください。')
+      const info = restored?.info || parcelInfo(feature)
+      const preserve = Boolean(restored || (parcelMetrics.geometry && pointInGeometry(center, parcelMetrics.geometry)))
+      selectPosition(center, { resetCandidate: false, preserveParcelReview: preserve })
+      setSelectedParcel(info)
+      setFocusParcelId(info.id)
+    } catch (error) { setParcelReviewStatus(error.message) }
+  }
+
+  function useReviewParcel(id) {
+    const entry = parcelReview.parcels.find(parcel => parcel.id === id)
+    if (!entry) return
+    const center = featureInteriorPoint({ type: 'Feature', geometry: entry.geometry })
+    if (!center) { setParcelReviewStatus('この筆の内部に計算地点を設定できません。'); return }
+    selectPosition(center, { resetCandidate: false, preserveParcelReview: true })
+    setSelectedParcel(entry.info); setFocusParcelId(entry.id); setParcelMode('point')
+    setParcelReviewStatus('この筆の内部を計算地点にしました。発電量・地平線はこの地点で再計算してください。')
+  }
+
+  function receiveReviewGeometry(geometry, kind) {
+    const next = kind === 'exclusion' ? { ...parcelReview, exclusions: [...parcelReview.exclusions, geometry] } : { ...parcelReview, boundary: geometry }
+    const accepted = updateParcelReview(next)
+    if (accepted) setParcelMode('point')
+    return accepted
   }
 
   async function handleTerrainAnalysis() {
@@ -2635,6 +2688,8 @@ export default function App() {
     terrainSection,
     siteName,
     parcel: selectedParcel,
+    parcelReview,
+    parcelMetrics,
     snowStation: confirmedSnowStation,
     expectedSnowMesh,
     meshBoundary,
@@ -2654,7 +2709,7 @@ export default function App() {
     gridCapacity: gridCapacity.data,
     capacityMatches,
     placeCapacityCandidates,
-  }), [position, elevation, terrain, terrainSection, siteName, selectedParcel, confirmedSnowStation, expectedSnowMesh, meshBoundary, snowBase, obstructionHeight, solarReference, selectedPlaceLabel, memo, fieldMemo, solarProMemo, generation, gridNotes, recordInfo, powerGrid.data, gridCapacity.data, capacityMatches, placeCapacityCandidates])
+  }), [position, elevation, terrain, terrainSection, siteName, selectedParcel, parcelReview, parcelMetrics, confirmedSnowStation, expectedSnowMesh, meshBoundary, snowBase, obstructionHeight, solarReference, selectedPlaceLabel, memo, fieldMemo, solarProMemo, generation, gridNotes, recordInfo, powerGrid.data, gridCapacity.data, capacityMatches, placeCapacityCandidates])
 
   function currentReviewRecord() {
     return createReviewRecord({ report, generationDraft: generationInputs, detailedHorizon, gridNotes, kind: recordInfo?.kind || 'review' })
@@ -2663,7 +2718,9 @@ export default function App() {
   function saveReviewRecord() {
     try {
       const record = currentReviewRecord()
-      const url = URL.createObjectURL(new Blob([JSON.stringify(record, null, 2) + '\n'], { type: 'application/json' }))
+      const serialized = JSON.stringify(record, null, 2) + '\n'
+      if (new TextEncoder().encode(serialized).length > MAX_REVIEW_BYTES) throw new Error('検討記録が2MBを超えています。不要な筆や範囲を減らしてから保存してください。')
+      const url = URL.createObjectURL(new Blob([serialized], { type: 'application/json' }))
       const link = document.createElement('a'); link.href = url; link.download = reviewRecordFilename(record); link.click()
       window.setTimeout(() => URL.revokeObjectURL(url), 1000)
       setRecordStatus({ message: '検討記録の保存を開始しました。ダウンロード先のファイルから再開できます。PDF原本・全設備地図・公式DB本体は含みません。', error: false })
@@ -2696,6 +2753,7 @@ export default function App() {
     const { candidate, inputs, results } = record
     setPosition(candidate.position)
     setSiteName(candidate.name); setSiteNameTouched(true); setMemo(candidate.memo); setFieldMemo(candidate.fieldMemo)
+    setParcelReview(candidate.parcelReview); setParcelMode('point'); setParcelReviewStatus('')
     setSelectedParcel(candidate.parcel); setParcelData(null); setFocusParcelId(null); setParcelQuery(''); setParcelStatus({ status: 'idle', message: '' })
     setAddress(''); setAddressResults([]); setSearchStatus('idle')
     setCurrentLocation(null); setLocationStatus({ status: 'idle', message: '' })
@@ -2718,7 +2776,7 @@ export default function App() {
   function applyPendingRecord() {
     if (!pendingRecord) return
     try {
-      const previous = { position, elevation, terrain, terrainSection, terrainSectionRange, obstructionHeight, detailedHorizon, snowBase, snowData, solarProMemo, generationInputs, generation, gridNotes, recordInfo, siteName, siteNameTouched, memo, fieldMemo, selectedParcel, parcelData, focusParcelId, parcelQuery, parcelStatus, powerGrid, placeInfo, placeApiStatus, currentLocation, locationStatus, address, addressResults, searchStatus, gridCapacity, adjacentMeshCompare, generationNotice }
+      const previous = { position, elevation, terrain, terrainSection, terrainSectionRange, obstructionHeight, detailedHorizon, snowBase, snowData, solarProMemo, generationInputs, generation, gridNotes, recordInfo, siteName, siteNameTouched, memo, fieldMemo, selectedParcel, parcelReview, parcelMode, parcelReviewStatus, parcelData, focusParcelId, parcelQuery, parcelStatus, powerGrid, placeInfo, placeApiStatus, currentLocation, locationStatus, address, addressResults, searchStatus, gridCapacity, adjacentMeshCompare, generationNotice }
       restoreReviewRecord(pendingRecord); setUndoRecord(previous)
       setRecordStatus({ message: '記録を開きました。結果は保存当時の値です。新しい条件で計算すると更新されます。', error: false })
     } catch (error) { setRecordStatus({ message: error.message, error: true }) }
@@ -2734,6 +2792,7 @@ export default function App() {
     setObstructionHeight(prior.obstructionHeight); setDetailedHorizon(prior.detailedHorizon); setSnowBase(prior.snowBase); setSnowData(settled(prior.snowData))
     setSolarProMemo(prior.solarProMemo); setGenerationInputs(prior.generationInputs); setGeneration(prior.generation); setGenerationNotice('')
     setGridNotes(prior.gridNotes); setRecordInfo(prior.recordInfo); setSiteName(prior.siteName); setSiteNameTouched(prior.siteNameTouched); setMemo(prior.memo); setFieldMemo(prior.fieldMemo)
+    setParcelReview(prior.parcelReview); setParcelMode(prior.parcelMode); setParcelReviewStatus(prior.parcelReviewStatus)
     setSelectedParcel(prior.selectedParcel); setParcelData(prior.parcelData); setFocusParcelId(prior.focusParcelId); setParcelQuery(prior.parcelQuery); setParcelStatus(settled(prior.parcelStatus))
     setPowerGrid(settled(prior.powerGrid)); setGridCapacity(settled(prior.gridCapacity)); setAdjacentMeshCompare(settled(prior.adjacentMeshCompare)); setGenerationNotice(prior.generationNotice); setPlaceInfo(settled(prior.placeInfo)); setPlaceApiStatus(prior.placeApiStatus)
     setCurrentLocation(prior.currentLocation); setLocationStatus(settled(prior.locationStatus)); setAddress(prior.address); setAddressResults(prior.addressResults); setSearchStatus(prior.searchStatus === 'loading' ? 'idle' : prior.searchStatus)
@@ -2760,6 +2819,7 @@ export default function App() {
       ['項目', '値'],
       ['候補地名', siteName],
       ['地番', selectedParcel?.number || ''],
+      ...parcelReviewCsvRows(parcelReview, parcelMetrics),
       ['地番所在地', [selectedParcel?.municipality, selectedParcel?.area].filter(Boolean).join(' ')],
       ['緯度（度分）', position ? toDegreeMinutes(position.lat, 'lat') : ''],
       ['経度（度分）', position ? toDegreeMinutes(position.lon, 'lon') : ''],
@@ -3012,6 +3072,13 @@ export default function App() {
     window.history.replaceState(null, '', '#' + target)
     window.setTimeout(() => {
       const element = document.getElementById(target)
+      if (target === 'use-cases' && element) {
+        element.open = true
+        element.querySelector(':scope > summary')?.focus({ preventScroll: true })
+        element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        return
+      }
+      if (target === 'simple-snow' || target === 'simple-horizon') { const analysis = document.getElementById('simple-analysis'); if (analysis) analysis.open = true }
       if (target === 'report-section' || target === 'solar-generation') { const details = element?.querySelector('details'); if (details) details.open = true }
       if (element) { element.tabIndex = -1; element.focus({ preventScroll: true }); element.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
     }, 0)
@@ -3050,7 +3117,7 @@ export default function App() {
             <button type="button" aria-current={activePage === 'power' ? 'page' : undefined} onClick={() => switchPage('power')}>系統確認</button>
             <details className="workspace-tools"><summary>{activePage === 'pdf' ? 'PDFツール' : activePage === 'inheritance' ? '登記チェック' : solarManualActive ? 'Solar Pro入力' : '業務ツール'}</summary>
               <div className="workspace-tools-menu" onClick={event => { if (event.target.closest('button, a')) { event.currentTarget.parentElement.open = false; event.currentTarget.parentElement.querySelector('summary')?.focus() } }}>
-                <button type="button" onClick={() => openReviewSection('use-cases')}>活用例・資料案内</button>
+                <button type="button" onClick={() => openReviewSection('use-cases')}>使い方・活用例</button>
                 <button type="button" onClick={openSolarManual}>Solar Pro入力ガイド</button>
                 <button type="button" onClick={() => switchPage('pdf')}>PDFツール</button>
                 <button type="button" onClick={() => switchPage('inheritance')}>登記チェック</button>
@@ -3073,13 +3140,15 @@ export default function App() {
           position={position} placeLabel={selectedPlaceLabel} siteName={siteName} generation={generation} powerGrid={powerGrid} terrain={terrain} snowReady={Boolean(confirmedSnowStation)} generationNotice={generationNotice}
           onSite={() => openReviewSection('site-select')} onGeneration={() => openReviewSection('solar-generation')}
           onGrid={() => switchPage('power')} onReport={() => openReviewSection('report-section')}
-        />}
-        {(activePage === 'solar' || activePage === 'power') && <ReviewRecordsPanel position={position} onSave={saveReviewRecord} onRead={readReviewRecord} pending={pendingRecord} status={recordStatus} recordInfo={recordInfo} onApply={applyPendingRecord} onDismiss={() => { candidateRequests.current.start('record-import'); setPendingRecord(null); setRecordStatus({ message: '', error: false }) }} onUndo={undoOpenedRecord} canUndo={Boolean(undoRecord)} notesCount={gridNotes.length} />}
+        >
+          <ReviewRecordsPanel position={position} onSave={saveReviewRecord} onRead={readReviewRecord} pending={pendingRecord} status={recordStatus} recordInfo={recordInfo} onApply={applyPendingRecord} onDismiss={() => { candidateRequests.current.start('record-import'); setPendingRecord(null); setRecordStatus({ message: '', error: false }) }} onUndo={undoOpenedRecord} canUndo={Boolean(undoRecord)} notesCount={gridNotes.length} />
+        </CandidateWorkflow>}
         {activePage === 'power' && <Suspense fallback={<p>系統確認マップを読み込んでいます…</p>}><PowerGridPage
           position={position} placeLabel={selectedPlaceLabel} powerGrid={powerGrid} gridCapacity={gridCapacity} capacityMatches={capacityMatches}
           annualYield={solarProMemo.annualYield} generation={generation} onGenerationChange={setGeneration} generationInputs={generationInputs} onGenerationInputsChange={setGenerationInputs} candidateRevision={candidateRevision} onGenerationNotice={setGenerationNotice} onSaveGridNote={addGridNote} savedGridNotes={gridNotes}
           onCheck={handlePowerGridCheck} onLoadCapacity={handleBundledGridCapacity} onBack={() => switchPage('solar')}
           onReport={() => openReviewSection('report-section')}
+          terrain={terrain} snowStation={confirmedSnowStation} onScenarioSources={openReviewSection}
         /></Suspense>}
         {activePage === 'solar' && (
           <>
@@ -3199,7 +3268,7 @@ export default function App() {
               <summary>
                 <span>
                   <strong>追加機能</strong>
-                  <small>地番ファイル・筆界確認</small>
+                  <small>地番ファイル・検討範囲</small>
                 </span>
               </summary>
               <div className="cadastre-option__body">
@@ -3208,7 +3277,7 @@ export default function App() {
                     <strong>地番ファイルの使い方</strong>
                     <ol>
                       <li>上の住所検索または地図クリックで候補地点を選択</li>
-                      <li>G空間情報センターで対象市区町村のGeoJSONをダウンロード</li>
+                      <li>G空間情報センターで対象市区町村のXML・ZIP・GeoJSONをダウンロード</li>
                       <li>この画面へ戻り、ファイルを読み込んで地番検索または筆界をクリック</li>
                     </ol>
                     <small>50MBを超えるファイルは候補地点から3km以内だけを自動表示します。ダウンロード画面の利用条件も確認してください。</small>
@@ -3263,13 +3332,31 @@ export default function App() {
             {searchStatus === 'empty' && <p className="inline-message">該当する候補がありません。座標の場合は「34.8617, 133.2433」の形式も使えます。</p>}
             {searchStatus === 'error' && <p className="inline-message inline-message--error">住所検索に接続できませんでした。座標入力または地図クリックを使用してください。</p>}
 
+            <ParcelReviewPanel
+              review={parcelReview} metrics={parcelMetrics} mode={parcelMode}
+              onModeChange={mode => { setParcelMode(mode); setParcelReviewStatus('') }}
+              onRemoveParcel={id => updateParcelReview(removeReviewParcel(parcelReview, id))}
+              onClearBoundary={() => updateParcelReview({ ...parcelReview, boundary: null })}
+              onClearExclusions={() => updateParcelReview({ ...parcelReview, exclusions: [] })}
+              onClear={() => updateParcelReview(createEmptyParcelReview())}
+              onUseParcel={useReviewParcel}
+              onFocusParcel={id => setFocusParcelId(id)}
+              onChangeRole={(id, role) => updateParcelReview({ ...parcelReview, parcels: parcelReview.parcels.map(entry => entry.id === id ? { ...entry, role } : entry) })}
+              geonexUrl={geonexParcelUrl(selectedParcel)}
+              status={[parcelReviewStatus, position && parcelMetrics.geometry && !pointInGeometry(position, parcelMetrics.geometry) ? '計算地点が有効な検討範囲の外にあります。地図で範囲内の地点を選び直してください。' : '', (parcelReview.boundary || parcelMetrics.targetCount) && !parcelMetrics.geometry ? '有効な検討面積がありません。対象・検討範囲・除外範囲を確認してください。' : ''].filter(Boolean).join(' ')}
+            />
             <MapPanel
               position={position}
               onSelect={(nextPosition) => {
-                setSelectedParcel(null)
-                setFocusParcelId(null)
-                selectPosition(nextPosition)
+                const preserve = Boolean(parcelMetrics.geometry && pointInGeometry(nextPosition, parcelMetrics.geometry))
+                selectPosition(nextPosition, { resetCandidate: !preserve, preserveParcelReview: preserve })
+                setSelectedParcel(null); setFocusParcelId(null)
               }}
+              parcelReview={parcelReview}
+              parcelMode={parcelMode}
+              onParcelModeChange={setParcelMode}
+              onReviewGeometry={receiveReviewGeometry}
+              onParcelDrawingError={setParcelReviewStatus}
               onUseCurrentLocation={handleUseCurrentLocation}
               currentLocation={currentLocation}
               locationStatus={locationStatus}
@@ -3800,7 +3887,7 @@ export default function App() {
 
         <section className="solar-generation no-print" id="solar-generation" aria-label="候補地の参考発電量">
           <div className="solar-generation__heading"><div><h2>参考発電量</h2><p>検討する設備条件を入力し、月別・年間の発電量を確認します。</p></div><button type="button" className="secondary-button" disabled={!position} onClick={() => switchPage('power')}>次に系統を確認 →</button></div>
-          <GenerationPanel key={candidateRevision + ":" + selectedCoordinateText} onNotice={setGenerationNotice} position={position} result={generation} onChange={setGeneration} annualYield={solarProMemo.annualYield} draftInputs={generationInputs} onInputsChange={setGenerationInputs} expanded />
+          <GenerationPanel key={candidateRevision + ":" + selectedCoordinateText} onNotice={setGenerationNotice} position={position} result={generation} onChange={setGeneration} annualYield={solarProMemo.annualYield} draftInputs={generationInputs} onInputsChange={setGenerationInputs} terrain={terrain} snowStation={confirmedSnowStation} onScenarioSources={openReviewSection} expanded />
         </section>
 
         <section className="report-section" id="report-section">
@@ -3870,8 +3957,6 @@ export default function App() {
           </details>
         </section>
 
-
-        <UseCasesGuide onExample={previewExampleRecord} onReport={() => openReviewSection('report-section')} />
 
         <div className="support-sections">
           <section className="manual-section panel" id="solar-manual">
@@ -4098,6 +4183,7 @@ export default function App() {
           </details>
         </section>
         </div>
+        <UseCasesGuide onExample={previewExampleRecord} onReport={() => openReviewSection('report-section')} />
           </>
         )}
 

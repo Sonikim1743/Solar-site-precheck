@@ -1,0 +1,73 @@
+.parcel-review-panel { min-width: 0; margin: 16px 0; padding: 20px; border: 1px solid #d7e3dc; border-radius: 12px; background: #fff; color: #203d34; }
+.parcel-review-panel__heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.parcel-review-panel__heading h3 { margin: 0; font-size: 17px; }
+.parcel-review-panel__heading p { margin: 5px 0 0; color: #64736c; font-size: 12px; }
+.parcel-geonex-link { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; border: 1px solid #cbdcd2; border-radius: 7px; padding: 7px 12px; color: #12624a; background: #f5faf7; font-size: 12px; font-weight: 700; text-decoration: none; }
+.parcel-mode-selector { display: flex; flex-wrap: wrap; gap: 6px; margin: 18px 0 8px; }
+.parcel-review-panel button, .parcel-review-panel select, .parcel-drawing-toolbar button { min-height: 40px; max-width: 100%; padding: 8px 11px; border: 1px solid #c6d6cc; border-radius: 7px; background: #fff; color: #2e483c; font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
+.parcel-mode-selector button { flex: 1 1 95px; }
+.parcel-mode-selector button.is-active, .parcel-drawing-toolbar button.parcel-button--primary { border-color: #0d7155; background: #0d7155; color: #fff; }
+.parcel-review-panel button:hover:not(:disabled), .parcel-review-panel select:hover:not(:disabled), .parcel-drawing-toolbar button:hover:not(:disabled), .parcel-geonex-link:hover { box-shadow: 0 0 0 2px #cde9db; }
+.parcel-review-panel button:disabled, .parcel-review-panel select:disabled, .parcel-drawing-toolbar button:disabled { opacity: .48; cursor: not-allowed; }
+.parcel-review-panel :is(button, select, a, summary):focus-visible, .parcel-drawing-toolbar button:focus-visible { outline: 3px solid #0078a8; outline-offset: 3px; }
+.parcel-mode-hint { margin: 0 0 15px; min-height: 1.6em; color: #61736a; font-size: 12px; line-height: 1.7; }
+.parcel-review-counts { display: flex; gap: 20px; flex-wrap: wrap; margin: 12px 0; font-size: 12px; }
+.parcel-review-counts > span { display: inline-flex; align-items: center; gap: 6px; }
+.parcel-role-dot { width: 10px; height: 10px; border-radius: 3px; background: #efbd3f; }
+.parcel-role-dot--reference { background: #66aee0; }
+.parcel-review-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 0 0 16px; }
+.parcel-review-metrics > div { min-width: 0; padding: 13px 11px; border: 1px solid #e0e9e3; border-radius: 8px; background: #f7faf8; }
+.parcel-review-metrics > div.is-total { background: #edf7f1; border-color: #bfdcca; }
+.parcel-review-metrics dt { color: #556b60; font-size: 11px; }
+.parcel-review-metrics dd { margin: 7px 0 3px; font-size: 21px; font-weight: 800; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.parcel-review-metrics dd small { font-size: 11px; font-weight: 500; white-space: nowrap; }
+.parcel-review-metrics > div > span { display: block; color: #64756c; font-size: 10px; line-height: 1.5; }
+.parcel-review-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; max-height: 390px; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.parcel-review-selection > summary { padding: 9px 0; cursor: pointer; color: #3e5c4b; font-size: 12px; }
+.parcel-review-selection[open] > summary { margin-bottom: 5px; }
+.parcel-review-item { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; min-width: 0; padding: 12px; border: 1px solid #e0e6df; border-left: 4px solid #dfaf30; border-radius: 7px; }
+.parcel-review-item--reference { border-left-color: #67a7d3; }
+.parcel-review-item__identity { flex: 1 1 210px; min-width: 0; overflow-wrap: anywhere; }
+.parcel-role-label { display: inline-block; margin-right: 8px; padding: 2px 6px; border-radius: 4px; background: #fff4d4; color: #76520a; font-size: 10px; font-weight: 700; }
+.parcel-review-item--reference .parcel-role-label { color: #185777; background: #edf6fd; }
+.parcel-review-item__identity > strong { font-size: 13px; }
+.parcel-review-item__identity p { margin: 6px 0 3px; color: #5e7065; font-size: 11px; line-height: 1.5; }
+.parcel-review-item__identity small { color: #758077; font-size: 10px; }
+.parcel-review-item__actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.parcel-review-item__actions select { min-width: 69px; }
+.parcel-review-item__actions button.parcel-button--quiet { color: #756b64; background: #faf9f7; }
+.parcel-review-empty { margin: 10px 0; border: 1px dashed #cbdad0; border-radius: 8px; padding: 16px; color: #69776f; font-size: 12px; line-height: 1.8; }
+.parcel-review-cleanup { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+.parcel-review-cleanup button { min-height: 36px; font-size: 11px; }
+.parcel-review-notes { border-top: 1px solid #e2e9e4; margin-top: 14px; padding-top: 12px; color: #65746b; font-size: 11px; line-height: 1.8; }
+.parcel-review-notes summary { cursor: pointer; color: #355b46; font-size: 12px; font-weight: 650; }
+.parcel-review-notes p { margin: 9px 0; }
+.parcel-review-message { margin: 10px 0; padding: 10px 12px; background: #edf7f0; border: 1px solid #bfdac8; border-radius: 7px; color: #2b6345; font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
+.parcel-review-message--error { background: #fff3ef; color: #923e2c; border-color: #efd0c5; }
+.parcel-drawing-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 12px; margin-top: 8px; border: 1px solid #b6d6c8; border-radius: 8px; background: #edf7f2; }
+.parcel-drawing-toolbar__instruction { display: grid; gap: 4px; font-size: 12px; color: #284d3d; }
+.parcel-drawing-toolbar__instruction span, .parcel-drawing-toolbar small { font-size: 11px; line-height: 1.6; color: #5b7466; }
+.parcel-drawing-toolbar__buttons { display: flex; gap: 6px; }
+.parcel-drawing-toolbar > small { flex-basis: 100%; }
+.map-shell--parcel-drawing .leaflet-container, .map-shell--parcel-drawing .leaflet-interactive { cursor: crosshair; }
+.parcel-draft-tooltip { padding: 1px 5px !important; border: 1px solid #d4e8dc !important; background: #fff !important; color: #184a37 !important; font-size: 10px !important; font-weight: 700; }
+.parcel-map-legend { display: flex; flex-wrap: wrap; gap: 9px 16px; margin: 9px 2px; font-size: 11px; color: #607369; }
+.parcel-map-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.parcel-map-legend i { display: inline-block; width: 16px; height: 10px; border: 2px solid #c79c24; background: #f9e8b8; }
+.parcel-map-legend i.parcel-map-legend__reference { border-color: #5897c5; border-style: dashed; background: #daeefe; }
+.parcel-map-legend i.parcel-map-legend__boundary { border-color: #599880; background: #d6eee4; }
+.parcel-map-legend i.parcel-map-legend__exclusion { border-color: #d56262; border-style: dashed; background: #f7d1d1; }
+.parcel-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+@media (max-width: 640px) {
+  .parcel-review-panel { padding: 14px; }
+  .parcel-review-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .parcel-review-metrics dd { font-size: 19px; }
+  .parcel-review-item { padding: 10px; gap: 8px; }
+  .parcel-review-item__actions { width: 100%; display: grid; grid-template-columns: auto 1fr; }
+  .parcel-review-item__actions button, .parcel-review-item__actions select { width: 100%; min-height: 42px; }
+  .parcel-mode-selector { gap: 5px; }
+  .parcel-mode-selector button { flex-basis: 29%; min-height: 44px; padding: 8px 5px; }
+  .parcel-drawing-toolbar__buttons { width: 100%; }
+  .parcel-drawing-toolbar__buttons button { flex: 1; min-height: 44px; }
+}
+@media print { .parcel-drawing-toolbar, .parcel-review-panel { display: none !important; } }

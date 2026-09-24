@@ -1,9 +1,12 @@
 import { generationInputs, parseGeneration, generationUrl } from '../../shared/generation.js'
+import { buildGenerationScenario } from '../../shared/generationScenario.js'
 import { isConfirmedSnowStation, thirdMeshCode } from '../services/nedo.js'
 import { validateRateSummaries } from '../services/nedoValidation.js'
 
+import { normalizeParcelReview } from './parcelReview.js'
+
 export const REVIEW_FORMAT = 'solar-site-precheck-review'
-export const REVIEW_SCHEMA_VERSION = 1
+export const REVIEW_SCHEMA_VERSION = 2
 export const MAX_REVIEW_BYTES = 2 * 1024 * 1024
 const fail = label => { throw new Error(`検討記録の${label}が不正です。元のファイルを確認してください。`) }
 const object = (value, label) => value && typeof value === 'object' && !Array.isArray(value) ? value : fail(label)
@@ -29,12 +32,37 @@ function normalizeGeneration(value, position, draft) {
   if (value == null) return null
   object(value, '発電量')
   const inputs = generationInputs(object(value.inputs, '発電量の条件'))
+  if (inputs.userhorizon !== undefined) fail('基準発電量の地形地平線')
   if (inputs.lat !== position.lat || inputs.lon !== position.lon) fail('発電量の候補地')
   if (['peakpower', 'angle', 'aspect', 'loss'].some(key => inputs[key] !== draft[key])) fail('発電量と入力条件の一致')
   const monthly = list(value.monthly, '月別発電量', 12, 12)
   const normalized = parseGeneration({ outputs: { totals: { fixed: { E_y: value.annualKwh } }, monthly: { fixed: monthly.map(row => ({ month: row.month, E_m: row.kwh })) } } }, inputs)
   if (Math.abs(monthly.reduce((total, row) => total + row.kwh, 0) - value.annualKwh) > Math.max(1, value.annualKwh * .001)) fail('年間・月別発電量の整合性')
-  return { ...normalized, source: text(value.source, '発電量の出典'), sourceUrl: generationUrl(inputs), period: text(value.period, '対象期間', 80), fetchedAt: date(value.fetchedAt, '発電量の取得日時') }
+  const base = { ...normalized, source: text(value.source, '発電量の出典'), sourceUrl: generationUrl(inputs), period: text(value.period, '対象期間', 80), fetchedAt: date(value.fetchedAt, '発電量の取得日時') }
+  if (value.scenario != null) base.scenario = normalizeGenerationScenario(value.scenario, base, position)
+  return base
+}
+
+function normalizeGenerationScenario(value, base, position) {
+  object(value, '試験比較')
+  if (value.version !== 1) fail('試験比較の形式')
+  let snow = null
+  if (value.snow != null) {
+    object(value.snow, '試験比較の積雪条件')
+    const mesh = text(value.snow.mesh, '試験比較の積雪メッシュ', 8)
+    if (!/^\d{8}$/.test(mesh) || mesh !== thirdMeshCode(position.lat, position.lon)) fail('試験比較の積雪メッシュ')
+    snow = {
+      rates: list(value.snow.rates, '試験比較の月別積雪出現率', 12, 12).map(rate => number(rate, '試験比較の積雪出現率', 0, 1)),
+      weight: number(value.snow.weight, '試験比較の積雪影響係数', 0, 100),
+      mesh,
+      source: text(value.snow.source, '試験比較の積雪出典'),
+    }
+  }
+  const terrain = value.terrain == null ? null : object(value.terrain, '試験比較の地平線計算')
+  if (terrain) text(terrain.period, '試験比較の地平線計算期間', 80)
+  // Derived totals in a file are not authoritative. The helper validates the
+  // terrain calculation, reconstructs source URLs, and recalculates this view.
+  return buildGenerationScenario(base, { snow, terrain, calculatedAt: date(value.calculatedAt, '試験比較の計算日時') })
 }
 
 function normalizeTerrain(value, position, height) {
@@ -104,7 +132,7 @@ function normalizeSnow(value, position) {
 export function validateReviewRecord(value) {
   object(value, 'ファイル形式')
   if (value.format !== REVIEW_FORMAT) fail('ファイル形式')
-  if (value.schemaVersion !== REVIEW_SCHEMA_VERSION) throw new Error('この検討記録の形式には対応していません。対応するアプリのバージョンで開いてください。')
+  if (![1, REVIEW_SCHEMA_VERSION].includes(value.schemaVersion)) throw new Error('この検討記録の形式には対応していません。対応するアプリのバージョンで開いてください。')
   const candidate = object(value.candidate, '候補地'), inputs = object(value.inputs, '条件'), results = object(value.results, '結果')
   const position = point(candidate.position, '候補地の座標')
   const draft = normalizeDraftInputs(inputs.generation)
@@ -116,7 +144,7 @@ export function validateReviewRecord(value) {
     if (reviewPositionKey(point(note.position, '設備確認メモの座標')) !== reviewPositionKey(position)) fail('設備確認メモの候補地')
     return { id: text(note.id, '設備確認メモID', 160), title: text(note.title, '設備名'), text: text(note.text, '設備確認メモ本文', 16000), recordedAt: date(note.recordedAt, '設備確認日時'), position }
   })
-  return { format: REVIEW_FORMAT, schemaVersion: REVIEW_SCHEMA_VERSION, savedAt: date(value.savedAt, '保存日時'), appVersion: text(value.appVersion, 'アプリ版', 40), kind: value.kind === 'example' ? 'example' : 'review', candidate: { position, name: text(candidate.name, '候補地名', 200), placeLabel: text(candidate.placeLabel, '地名'), memo: text(candidate.memo, '候補地メモ', 20000), fieldMemo: text(candidate.fieldMemo, '現地メモ', 20000), parcel }, inputs: { obstructionHeight, detailedHorizon: inputs.detailedHorizon === true, snowBase: number(inputs.snowBase, '積雪補正の基準値', 0, 1), generation: draft, solarProMemo: optionalTextFields(inputs.solarProMemo, ['reportName', 'annualYield', 'capacity', 'module', 'checkedAt']) }, results: { elevation: { value: nullable(elevation.value, '標高', -500, 10000), source: text(elevation.source, '標高出典') }, terrain: normalizeTerrain(results.terrain, position, obstructionHeight), terrainSection: normalizeSection(results.terrainSection, position), snowStation: normalizeSnow(results.snowStation, position), generation: normalizeGeneration(results.generation, position, draft) }, gridNotes }
+  return { format: REVIEW_FORMAT, schemaVersion: REVIEW_SCHEMA_VERSION, savedAt: date(value.savedAt, '保存日時'), appVersion: text(value.appVersion, 'アプリ版', 40), kind: value.kind === 'example' ? 'example' : 'review', candidate: { position, name: text(candidate.name, '候補地名', 200), placeLabel: text(candidate.placeLabel, '地名'), memo: text(candidate.memo, '候補地メモ', 20000), fieldMemo: text(candidate.fieldMemo, '現地メモ', 20000), parcel, parcelReview: normalizeParcelReview(value.schemaVersion >= 2 ? candidate.parcelReview : null) }, inputs: { obstructionHeight, detailedHorizon: inputs.detailedHorizon === true, snowBase: number(inputs.snowBase, '積雪補正の基準値', 0, 1), generation: draft, solarProMemo: optionalTextFields(inputs.solarProMemo, ['reportName', 'annualYield', 'capacity', 'module', 'checkedAt']) }, results: { elevation: { value: nullable(elevation.value, '標高', -500, 10000), source: text(elevation.source, '標高出典') }, terrain: normalizeTerrain(results.terrain, position, obstructionHeight), terrainSection: normalizeSection(results.terrainSection, position), snowStation: normalizeSnow(results.snowStation, position), generation: normalizeGeneration(results.generation, position, draft) }, gridNotes }
 }
 
 export function parseReviewRecord(raw) {
@@ -127,7 +155,7 @@ export function parseReviewRecord(raw) {
 }
 
 export function createReviewRecord({ report, generationDraft, detailedHorizon = false, gridNotes = [], kind = 'review' }) {
-  return validateReviewRecord({ format: REVIEW_FORMAT, schemaVersion: REVIEW_SCHEMA_VERSION, appVersion: report.appVersion, savedAt: new Date().toISOString(), kind, candidate: { position: report.position, name: report.siteName, placeLabel: report.placeLabel, memo: report.memo, fieldMemo: report.fieldMemo, parcel: report.parcel }, inputs: { obstructionHeight: report.obstructionHeight, detailedHorizon, snowBase: report.snowBase, solarProMemo: report.solarProMemo, generation: generationDraft }, results: { elevation: { value: report.elevation, source: report.elevationSource }, terrain: report.terrain, terrainSection: report.terrainSection, snowStation: report.snowStation, generation: report.generation }, gridNotes })
+  return validateReviewRecord({ format: REVIEW_FORMAT, schemaVersion: REVIEW_SCHEMA_VERSION, appVersion: report.appVersion, savedAt: new Date().toISOString(), kind, candidate: { position: report.position, name: report.siteName, placeLabel: report.placeLabel, memo: report.memo, fieldMemo: report.fieldMemo, parcel: report.parcel, parcelReview: report.parcelReview }, inputs: { obstructionHeight: report.obstructionHeight, detailedHorizon, snowBase: report.snowBase, solarProMemo: report.solarProMemo, generation: generationDraft }, results: { elevation: { value: report.elevation, source: report.elevationSource }, terrain: report.terrain, terrainSection: report.terrainSection, snowStation: report.snowStation, generation: report.generation }, gridNotes })
 }
 
 export function reviewRecordFilename(record) {
