@@ -3153,6 +3153,19 @@ export default function App() {
       </header>
 
       <main>
+        {activePage === 'generation' && <section className="panel solar-generation solar-generation--page no-print" id="solar-generation" aria-label="候補地の参考発電量">
+          <div className="solar-generation__heading"><div><h1>参考発電量を計算</h1><p>{siteName || selectedPlaceLabel || (position ? selectedCoordinateText : '先に候補地を選択してください')}</p></div><button type="button" className="secondary-button" onClick={() => switchPage('solar')}>← 候補地へ戻る</button></div>
+          <GenerationPanel key={candidateRevision + ":" + selectedCoordinateText} onNotice={setGenerationNotice} position={position} result={generation} onChange={setGeneration} annualYield={solarProMemo.annualYield} draftInputs={generationInputs} onInputsChange={setGenerationInputs} terrain={terrain} snowStation={confirmedSnowStation} onScenarioSources={openReviewSection}
+            scenarioDraft={generationScenarioDraft?.key === `${candidateRevision}:${selectedCoordinateText}:${generation?.fetchedAt}` ? generationScenarioDraft.value : undefined}
+            onScenarioDraftChange={update => {
+              const key = `${candidateRevision}:${selectedCoordinateText}:${generation?.fetchedAt}`
+              setGenerationScenarioDraft(current => {
+                const previous = current?.key === key ? current.value : { snowEnabled: Boolean(generation?.scenario?.snow), terrainEnabled: Boolean(generation?.scenario?.terrain), weight: generation?.scenario?.snow?.weight ?? 25 }
+                return { key, value: typeof update === 'function' ? update(previous) : update }
+              })
+            }} expanded />
+          {generationNotice && <p role="status">{generationNotice}</p>}
+        </section>}
         {activePage === 'power' && <Suspense fallback={<p>系統確認マップを読み込んでいます…</p>}><PowerGridPage
           position={position} placeLabel={selectedPlaceLabel} powerGrid={powerGrid} gridCapacity={gridCapacity} capacityMatches={capacityMatches}
           annualYield={solarProMemo.annualYield} generation={generation} onSaveGridNote={addGridNote} savedGridNotes={gridNotes}
@@ -3384,24 +3397,13 @@ export default function App() {
                 <div className="simple-point-meta"><span>{position ? selectedCoordinateText : '緯度・経度 —'}</span><span>標高 <b>{elevation.status === 'success' ? `${elevation.value.toFixed(1)} m` : elevation.status === 'loading' ? '取得中…' : '—'}</b></span></div>
                 <div className="simple-point-actions">{position && <><button type="button" onClick={copySelectedCoordinates}>緯度経度コピー</button><a href={googleMapsUrl} target="_blank" rel="noreferrer">Google マップ ↗</a></>}{pointActionStatus && <span role="status">{pointActionStatus}</span>}</div>
               </div> : <div className="selected-point-mini">
-                <span>選択地点</span>
-                <strong>{position ? `${toDegreeMinutes(position.lat, 'lat')} / ${toDegreeMinutes(position.lon, 'lon')}` : '地図で地点を選択'}</strong>
-                <small>
-                  {elevation.status === 'loading' && '標高 取得中…'}
-                  {elevation.status === 'success' && `標高 ${elevation.value.toFixed(1)}m`}
-                  {elevation.status === 'error' && '標高 未取得'}
-                  {elevation.status === 'idle' && '標高 —'}
-                  {selectedPlaceLabel ? ` / ${selectedPlaceLabel}` : ''}
-                </small>
-                {position && (
-                  <button type="button" className="mini-copy-button" onClick={copySelectedCoordinates} title={selectedCoordinateText}>
-                    緯度経度コピー
-                  </button>
-                )}
-                {pointActionStatus && <em>{pointActionStatus}</em>}
+                <div className="selected-point-mini__location"><span>選択地点</span><strong>{position ? selectedPlaceLabel || '住所を確認中' : '住所検索または地図で地点を選択'}</strong></div>
+                <div className="selected-point-mini__coordinates"><span>緯度・経度</span><strong>{position ? `${toDegreeMinutes(position.lat, 'lat')} / ${toDegreeMinutes(position.lon, 'lon')}` : '—'}</strong></div>
+                <div className="selected-point-mini__elevation"><span>標高</span><strong>{elevation.status === 'success' ? `${elevation.value.toFixed(1)} m` : elevation.status === 'loading' ? '取得中…' : elevation.status === 'error' ? '未取得' : '—'}</strong></div>
+                {position && <button type="button" className="mini-copy-button" onClick={copySelectedCoordinates} title={selectedCoordinateText}>緯度経度コピー</button>}
+                {pointActionStatus && <em role="status">{pointActionStatus}</em>}
               </div>}
               {position && !Number.isFinite(elevation.value) && <button className="secondary-button" disabled={elevation.status === 'loading'} onClick={fetchMissingElevation}>{elevation.status === 'loading' ? '標高を取得中…' : 'この地点の標高を取得'}</button>}
-              <details className="map-terrain-disclosure"><summary>地形断面を見る</summary>
               <div className="terrain-section-quick">
                 <div>
                   <strong>
@@ -3444,7 +3446,6 @@ export default function App() {
                 <p className="inline-message inline-message--error">周辺{terrainSectionRange}mの標高断面を取得できませんでした。時間をおいて再試行してください。</p>
               )}
               {terrainSectionOpen && <TerrainSectionPreview analysis={terrainSection} />}
-              </details>
             </div>
             <button type="button" className="power-page-link" disabled={!position} onClick={() => switchPage('power')}>この地点の系統を確認 →</button>
             {selectedParcel && (
@@ -3895,26 +3896,7 @@ export default function App() {
             </div>
             </AnalysisContainer>
           </section>
-        <section className="panel solar-generation solar-generation--folded no-print" id="solar-generation" aria-label="候補地の参考発電量">
-          <details className="generation-workspace-disclosure">
-            <summary className="chapter-summary">
-              <div className="section-heading"><div className="step-number">G</div><div><h2>参考発電量を計算</h2><p>設備条件から月別・年間の参考値を確認。必要なときに使用します。</p></div></div>
-              <span className="chapter-toggle">クリックして開く</span>
-            </summary>
-            <div className="chapter-body">
-          <GenerationPanel key={candidateRevision + ":" + selectedCoordinateText} onNotice={setGenerationNotice} position={position} result={generation} onChange={setGeneration} annualYield={solarProMemo.annualYield} draftInputs={generationInputs} onInputsChange={setGenerationInputs} terrain={terrain} snowStation={confirmedSnowStation} onScenarioSources={openReviewSection}
-            scenarioDraft={generationScenarioDraft?.key === `${candidateRevision}:${selectedCoordinateText}:${generation?.fetchedAt}` ? generationScenarioDraft.value : undefined}
-            onScenarioDraftChange={update => {
-              const key = `${candidateRevision}:${selectedCoordinateText}:${generation?.fetchedAt}`
-              setGenerationScenarioDraft(current => {
-                const previous = current?.key === key ? current.value : { snowEnabled: Boolean(generation?.scenario?.snow), terrainEnabled: Boolean(generation?.scenario?.terrain), weight: generation?.scenario?.snow?.weight ?? 25 }
-                return { key, value: typeof update === 'function' ? update(previous) : update }
-              })
-            }} expanded />
-          {generationNotice && <p role="status">{generationNotice}</p>}
-            </div>
-          </details>
-        </section>
+
 
         </div>
 

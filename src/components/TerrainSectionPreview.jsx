@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { endpointSlope, isProfilePoint, profilePointRuns, slopeSegments, steepestSegment } from '../utils/terrainProfile.js'
 
 const graphWidth = 620
 const graphHeight = 210
@@ -10,35 +11,44 @@ function valueText(value, digits = 1, suffix = '') {
   return Number.isFinite(value) ? `${value.toFixed(digits)}${suffix}` : '—'
 }
 
-function slopeAngleText(percent) {
-  if (!Number.isFinite(percent)) return '—'
-  return `約${((Math.atan(Math.abs(percent) / 100) * 180) / Math.PI).toFixed(1)}°`
+function distanceText(value) {
+  return Number.isFinite(value) ? `${Number(value.toFixed(1))}m` : '—'
+}
+
+function averageSlopeText(line) {
+  const slope = endpointSlope(line)
+  return slope ? `約${slope.angle.toFixed(1)}°（${slope.slopePercent.toFixed(1)}%）` : '—'
 }
 
 function profileStats(line) {
   const s = line.summary || {}
+  const slope = endpointSlope(line)
   return [
     `最高 ${valueText(s.maxElevation, 1, 'm')}`,
     `最低 ${valueText(s.minElevation, 1, 'm')}`,
-    `端点差 ${valueText(s.elevationDiff, 1, 'm')}`,
-    `端点平均角 ${slopeAngleText(s.averageSlopePercent)}`,
+    `両端差 ${valueText(slope?.elevationDelta, 1, 'm')}`,
+    `両端平均 ${averageSlopeText(line)}`,
   ].join(' / ')
 }
 
 function slopeDirectionText(line) {
-  const diff = line.summary?.elevationDiff
+  const diff = endpointSlope(line)?.elevationDelta
   const from = line.negativeDirection || '左'
   const to = line.positiveDirection || '右'
-  if (!Number.isFinite(diff) || Math.abs(diff) < 0.1) return `${from}→${to} ほぼ水平`
+  if (!Number.isFinite(diff)) return `${from}→${to} 両端の標高未取得`
+  if (Math.abs(diff) < 0.1) return `${from}→${to} 両端はほぼ同じ高さ`
   return `${from}→${to} ${diff > 0 ? '上り' : '下り'}`
 }
 
-function heightDiffNotice(line) {
-  const diff = line.summary?.elevationDiff
-  if (!Number.isFinite(diff) || Math.abs(diff) <= 5) return null
+function averageSlopeNotice(line) {
+  const slope = endpointSlope(line)
+  if (!slope) return '両端の標高がそろっていないため、平均勾配は未計算です。'
   const from = line.negativeDirection || '左'
   const to = line.positiveDirection || '右'
-  return `${from}→${to}で${diff > 0 ? '+' : ''}${diff.toFixed(1)}m`
+  const height = Math.abs(slope.heightPer10Meters)
+  if (height === 0) return `${from}→${to} 両端は同じ高さ（両端平均0%・途中の起伏は別）`
+  const amount = height < 0.01 ? '0.01m未満' : `約${height.toFixed(2)}m`
+  return `${from}→${to} 水平10mあたり${amount}${slope.heightPer10Meters > 0 ? '高く' : '低く'}なる（両端平均）`
 }
 
 function pointToChart(point, minElevation, maxElevation, rangeMeters) {
@@ -47,52 +57,6 @@ function pointToChart(point, minElevation, maxElevation, rangeMeters) {
     x: padding.left + ((point.distance + rangeMeters) / (rangeMeters * 2)) * plotWidth,
     y: padding.top + plotHeight - ((point.elevation - minElevation) / span) * plotHeight,
   }
-}
-
-function steepestSegment(line) {
-  const valid = (line.points || []).filter((point) => Number.isFinite(point.elevation))
-  let best = null
-  for (let index = 1; index < valid.length; index += 1) {
-    const start = valid[index - 1]
-    const end = valid[index]
-    const distance = Math.abs(end.distance - start.distance)
-    if (!distance) continue
-    const elevationDelta = end.elevation - start.elevation
-    const slopePercent = Math.abs(elevationDelta / distance) * 100
-    const angle = (Math.atan2(Math.abs(elevationDelta), distance) * 180) / Math.PI
-    if (!best || slopePercent > best.slopePercent) {
-      best = {
-        start,
-        end,
-        slopePercent,
-        angle,
-        elevationDelta,
-      }
-    }
-  }
-  return best
-}
-
-function slopeSegments(line) {
-  const valid = (line.points || []).filter((point) => Number.isFinite(point.elevation))
-  const segments = []
-  for (let index = 1; index < valid.length; index += 1) {
-    const start = valid[index - 1]
-    const end = valid[index]
-    const distance = Math.abs(end.distance - start.distance)
-    if (!distance) continue
-    const elevationDelta = end.elevation - start.elevation
-    const slopePercent = Math.abs(elevationDelta / distance) * 100
-    const angle = (Math.atan2(Math.abs(elevationDelta), distance) * 180) / Math.PI
-    segments.push({
-      start,
-      end,
-      slopePercent,
-      angle,
-      direction: elevationDelta >= 0 ? '上り' : '下り',
-    })
-  }
-  return segments
 }
 
 function slopeLevel(segment) {
@@ -104,9 +68,9 @@ function slopeLevel(segment) {
 
 function steepestSegmentText(line) {
   const segment = steepestSegment(line)
-  if (!segment) return '最急10m区間 —'
-  const direction = segment.elevationDelta >= 0 ? '上り' : '下り'
-  return `最急10m区間 約${segment.angle.toFixed(1)}°（${direction}）`
+  if (!segment) return '最急区間 —'
+  const direction = segment.direction
+  return `最急区間 ${distanceText(segment.distance)}・約${segment.angle.toFixed(1)}°（${direction}）`
 }
 
 function ReportMetric({ label, value, note }) {
@@ -119,15 +83,16 @@ function ReportMetric({ label, value, note }) {
   )
 }
 
-function TerrainProfileMetrics({ line, steepest, diffNotice }) {
+function TerrainProfileMetrics({ line, steepest }) {
   const range = line.rangeMeters || 100
   const s = line.summary || {}
-  const direction = steepest?.elevationDelta >= 0 ? '上り' : '下り'
+  const average = endpointSlope(line)
+  const direction = steepest?.direction
   const steepestValue = steepest
     ? `${steepest.angle.toFixed(1)}°`
     : '—'
   const steepestNote = steepest
-    ? `${steepest.start.distance}m→${steepest.end.distance}m・${direction}`
+    ? `${steepest.start.distance}m→${steepest.end.distance}m（${distanceText(steepest.distance)}）・${direction}`
     : ''
 
   return (
@@ -144,17 +109,17 @@ function TerrainProfileMetrics({ line, steepest, diffNotice }) {
           value={`${valueText(s.maxElevation, 1, 'm')} / ${valueText(s.minElevation, 1, 'm')}`}
         />
         <ReportMetric
-          label="端点高低差"
-          value={valueText(s.elevationDiff, 1, 'm')}
-          note={diffNotice || '±5m以内は大きな高低差なし'}
+          label="両端高低差"
+          value={valueText(average?.elevationDelta, 1, 'm')}
+          note={average ? `${line.negativeDirection || '左'}→${line.positiveDirection || '右'}・水平距離${distanceText(average.distance)}` : '両端の標高未取得'}
         />
         <ReportMetric
-          label="端点平均角"
-          value={slopeAngleText(s.averageSlopePercent)}
+          label="両端平均角・勾配"
+          value={averageSlopeText(line)}
           note="両端の標高差÷水平距離"
         />
         <ReportMetric
-          label="最急10m区間"
+          label="最急区間"
           value={steepestValue}
           note={steepestNote}
         />
@@ -170,7 +135,7 @@ function overallTerrainSummary(analysis) {
     .filter((item) => item.segment)
   const steepest = steepSegments.sort((a, b) => b.segment.slopePercent - a.segment.slopePercent)[0]
   const elevationDiffs = lines
-    .map((line) => line.summary?.elevationDiff)
+    .map((line) => endpointSlope(line)?.elevationDelta)
     .filter((value) => Number.isFinite(value))
   const maxAbsDiff = elevationDiffs.length
     ? elevationDiffs.reduce((best, value) => Math.abs(value) > Math.abs(best) ? value : best, elevationDiffs[0])
@@ -197,47 +162,38 @@ function TerrainSectionSummary({ analysis }) {
         <strong>{valueText(summary.maxElevation, 1, 'm')} / {valueText(summary.minElevation, 1, 'm')}</strong>
       </div>
       <div>
-        <span>最大高低差</span>
-        <strong>{Number.isFinite(summary.maxAbsDiff) ? `${summary.maxAbsDiff > 0 ? '+' : ''}${summary.maxAbsDiff.toFixed(1)}m` : '—'}</strong>
+        <span>両端の最大高低差</span>
+        <strong>{Number.isFinite(summary.maxAbsDiff) ? `${Math.abs(summary.maxAbsDiff).toFixed(1)}m` : '—'}</strong>
       </div>
       <div>
-        <span>最急10m区間</span>
-        <strong>{summary.steepest ? `${summary.steepest.line.label} ${summary.steepest.segment.angle.toFixed(1)}°` : '—'}</strong>
+        <span>最急区間</span>
+        <strong>{summary.steepest ? `${summary.steepest.line.label} ${summary.steepest.segment.angle.toFixed(1)}° / ${distanceText(summary.steepest.segment.distance)}` : '—'}</strong>
       </div>
     </div>
   )
 }
 
 function makePath(points, minElevation, maxElevation, rangeMeters) {
-  const span = Math.max(1, maxElevation - minElevation)
-  return points
-    .filter((point) => Number.isFinite(point.elevation))
-    .map((point, index) => {
-      const x = padding.left + ((point.distance + rangeMeters) / (rangeMeters * 2)) * plotWidth
-      const y = padding.top + plotHeight - ((point.elevation - minElevation) / span) * plotHeight
+  return profilePointRuns(points).map((run) => run.map((point, index) => {
+      const { x, y } = pointToChart(point, minElevation, maxElevation, rangeMeters)
       return `${index === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`
-    })
-    .join(' ')
+    }).join(' ')).join(' ')
 }
 
 function makeArea(points, minElevation, maxElevation, rangeMeters) {
-  const path = makePath(points, minElevation, maxElevation, rangeMeters)
-  if (!path) return ''
-  const firstX = padding.left
-  const lastX = padding.left + plotWidth
   const baseY = padding.top + plotHeight
-  return `${path} L ${lastX.toFixed(1)} ${baseY.toFixed(1)} L ${firstX.toFixed(1)} ${baseY.toFixed(1)} Z`
+  return profilePointRuns(points).filter((run) => run.length > 1).map((run) => {
+    const path = makePath(run, minElevation, maxElevation, rangeMeters)
+    const firstX = pointToChart(run[0], minElevation, maxElevation, rangeMeters).x
+    const lastX = pointToChart(run.at(-1), minElevation, maxElevation, rangeMeters).x
+    return `${path} L ${lastX.toFixed(1)} ${baseY.toFixed(1)} L ${firstX.toFixed(1)} ${baseY.toFixed(1)} Z`
+  }).join(' ')
 }
 
 function TerrainProfileChart({ line, minElevation, maxElevation, showSlopeDetails, reportMode }) {
   const range = line.rangeMeters || 100
   const interval = line.intervalMeters || 10
-  const diffNotice = heightDiffNotice(line)
-  const sitePoint = (line.points || [])
-    .filter((point) => Number.isFinite(point?.distance) && Number.isFinite(point?.elevation))
-    .reduce((closest, point) => (
-      !closest || Math.abs(point.distance) < Math.abs(closest.distance) ? point : closest
-    ), null)
+  const sitePoint = (line.points || []).find((point) => isProfilePoint(point) && point.distance === 0)
   const siteElevationText = sitePoint ? `標高 ${sitePoint.elevation.toFixed(1)}m` : ''
   const distanceTicks = Array.from(
     { length: Math.floor((range * 2) / interval) + 1 },
@@ -258,16 +214,16 @@ function TerrainProfileChart({ line, minElevation, maxElevation, showSlopeDetail
     : null
 
   return (
-    <div className={`terrain-section-chart ${reportMode ? 'terrain-section-chart--report' : ''} ${diffNotice ? 'terrain-section-chart--height-watch' : ''}`}>
+    <div className={`terrain-section-chart ${reportMode ? 'terrain-section-chart--report' : ''}`}>
       <div className="terrain-section-chart__title">
         <strong>{line.label} <small>（{slopeDirectionText(line)}）</small></strong>
-        {diffNotice && <em className="terrain-section-chart__height-alert">高低差あり：{diffNotice}</em>}
         <span>{profileStats(line)} / {steepestSegmentText(line)}</span>
+        <span>{averageSlopeNotice(line)}</span>
       </div>
       <div className="terrain-section-chart__body">
         <div className="terrain-section-chart__figure">
           <svg viewBox={`0 0 ${graphWidth} ${graphHeight}`} role="img">
-            <title>{line.label} 標高断面</title>
+            <title>{`${line.label} 標高断面`}</title>
             <rect className="terrain-section-chart__bg" x={padding.left} y={padding.top} width={plotWidth} height={plotHeight} />
             {[0, 0.5, 1].map((ratio) => {
               const y = padding.top + plotHeight * ratio
@@ -331,7 +287,7 @@ function TerrainProfileChart({ line, minElevation, maxElevation, showSlopeDetail
             })}
             {steepestStart && steepestEnd && (
               <g>
-                <title>10mごとの取得点の中で、最も勾配が大きい区間です。</title>
+                <title>{`有効な隣接取得点の中で最も勾配が大きい区間（水平距離${distanceText(steepest.distance)}）です。`}</title>
                 <line
                   className="terrain-section-chart__steepest"
                   x1={steepestStart.x}
@@ -346,27 +302,27 @@ function TerrainProfileChart({ line, minElevation, maxElevation, showSlopeDetail
                 )}
               </g>
             )}
-            {line.points
-              .filter((point) => Number.isFinite(point.elevation))
+            {(line.points || [])
+              .filter(isProfilePoint)
               .map((point) => {
                 const x = padding.left + ((point.distance + range) / (range * 2)) * plotWidth
                 const y = padding.top + plotHeight - ((point.elevation - minElevation) / span) * plotHeight
                 return <circle key={point.distance} className="terrain-section-chart__sample" cx={x} cy={y} r="2.4" />
               })}
             <line className="terrain-section-chart__center" x1={padding.left + plotWidth / 2} x2={padding.left + plotWidth / 2} y1={padding.top} y2={padding.top + plotHeight} />
-            <text className="terrain-section-chart__interval" x={padding.left + plotWidth - 4} y={padding.top + 14} textAnchor="end">10m刻み</text>
+            <text className="terrain-section-chart__interval" x={padding.left + plotWidth - 4} y={padding.top + 14} textAnchor="end">取得間隔 {distanceText(interval)}</text>
           </svg>
         </div>
-        {reportMode && <TerrainProfileMetrics line={line} steepest={steepest} diffNotice={diffNotice} />}
+        {reportMode && <TerrainProfileMetrics line={line} steepest={steepest} />}
       </div>
       {showSlopeDetails && (
-        <div className="terrain-section-chart__segment-list" aria-label={`${line.label} 10m区間別勾配`}>
+        <div className="terrain-section-chart__segment-list" aria-label={`${line.label} 隣接取得点の区間別勾配`}>
           {segments.map((segment) => (
             <span
               key={`${segment.start.distance}-${segment.end.distance}`}
               className={`terrain-section-chart__segment-chip terrain-section-chart__segment-chip--${slopeLevel(segment)}`}
             >
-              {segment.start.distance}→{segment.end.distance}m
+              {segment.start.distance}→{segment.end.distance}m（{distanceText(segment.distance)}）
               <strong>{segment.angle.toFixed(1)}°</strong>
               <em>{segment.direction}</em>
             </span>
@@ -390,7 +346,7 @@ export default function TerrainSectionPreview({ analysis, forceSlopeDetails = fa
       <div className="terrain-section-preview__heading">
         <div>
           <strong>候補地周辺{analysis.rangeMeters || 100}m 断面プレビュー</strong>
-          <span>候補地点を中心に、東西・南北方向を10m間隔で標高取得した簡易断面です。橙色は10mごとの取得点で最も急な区間です。</span>
+          <span>候補地点を中心に東西・南北の標高を取得した簡易断面です。橙色は有効な隣接取得点で最も急な区間です。</span>
         </div>
         {!forceSlopeDetails && (
           <button
@@ -416,7 +372,7 @@ export default function TerrainSectionPreview({ analysis, forceSlopeDetails = fa
       </div>
       <TerrainSectionSummary analysis={analysis} />
       <p className="terrain-section-source-note">
-        ※ 標高データは国土地理院DEM標高タイルに基づく概算です。10m間隔の取得点を線で結んで表示しています。造成後地形・擁壁・道路・細かな法面は反映されないため、現地確認や正式図面の代替ではありません。
+        ※ 国土地理院DEMによる概算。縦横の縮尺は異なり、見た目の傾きは実角度ではありません。両端平均は各断面の値で、筆全体の平均ではありません。欠測区間は接続せず、造成・擁壁などの詳細は現地・図面で確認してください。
       </p>
     </section>
   )

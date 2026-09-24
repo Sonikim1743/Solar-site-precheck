@@ -5,6 +5,7 @@ const pageHashes = {
 }
 
 export function pageFromHash(hash = '') {
+  if (hash === '#solar-generation') return 'generation'
   if (hash === '#power-grid') return 'power'
   if (hash === '#pdf-tools') return 'pdf'
   if (hash === '#inheritance-check') return 'inheritance'

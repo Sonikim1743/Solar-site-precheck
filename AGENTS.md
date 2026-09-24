@@ -8,10 +8,13 @@ for deployment evidence, rather than assuming package.json is the live version.
   running OpenClaw. Windows is used for field work, SolarPro/CAD, and the portable app.
 - Report in Korean. User-facing application copy is Japanese. Keep the interface
   compact, place detailed explanations in contextual disclosures, and preserve inputs.
-- Latest user correction for v1.27.1: complete the core workflow on one page.
-  Preserve the established collapsible report/reference/SolarPro sections and
-  offer generation and parcel review as optional accordions on that same page.
-  Earlier instructions to split these tasks into dedicated screens are withdrawn.
+- Latest explicit user change for planned v1.27.2: generation alone leaves the
+  initial main page and opens in a separate screen from the upper menu. This is
+  the exception to the v1.27.1 same-page rule; do not split other existing tools.
+  Keep horizon, snow, parcel review, report, reference and SolarPro manual in
+  the main page's established collapsible sections.
+- Keep the terrain cross-section buttons directly visible without an extra
+  disclosure. Clarify spacing between the location, elevation and copy controls.
 - Use short section titles and brief summaries; keep detailed controls and
   explanations collapsed by default. Preserve selected locations and inputs.
 - Simplicity must not hide existing core functions. Opening the tools menu once
@@ -22,9 +25,10 @@ for deployment evidence, rather than assuming package.json is the live version.
   are not candidate changes and must not reset the user's work.
 - GEONEX confirmation tabs, buttons and external links were rejected by the user
   and are removed from the v1.27.1 scope. Do not revive them as a follow-up task.
-- Verify completing the workflow on one page, desktop/mobile map use, section
-  opening/closing, and calculation/save/reopen workflows. Passing code tests alone
-  does not establish that a screen is simple or usable.
+- Verify the changed main-page controls and the generation screen round trip,
+  including preservation of the location, inputs and results. Record actual
+  desktop/mobile coverage and limits. Passing code tests alone does not establish
+  that a screen is simple or usable; do not imply unchecked workflows passed.
 - GitHub `Sonikim1743/Solar-site-precheck` is the public code repository. Do not put
   candidate records, land registry documents, private CAD files, OpenClaw memory,
   authentication state, or full private conversation/handoff archives in it.
