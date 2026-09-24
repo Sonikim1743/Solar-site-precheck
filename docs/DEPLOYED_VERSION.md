@@ -1,32 +1,36 @@
-# 공개 배포 상태
+# 공개 배포 상태 — v1.27.1
 
-**v1.27.1 현재 검증 중.** 아래는 2026-09-24 14:07~14:09 JST에 실제 확인한 **v1.27 운영 상태**다. v1.27.1의 게시 완료나 GitHub CI 성공을 나타내지 않는다.
+2026-09-24에 GitHub, 기존 Cloudflare Pages 운영 주소, Windows 로컬 5173 실행판을 갱신했다.
 
-## 확인된 v1.27 운영 상태
+## 실제 게시 증거
+- 운영 URL: https://solar-site-precheck.pages.dev/
+- 배포 URL: https://40c9c8a3.solar-site-precheck.pages.dev/
+- Cloudflare production ID: `40c9c8a3-10e7-4e91-9e4b-b813387223fb`
+- 소스 커밋: `655eec45e03a57d0560bae03335e5957d9933bbf`
+- 배포 파일을 포함한 GitHub 커밋: `2dd9d7163c4fd1832f785d9f1552fddb4d2beecc`
+- 공개 파일: `index-BAyOgCG3.js` / 로컬 파일: `index-ClqyUBO8.js`
+- 버전 1.27.1 / build date 2026-09-24
 
-- 공개 URL: https://solar-site-precheck.pages.dev/
-- Cloudflare 프로젝트: `solar-site-precheck` / 환경: `Production` / 브랜치: `main`
-- 배포 ID: `69ea5bef-3ac3-4897-9aa1-2c9eeaa66a35`
-- 배포별 URL: https://69ea5bef.solar-site-precheck.pages.dev/
-- 앱 버전: **1.27** / 빌드일: **2026-09-24** / 대상: **cloudflare**
-- main JS: `index-1VWw4kON.js`
-- 배포 패키지 소스 커밋: `f6fb2e245a4955f7171f7b864f950fa8eaffa616`
-- 확인 시점 GitHub `main`: `c794c89eb8a174ebddfdf8e3d7426c6fefdc1408`
+문서만 갱신한 후속 커밋은 위 소스/배포 파일의 커밋과 다를 수 있다. GitHub push만으로 Pages가 배포되지 않으며, 이번에는 인증된 Wrangler로 기존 프로젝트에 직접 배포했다.
 
-기존 계정의 공식 Wrangler 배포 목록에서 위 ID와 Production / main / Source `f6fb2e2`를 확인했다. GitHub 원격 조회도 위 `main` 커밋과 일치했다. 배포 파일을 만든 소스 커밋과 배포 패키지·기록을 포함한 GitHub 커밋은 구분한다.
+## 확인 결과
+- 패키징의 자동 테스트 165개, 공개/portable 빌드, CSP, 매뉴얼 PDF와 OCR 자산, Functions 번들, ZIP 파일 해시 검증 통과.
+- 실제 운영 HTML·주요 JS·PWA manifest가 검증된 Cloudflare 패키지와 일치. 버전·일자·실행 대상, API 요청 검사, 배포 ID·branch·source, GitHub 원격 커밋까지 총 12개 게시 검사를 통과했다.
+- [GitHub CI 35960897697](https://github.com/Sonikim1743/Solar-site-precheck/actions/runs/35960897697)의 Test and build job 107509041190 성공. 설치·테스트·빌드·CSP·PDF/OCR·배포 메타데이터 모두 성공했다. 이전 pnpm 9 workspace 초기화 실패를 `packages: ['.']`로 수정했다.
+- 새 Windows portable 복사본의 파일 56개 해시 일치. 시험 주소에서 HTML, PDF 실제 형식, 계통 API 요청 검사, NEDO 정상/오류, PDF API 메서드 검사 6개 통과 후 기존 5173을 같은 버전으로 교체하고 동일한 6개 검사도 통과했다. 로컬/공개 브라우저에서 Version 1.27.1을 확인했고, 기존 로컬 후보지 좌표·주소·표고가 보존됐다. 개인 PDF 업로드 검사는 생략했다.
+- 원래 개발 소스와 브라우저 자료를 보존했다. 다음 Windows 실행부터는 새 `SolarSitePrecheck-Local-v1.27.1/START_LOCAL_ONLY.cmd`를 사용한다. 옛 소스 폴더의 실행 파일은 예전 소스를 다시 빌드할 수 있다.
 
-운영 HTML, main JS, PWA `manifest.json`은 모두 HTTP 200이며 로컬 Cloudflare 패키지의 SHA-256과 일치했다. main JS의 SHA-256은 `7d6434288935872ca10813ba96680589d9ef5bdbea037a35717781bc09b3640c`다. 패키지 루트의 `release-manifest.json`은 로컬 검증 자료이고, 공개 사이트의 PWA `manifest.json`과 다른 파일이다.
+## 패키지
+| 대상 | 파일 | SHA-256 |
+|---|---|---|
+| Cloudflare | SolarSitePrecheck_v1.27.1_2026-09-24_cloudflare.zip | f329438de78c014b0e930edb41ee4add68a8a0383847833865f4e8c9d02fa7f4 |
+| Windows | SolarSitePrecheck_v1.27.1_release_light.zip | a3389ac12e0ef817da450f53358c7d4a29ab6e523def048a80a4385f16dc799d |
 
-`/api/pv-generation?invalid=1`은 JSON 오류와 HTTP 400을 반환했다. 공개 시험좌표 34.9, 133.5에서 DC 50 kW, 손실 14%, 경사 20°, 남향 0°로 실제 발전량 API를 조회했을 때 HTTP 200, 연간 **66,151.04 kWh**, 12개월 결과를 반환했다. 출처는 **PVGIS 5.3 / PVGIS-ERA5**, 자료기간은 **2005–2023**, 표준 지형 옵션은 `usehorizon=1`이다. 이는 공개 계산 시험이며 실측·현장조사·계통 접속 확인이 아니다.
+## 화면과 인수인계
+지도 → 지평선·적설 → 발전량 → 레포트 → 자료/매뉴얼을 한 페이지에서 펼쳐 쓰는 흐름을 유지한다. GEONEX 확인 버튼과 상단 중복 현황을 제거하고, 추가 도구는 기본 접힘으로 정리했다. 실제 데스크톱 확인과 한계는 `V1_27_1_BROWSER_CHECK_KO.md`를 따른다. 최종 390px 화면 검증은 미확인이다.
 
-## GitHub CI와 후속 검증
+앞으로 코드는 Mac OpenClaw에서 수정하는 계획이며 `MAC_OPENCLAW_START_KO.md`로 이어받는다. Mac 실기에서의 clone·설정·실행은 아직 수행하지 않았다. 비공개 업무 자료/대화/기억은 공개 GitHub에 포함하지 않았다.
 
-v1.27 커밋의 [CI 실행](https://github.com/Sonikim1743/Solar-site-precheck/actions/runs/35958328263)은 실패했다. Setup Node.js의 `pnpm store path --silent`가 `packages field missing or empty`로 종료했고, 이후 의존성 설치·테스트·빌드·자료 검증은 실행되지 않았다. 운영 파일 일치와 실제 API 성공은 이 CI 결과와 별도로 확인했다.
-
-후속 작업본의 `pnpm-workspace.yaml`에 `packages: ['.']`를 추가한 뒤, pnpm **9.15.9**의 같은 store 조회 명령은 종료 코드 0으로 성공했다. 이전 설정의 작은 독립 재현은 같은 오류로 실패했다. 검사 전후 작업본의 lock 파일과 workspace 파일 해시는 같았으며 프로젝트 의존성을 설치하지 않았다. 이 제한 검증은 새 커밋의 전체 CI 성공을 대신하지 않는다.
-
-v1.27.1 게시 후에는 새 소스 커밋, 최종 GitHub main, Cloudflare 배포 ID, 운영 파일 해시와 CI 결과를 다시 확인해 이 문서를 갱신한다. 기존 사용자 PC의 5173 서버 전환과 전체 UI·인쇄·모바일 회귀 검사는 이 문서의 독립 배포 검증 범위에 포함되지 않는다.
-
-## 이전 배포 이력
-
-직전 v1.25 배포는 `cb0731e4-2f06-4b67-ae7a-e3e20a0e7e6d`, 빌드일 2026-09-11, main JS `index-ClR_BLMJ.js`였다. 2026-09-11 사용자 제공 보고서는 당시 HTTP·화면 검사 통과를 기록했다. 해당 이전 검사 결과를 새 v1.27이나 v1.27.1의 검사 결과로 간주하지 않는다.
+## 이전 이력
+- v1.27: 2026-09-24, deployment `69ea5bef-3ac3-4897-9aa1-2c9eeaa66a35`, source `f6fb2e245a4955f7171f7b864f950fa8eaffa616`. 같은 날 사용자 피드백으로 v1.27.1로 갱신.
+- v1.25: 사용자 제공 2026-09-11 배포 보고서의 deployment `cb0731e4-2f06-4b67-ae7a-e3e20a0e7e6d`.
