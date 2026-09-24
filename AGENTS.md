@@ -6,9 +6,10 @@ for deployment evidence, rather than assuming package.json is the live version.
 
 - The preferred development machine after the v1.27 handoff is the user's Mac
   running OpenClaw. Windows is used for field work, SolarPro/CAD, and the portable app.
-- Report in Korean. User-facing application copy is Japanese. Keep the interface
+- Converse with the user in Korean. User-facing application copy and deliverable
+  documents, reports and figures are Japanese (explicit preference, 2026-09-24). Keep the interface
   compact, place detailed explanations in contextual disclosures, and preserve inputs.
-- Latest explicit user change for planned v1.27.2: generation alone leaves the
+- Latest explicit user change for v1.27.2: generation alone leaves the
   initial main page and opens in a separate screen from the upper menu. This is
   the exception to the v1.27.1 same-page rule; do not split other existing tools.
   Keep horizon, snow, parcel review, report, reference and SolarPro manual in
