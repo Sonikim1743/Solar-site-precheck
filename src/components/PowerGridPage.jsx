@@ -2,7 +2,6 @@ import {useEffect,useMemo,useRef,useState} from 'react'
 import {MapContainer,TileLayer,CircleMarker,Tooltip,Polyline,ScaleControl,LayersControl,useMap,Circle} from 'react-leaflet'
 import {PowerGridOverlay} from './MapPanel.jsx'
 import GridEquipmentDetails from './GridEquipmentDetails.jsx'
-import GenerationPanel from './GenerationPanel.jsx'
 import {filterPowerGridView} from '../services/powerGridView.js'
 import {resolvePowerGridIdentities} from '../services/powerGridIdentity.js'
 import {buildGridReview,gridDistance,gridRecordKey,gridReviewNote} from '../services/gridReview.js'
@@ -22,7 +21,7 @@ function FitGrid({position,data,selected,fitKey}){
  },[map,position,data?.radiusMeters,selected,fitKey])
  return null
 }
-export default function PowerGridPage({position,placeLabel,powerGrid,gridCapacity,onCheck,onLoadCapacity,onBack,onReport,annualYield='',generation=null,onGenerationChange,generationInputs,onGenerationInputsChange,candidateRevision=0,onGenerationNotice,onSaveGridNote,savedGridNotes=[],terrain,snowStation,onScenarioSources}){
+export default function PowerGridPage({position,placeLabel,powerGrid,gridCapacity,onCheck,onLoadCapacity,onBack,onReport,onGeneration,annualYield='',generation=null,onSaveGridNote,savedGridNotes=[]}){
  const [selectedId,setSelectedId]=useState(''),[official,setOfficial]=useState(null),[tab,setTab]=useState('nearby'),[kind,setKind]=useState('all'),[query,setQuery]=useState('')
  const [areaId,setAreaId]=useState(()=>findChugokuGridAreaByAddress(placeLabel)?.id||''),[radius,setRadius]=useState(powerGrid.data?.radiusMeters||10000),[voltage,setVoltage]=useState('all'),[showNames,setShowNames]=useState(false),[fitKey,setFitKey]=useState(0),[noteStatus,setNoteStatus]=useState('')
  const attempted=useRef(''),siteKey=position?position.lat+','+position.lon:''
@@ -38,7 +37,6 @@ export default function PowerGridPage({position,placeLabel,powerGrid,gridCapacit
  const officialRows=useMemo(()=>[...(gridCapacity.data?.lines||[]),...(gridCapacity.data?.substations||[])].filter(row=>(!areaId||row.areaId===areaId)&&(kind==='all'||row.type===kind)&&(!query||[row.name,row.no,row.flowDirection].join(' ').toLowerCase().includes(query.toLowerCase()))),[gridCapacity.data,areaId,kind,query])
  const record=official||selected?.capacity,targetArea=CHUGOKU_GRID_AREAS.find(area=>area.id===areaId)
  function selectEquipment(payload){setSelectedId(payload.equipment.id);setOfficial(null);setNoteStatus('')}
- function onGeneration(){const panel=document.getElementById('generation-panel');if(panel){panel.open=true;panel.scrollIntoView({behavior:'smooth',block:'start'})}}
  function saveNote(){if(!position||(!selected&&!official))return;const text=gridReviewNote({position,placeLabel,row:selected,official,annualYield,generation});onSaveGridNote?.({id:siteKey+'|'+(selected?.equipment.id||gridRecordKey(official)),title:record?.name||selected?.equipment.name||'設備確認',position:{...position},recordedAt:new Date().toISOString(),text});const url=URL.createObjectURL(new Blob(['\uFEFF'+text],{type:'text/plain;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='系統検討メモ.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);setNoteStatus('設備メモを記録に追加し、テキスト保存を開始しました。候補地と一緒に残すには「検討記録を保存」を押してください。')}
  return <section className="power-page" aria-label="系統確認マップ">
  <header className="power-page__header"><div><div className="power-page__eyebrow">候補地の事前検討 / 系統</div><h1>周辺の電力設備を確認</h1><p>{placeLabel||'候補地を選択してください'}{position&&<span className="power-page__coordinates">{position.lat.toFixed(5)}, {position.lon.toFixed(5)}</span>}</p></div><div className="power-page__actions"><button onClick={onBack}>候補地を変更</button><button disabled={!position} onClick={onReport}>レポートへ</button></div></header>
@@ -72,7 +70,7 @@ export default function PowerGridPage({position,placeLabel,powerGrid,gridCapacit
  <p className="power-page__hint">別画面へ移動すると設備の選択は解除されます。必要な内容は設備メモに保存してください。保存したメモはレポートと検討記録に含まれます（直近20件）。</p><button className="power-page__primary" onClick={saveNote}>設備確認メモを保存</button>{noteStatus&&<p role="status">{noteStatus}</p>}</section>}
  <div className="power-page__official-links"><a href={targetArea?.mappingUrl||CHUGOKU_GRID_SOURCE_PAGE} target="_blank" rel="noreferrer">公式の系統図</a><a href={targetArea?.pdfUrl||CHUGOKU_GRID_SOURCE_PAGE} target="_blank" rel="noreferrer">空容量・予想潮流の資料</a><small>中国電力NW / {gridCapacity.data?.areas?.find(area=>area.id===areaId)?.updatedAt||'更新日は各設備に表示'}</small></div></aside></div>
  {savedGridNotes.length>0&&<section className="saved-grid-notes" aria-label="保存した設備確認メモ"><h2>保存した設備確認メモ</h2><p>保存時の内容です。現在の公表資料との再照合は行っていません。別の条件で検討する場合は設備を選び直してメモを更新してください。</p>{savedGridNotes.map(note=><details key={note.id}><summary>{note.title} / {new Date(note.recordedAt).toLocaleDateString('ja-JP')}</summary><pre>{note.text}</pre></details>)}</section>}
- <section className="power-page__handoff"><div><span className="power-page__eyebrow">次の検討</span><h2>発電量と接続条件を、一つの候補地で確認</h2><p>発電量は「どれだけ発電するか」、系統は「どこへ・どの条件で接続するか」。公表空容量から出力制御率は計算しません。</p>{generation?<strong>参考年間発電量 {Math.round(generation.annualKwh).toLocaleString('ja-JP')} kWh</strong>:annualYield?<strong>Solar Pro年間発電量（入力値） {annualYield}</strong>:<span>発電量はまだ計算・入力されていません。</span>}</div><div className="power-page__actions"><button onClick={onGeneration||onBack} disabled={!position}>この地点の発電量を確認</button><button onClick={onReport} disabled={!position}>レポートで整理</button></div></section>
- <GenerationPanel key={candidateRevision+":"+siteKey} onNotice={onGenerationNotice} position={position} result={generation} onChange={onGenerationChange} annualYield={annualYield} draftInputs={generationInputs} onInputsChange={onGenerationInputsChange} terrain={terrain} snowStation={snowStation} onScenarioSources={onScenarioSources}/><p className="power-page__footnote">地図：OpenStreetMap・国土地理院。未登録の設備は表示されません。空容量は公表時点の参考情報で、接続可否・工事費・工期は電力会社への確認が必要です。</p>
+ <nav className="power-page__related" aria-label="関連画面へ移動"><button type="button" onClick={onGeneration} disabled={!position||!onGeneration}>発電量へ →</button><button type="button" onClick={onReport} disabled={!position||!onReport}>レポートへ →</button></nav>
+ <p className="power-page__footnote">地図：OpenStreetMap・国土地理院。未登録の設備は表示されません。空容量は公表時点の参考情報で、接続可否・工事費・工期は電力会社への確認が必要です。</p>
  </section>
 }

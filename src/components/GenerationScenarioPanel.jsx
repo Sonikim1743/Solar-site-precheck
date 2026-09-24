@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import { buildGenerationScenario, scenarioHorizon } from '../../shared/generationScenario.js'
 import { isConfirmedSnowStation, thirdMeshCode } from '../services/nedo.js'
 
-export default function GenerationScenarioPanel({ position, result, onChange, terrain, snowStation, onSources }) {
-  const [snowEnabled, setSnowEnabled] = useState(Boolean(result.scenario?.snow))
-  const [terrainEnabled, setTerrainEnabled] = useState(Boolean(result.scenario?.terrain))
-  const [weight, setWeight] = useState(result.scenario?.snow?.weight ?? 25)
+export default function GenerationScenarioPanel({ position, result, onChange, terrain, snowStation, onSources, scenarioDraft, onScenarioDraftChange }) {
+  const initialDraft = { snowEnabled: Boolean(result.scenario?.snow), terrainEnabled: Boolean(result.scenario?.terrain), weight: result.scenario?.snow?.weight ?? 25 }
+  const [localDraft, setLocalDraft] = useState(() => initialDraft)
+  const { snowEnabled, terrainEnabled, weight } = { ...initialDraft, ...(scenarioDraft ?? localDraft) }
   const [status, setStatus] = useState('idle'), [message, setMessage] = useState('')
   const controller = useRef(null)
   useEffect(() => () => controller.current?.abort(), [])
@@ -16,13 +16,17 @@ export default function GenerationScenarioPanel({ position, result, onChange, te
   let horizon = null
   try { horizon = scenarioHorizon(terrain, position) } catch { /* Unavailable data is explained beside its option. */ }
 
-  function edit(setter, value) {
+  function updateDraft(patch) {
+    const setDraft = onScenarioDraftChange || setLocalDraft
+    setDraft(current => ({ ...initialDraft, ...current, ...patch }))
+  }
+  function edit(patch) {
     controller.current?.abort(); controller.current = null
-    setter(value); setStatus('idle'); setMessage('条件を変更しました。「この仮定で比較する」で反映します。')
+    updateDraft(patch); setStatus('idle'); setMessage('条件を変更しました。「この仮定で比較する」で反映します。')
     if (result.scenario) { const { scenario, ...baseline } = result; onChange(baseline) }
   }
   function cancel() { controller.current?.abort(); controller.current = null; setStatus('idle'); setMessage('追加比較を取り消しました。基本の発電量は残っています。') }
-  function clear() { cancel(); setSnowEnabled(false); setTerrainEnabled(false); const { scenario, ...baseline } = result; onChange(baseline); setMessage('基本の参考発電量だけを表示しています。') }
+  function clear() { cancel(); updateDraft({ snowEnabled: false, terrainEnabled: false }); const { scenario, ...baseline } = result; onChange(baseline); setMessage('基本の参考発電量だけを表示しています。') }
   async function compare(event) {
     event.preventDefault()
     if (!snowEnabled && !terrainEnabled) { setMessage('比較に使う条件を選んでください。'); return }
@@ -55,15 +59,15 @@ export default function GenerationScenarioPanel({ position, result, onChange, te
     <form onSubmit={compare}>
       <div className="generation-scenario__options">
         <div className="generation-scenario__option">
-          <label className="generation-scenario__check"><input type="checkbox" checked={snowEnabled} disabled={!snowReady && !snowEnabled} onChange={event => edit(setSnowEnabled, event.target.checked)} />積雪の影響を仮定する</label>
+          <label className="generation-scenario__check"><input type="checkbox" checked={snowEnabled} disabled={!snowReady && !snowEnabled} onChange={event => edit({ snowEnabled: event.target.checked })} />積雪の影響を仮定する</label>
           <p>{snowReady ? `確認済みの積雪出現率 / メッシュ ${snowStation.id}` : '同じ候補地のNEDO積雪資料を確認すると使えます。'}</p>
           {!snowReady && onSources && <button type="button" onClick={() => onSources('simple-snow')}>積雪資料を確認</button>}
-          {snowEnabled && <><label>出現率に対する仮定の影響度（%）<input aria-label="積雪の仮定の影響度（%）" type="number" min="0" max="100" step="any" required value={weight} onChange={event => edit(setWeight, event.target.value)} /></label>
+          {snowEnabled && <><label>出現率に対する仮定の影響度（%）<input aria-label="積雪の仮定の影響度（%）" type="number" min="0" max="100" step="any" required value={weight} onChange={event => edit({ weight: event.target.value })} /></label>
             <p>例：出現率20% × 影響度25% → その月を5%減。25%は操作確認用の仮定で、推奨値ではありません。積雪出現率はパネル上の積雪や停止時間の実測値ではありません。</p>
             <p>システム損失にすでに見込んだ積雪分は重ねないでください。既存の積雪基準係数は掛け直しません。</p></>}
         </div>
         <div className="generation-scenario__option">
-          <label className="generation-scenario__check"><input type="checkbox" checked={terrainEnabled} disabled={!horizon && !terrainEnabled} onChange={event => edit(setTerrainEnabled, event.target.checked)} />周辺地形で置き換えて比較する</label>
+          <label className="generation-scenario__check"><input type="checkbox" checked={terrainEnabled} disabled={!horizon && !terrainEnabled} onChange={event => edit({ terrainEnabled: event.target.checked })} />周辺地形で置き換えて比較する</label>
           <p>{horizon ? `欠測のない${horizon.length}方位の地形角を使用 / 樹高の一律加算は除外` : '同じ候補地の欠測のない8方位または36方位の地平線分析が必要です。'}</p>
           {horizon && terrain.radius && <p>範囲・資料：{terrain.radius}</p>}
           {!horizon && onSources && <button type="button" onClick={() => onSources('simple-horizon')}>地平線を分析</button>}

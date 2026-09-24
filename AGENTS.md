@@ -8,6 +8,23 @@ for deployment evidence, rather than assuming package.json is the live version.
   running OpenClaw. Windows is used for field work, SolarPro/CAD, and the portable app.
 - Report in Korean. User-facing application copy is Japanese. Keep the interface
   compact, place detailed explanations in contextual disclosures, and preserve inputs.
+- Latest user correction for v1.27.1: complete the core workflow on one page.
+  Preserve the established collapsible report/reference/SolarPro sections and
+  offer generation and parcel review as optional accordions on that same page.
+  Earlier instructions to split these tasks into dedicated screens are withdrawn.
+- Use short section titles and brief summaries; keep detailed controls and
+  explanations collapsed by default. Preserve selected locations and inputs.
+- Simplicity must not hide existing core functions. Opening the tools menu once
+  must reveal named direct entries for 地平線・日影を計算, 積雪データを見る,
+  and レポート. Navigation must open the relevant destination/disclosure.
+- Preserve the selected location, inputs, parcel review and calculated results
+  when opening/closing sections or following menu links. These actions alone
+  are not candidate changes and must not reset the user's work.
+- GEONEX confirmation tabs, buttons and external links were rejected by the user
+  and are removed from the v1.27.1 scope. Do not revive them as a follow-up task.
+- Verify completing the workflow on one page, desktop/mobile map use, section
+  opening/closing, and calculation/save/reopen workflows. Passing code tests alone
+  does not establish that a screen is simple or usable.
 - GitHub `Sonikim1743/Solar-site-precheck` is the public code repository. Do not put
   candidate records, land registry documents, private CAD files, OpenClaw memory,
   authentication state, or full private conversation/handoff archives in it.

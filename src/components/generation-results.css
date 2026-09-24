@@ -1,5 +1,8 @@
 .generation-panel.generation-panel--overview{border:0;padding:0;margin:0;background:transparent}
 .generation-panel--overview>summary{padding:8px 0 14px;font-size:14px;color:#536e65}
+.generation-panel--expanded>summary{display:none}
+.generation-panel--baseline .generation-overview__hero{grid-template-columns:minmax(0,1fr)}
+.generation-panel--baseline .generation-overview__compare-prompt{display:none}
 .generation-overview{color:#1c4439;margin:4px 0 22px;font-variant-numeric:tabular-nums}
 .generation-overview__hero{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(235px,1fr);gap:28px;padding:32px;background:linear-gradient(115deg,#f0f7f3,#f9fbf8);border:1px solid #dce9df;border-radius:15px}
 .generation-overview__eyebrow{font-size:13px;letter-spacing:.04em;font-weight:600;color:#57746a}

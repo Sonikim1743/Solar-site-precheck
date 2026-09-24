@@ -9,17 +9,8 @@ const MODES = [
   ['exclusion', '除外範囲', '設置を除外する範囲の角を地図で順に指定します。複数の範囲を追加できます。'],
 ]
 
-function areaLabel(value) {
-  return Number.isFinite(value) ? new Intl.NumberFormat('ja-JP', { maximumFractionDigits: 1 }).format(value) : '—'
-}
-
-function officialGeonexUrl(value) {
-  try {
-    const url = new URL(value || 'https://geonex-maps.com/')
-    return url.protocol === 'https:' && url.hostname === 'geonex-maps.com' && !url.username && !url.password ? url.href : 'https://geonex-maps.com/'
-  } catch {
-    return 'https://geonex-maps.com/'
-  }
+function areaLabel(value, maximumFractionDigits = 1) {
+  return Number.isFinite(value) ? new Intl.NumberFormat('ja-JP', { maximumFractionDigits }).format(value) : '—'
 }
 
 export default function ParcelReviewPanel({
@@ -32,7 +23,6 @@ export default function ParcelReviewPanel({
   onClearBoundary,
   onClearExclusions,
   onClear,
-  geonexUrl,
   onUseParcel,
   onFocusParcel,
   status,
@@ -55,8 +45,7 @@ export default function ParcelReviewPanel({
 
   return <section className="parcel-review-panel" aria-labelledby={headingId}>
     <div className="parcel-review-panel__heading">
-      <div><h3 id={headingId}>筆と検討範囲</h3><p>対象を整理して、使う範囲を確認</p></div>
-      <a className="parcel-geonex-link" href={officialGeonexUrl(geonexUrl)} target="_blank" rel="noopener noreferrer">GEONEXで確認 <span aria-hidden="true">↗</span><span className="parcel-sr-only">（別タブ）</span></a>
+      <h3 id={headingId}>筆と範囲の選択</h3>
     </div>
 
     <div className="parcel-mode-selector" role="group" aria-label="地図の操作" aria-describedby={modeHintId}>
@@ -64,12 +53,12 @@ export default function ParcelReviewPanel({
     </div>
     <p className="parcel-mode-hint" id={modeHintId} aria-live="polite">{modeHint}</p>
 
-    {hasReview && <><div className="parcel-review-counts"><span><i className="parcel-role-dot parcel-role-dot--target" />対象 <strong>{targetCount}筆</strong></span><span><i className="parcel-role-dot parcel-role-dot--reference" />参考 <strong>{referenceCount}筆</strong></span></div>
-    <dl className="parcel-review-metrics">
+    {hasReview && <><p className="parcel-review-summary"><span>検討面積 <strong>{areaLabel(metrics?.usableAreaM2, 0)}</strong> m²</span><span>· 対象{targetCount}筆 / 参考{referenceCount}筆</span></p>
+    <details className="parcel-review-breakdown"><summary>面積の内訳</summary><dl className="parcel-review-metrics">
       {areaMetrics.map(([label, value, description]) => <div key={label} className={label === '有効範囲' ? 'is-total' : ''}><dt>{label}</dt><dd>{areaLabel(value)}<small> m²</small></dd><span>{description}</span></div>)}
-    </dl></>}
+    </dl></details></>}
 
-    {!!parcels.length && <details className="parcel-review-selection" open={parcels.length <= 4}><summary>選んだ筆 <strong>{parcels.length}筆</strong> · 一覧と操作</summary><ul className="parcel-review-list" aria-label="選んだ筆">
+    {!!parcels.length && <details className="parcel-review-selection"><summary>選んだ筆 <strong>{parcels.length}筆</strong></summary><ul className="parcel-review-list" aria-label="選んだ筆">
       {parcels.map((entry) => <li key={entry.id} className={`parcel-review-item parcel-review-item--${entry.role === 'reference' ? 'reference' : 'target'}`}>
         <div className="parcel-review-item__identity"><span className="parcel-role-label">{entry.role === 'reference' ? '参考' : '対象'}</span><strong>{entry.info?.number || '地番未記載'}</strong><p>{[entry.info?.municipality, entry.info?.area].filter(Boolean).join(' ') || '所在地未記載'}</p><small>{entry.source?.fileName ? `出典：${entry.source.fileName}` : '出典ファイル未記載'}</small></div>
         <div className="parcel-review-item__actions">
@@ -81,18 +70,16 @@ export default function ParcelReviewPanel({
       </li>)}
     </ul></details>}
 
-    {hasReview && <div className="parcel-review-cleanup">
+    {hasReview && <details className="parcel-review-management"><summary>筆・範囲の管理</summary><div className="parcel-review-cleanup">
       <button type="button" onClick={onClearBoundary} disabled={!review?.boundary || !onClearBoundary}>検討範囲を解除</button>
       <button type="button" onClick={onClearExclusions} disabled={!review?.exclusions?.length || !onClearExclusions}>除外を解除{review?.exclusions?.length ? `（${review.exclusions.length}）` : ''}</button>
       <button type="button" onClick={onClear} disabled={!hasReview || !onClear}>筆・範囲をすべて解除</button>
-    </div>}
-
-    {statusMessage && <p className={`parcel-review-message${isError ? ' parcel-review-message--error' : ''}`} role={isError ? 'alert' : 'status'}>{statusMessage}</p>}
-    {hasReview && <details className="parcel-review-notes"><summary>面積・計算地点の扱い</summary><div>
+    </div><div className="parcel-review-notes">
       <p>面積は読み込んだ図形・描いた範囲からの概算です。登記面積や確定した境界を示すものではありません。重複する範囲は二重に数えず、範囲外の除外部分は控除しません。</p>
       <p>対象筆があり「検討範囲」も描いた場合は、対象筆と描いた範囲の共通部分を使います。範囲未指定なら対象筆の図形、対象筆なしなら描いた範囲を使います。参考の筆は面積に含めません。</p>
       <p>対象・参考の追加だけでは計算地点と発電量は変わりません。「この筆で計算」は筆内の1点に計算地点を変更します。その点が設備の予定位置に合うか確認してください。1点の結果が筆全体を代表するとは限りません。</p>
-      <p>面積から設備容量・発電量は自動確定しません。配置や除外条件を確認し、発電量画面で設備容量を入力してください。GEONEXの確認結果も自動で取り込まれません。</p>
+      <p>面積から設備容量・発電量は自動確定しません。配置や除外条件を確認し、発電量画面で設備容量を入力してください。</p>
     </div></details>}
+    {statusMessage && <p className={`parcel-review-message${isError ? ' parcel-review-message--error' : ''}`} role={isError ? 'alert' : 'status'}>{statusMessage}</p>}
   </section>
 }

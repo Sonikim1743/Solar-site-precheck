@@ -3,7 +3,7 @@ import { GENERATION_DOCS, generationInputs } from '../../shared/generation.js'
 import GenerationScenarioPanel from './GenerationScenarioPanel.jsx'
 import GenerationResults from './GenerationResults.jsx'
 
-export default function GenerationPanel({ position, result, onChange, annualYield = '', draftInputs, onInputsChange, expanded = false, onNotice, terrain, snowStation, onScenarioSources }) {
+export default function GenerationPanel({ position, result, onChange, annualYield = '', draftInputs, onInputsChange, scenarioDraft, onScenarioDraftChange, expanded = false, onNotice, terrain, snowStation, onScenarioSources }) {
   const [localInputs, setLocalInputs] = useState(() => result?.inputs || { peakpower: 50, angle: 20, aspect: 0, loss: 14 })
   const inputs = draftInputs || localInputs
   const setInputs = onInputsChange || setLocalInputs
@@ -41,7 +41,7 @@ export default function GenerationPanel({ position, result, onChange, annualYiel
   }
   function cancel() { controller.current?.abort(); controller.current = null; setStatus('idle'); setMessage('計算を取り消しました。') }
   function showComparison() { if (comparison.current) { comparison.current.open = true; comparison.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); comparison.current.querySelector('summary')?.focus({ preventScroll: true }) } }
-  return <details className="generation-panel generation-panel--overview" id="generation-panel" open={expanded || undefined}>
+  return <details className={`generation-panel generation-panel--overview${expanded ? ' generation-panel--expanded' : ''}${result && !result.scenario ? ' generation-panel--baseline' : ''}`} id="generation-panel" open={expanded || undefined}>
     <summary>参考発電量を見る</summary>
     {message && <p className="generation-status" role={status === 'error' ? 'alert' : 'status'}>{message}</p>}
     {result && <GenerationResults key={result.fetchedAt} result={result} onCompare={showComparison} />}
@@ -55,7 +55,7 @@ export default function GenerationPanel({ position, result, onChange, annualYiel
       <label>システム損失（%）<input type="number" min="0" max="99" step="any" required value={inputs.loss} onChange={e => edit('loss', e.target.value)} /></label>
       </div><button className="power-page__primary" disabled={!position || status === 'loading'}>{status === 'loading' ? '計算中…' : 'この条件で計算する'}</button>{status === 'loading' && <button type="button" onClick={cancel}>計算を取り消す</button>}</form></div>
     </details>
-    {result && <details className="generation-fold generation-comparison-controls" ref={comparison}><summary>積雪・地形の比較条件<small>{result.scenario ? '仮定を適用中' : '必要なときに比較'}</small></summary><div className="generation-fold__body"><GenerationScenarioPanel key={result.fetchedAt} position={position} result={result} onChange={onChange} terrain={terrain} snowStation={snowStation} onSources={onScenarioSources} /></div></details>}
+    {result && <details className="generation-fold generation-comparison-controls" ref={comparison}><summary>積雪・地形の比較条件<small>{result.scenario ? '仮定を適用中' : '必要なときに比較'}</small></summary><div className="generation-fold__body"><GenerationScenarioPanel key={result.fetchedAt} position={position} result={result} onChange={onChange} terrain={terrain} snowStation={snowStation} onSources={onScenarioSources} scenarioDraft={scenarioDraft} onScenarioDraftChange={onScenarioDraftChange} /></div></details>}
     <details className="generation-fold generation-evidence"><summary>詳しい数値と計算の出典</summary><div className="generation-fold__body">
       {result && <><p>{result.source} / {result.period || '期間は出典で確認'} / 取得 {new Date(result.fetchedAt).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}。容量1 kWpあたり {Math.round(result.annualKwh / result.inputs.peakpower).toLocaleString('ja-JP')} kWh/年。</p>
         <div className="generation-exact-table"><table><caption>月別の参考発電量（kWh）</caption><thead><tr><th scope="col">月</th><th scope="col">基本値</th>{result.scenario && <><th scope="col">試算</th><th scope="col">積雪の仮定減少率</th></>}</tr></thead><tbody>{result.monthly.map(row => <tr key={row.month}><th scope="row">{row.month}月</th><td>{row.kwh.toLocaleString('ja-JP', { maximumFractionDigits: 2 })}</td>{result.scenario && <><td>{result.scenario.monthly.find(item => item.month === row.month)?.kwh.toLocaleString('ja-JP', { maximumFractionDigits: 2 })}</td><td>{result.scenario.snow ? (result.scenario.snow.rates[row.month - 1] * result.scenario.snow.weight).toFixed(2) + '%' : '—'}</td></>}</tr>)}</tbody></table></div>

@@ -3,7 +3,7 @@
 ## 역할
 **Mac OpenClaw에서 코드 수정 → GitHub에 검증된 이력 보관 → 기존 Cloudflare Pages와 Windows 실행판에 같은 릴리스 반영**을 기준으로 한다. Mac에 대한 설정은 이 문서만으로 실행되지 않는다.
 
-코드는 현재 공개 저장소 `https://github.com/Sonikim1743/Solar-site-precheck`를 기준으로 한다. 최초 인수 때 `package.json`, `git log -1`, `docs/DEPLOYED_VERSION.md`를 함께 읽어 소스와 운영 버전을 확인한다. v1.27이 원격에 반영됐는지 확인하기 전에는 옛 main을 최신 작업으로 판단하지 않는다.
+코드는 현재 공개 저장소 `https://github.com/Sonikim1743/Solar-site-precheck`를 기준으로 한다. v1.27의 GitHub 원격 반영은 완료되었으며, 현재 후속 정리는 v1.27.1이다. 최초 인수 때 `package.json`, `git log -1`, `docs/DEPLOYED_VERSION.md`를 함께 읽어 받은 소스와 실제 운영 버전을 구분한다. v1.27.1의 최종 원격·공개 반영 여부는 이번 릴리스의 커밋·배포 ID·확인 결과가 기록된 최신 `docs/DEPLOYED_VERSION.md`를 기준으로 확인한다. 이 파일이 아직 v1.25 등 과거 상태를 기록하고 있다면 v1.27.1 배포 완료로 해석하지 않는다.
 
 ## 첫 실행
 기존 Mac 폴더가 있다면 원격과 미커밋 변경부터 확인하고 보존한다. 없을 때만 다음 새 폴더 예시를 사용한다.
