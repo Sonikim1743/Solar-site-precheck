@@ -39,6 +39,23 @@
 .terrain-area-rotation-controls p { flex:1 1 180px; }
 .terrain-area-figure svg text { font-family:Meiryo,"Noto Sans JP",system-ui,sans-serif; fill:#3d5646; font-size:13px; }
 .terrain-area-svg-legend text { font-size:14px; }
+.terrain-area-svg-legend .terrain-area-svg-share { font-size:18px; font-weight:700; }
+.terrain-area-height-controls { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin:0 0 6px; }
+.terrain-area-height-controls>span { margin-right:4px; color:#64786f; font-size:13px; }
+.terrain-area-height-controls button { min-height:38px; padding:7px 12px; border:1px solid #ccdcd1; border-radius:6px; background:#fff; color:#476653; font:inherit; font-size:14px; font-weight:600; cursor:pointer; }
+.terrain-area-height-controls button[aria-pressed="true"] { border-color:#17664f; background:#edf6ef; color:#17664f; }
+.terrain-area-height-controls p { flex:1 1 250px; margin:0 0 0 6px; color:#64786f; font-size:13px; line-height:1.5; }
+.terrain-area-height-controls button:focus-visible { outline:3px solid #4f9676; outline-offset:3px; }
+.terrain-area-slope-distribution { margin-top:12px; border-top:1px solid #dce5da; padding-top:10px; }
+.terrain-area-slope-distribution table { width:100%; table-layout:fixed; border-collapse:collapse; }
+.terrain-area-slope-distribution caption { padding-bottom:8px; text-align:left; color:#3d5646; font-size:14px; font-weight:600; }
+.terrain-area-slope-distribution caption span { color:#64786f; font-weight:400; margin-left:8px; }
+.terrain-area-slope-distribution th,.terrain-area-slope-distribution td { text-align:left; padding:3px 8px; border-left:1px solid #dce5da; }
+.terrain-area-slope-distribution th:first-child,.terrain-area-slope-distribution td:first-child { padding-left:0; border-left:0; }
+.terrain-area-slope-distribution th { color:#476653; font-size:13px; font-weight:500; }
+.terrain-area-slope-distribution th i { display:inline-block; width:12px; height:10px; border:1px solid #a8b0a3; border-radius:2px; margin-right:5px; }
+.terrain-area-slope-distribution td { color:#193e35; font-size:22px; font-weight:650; font-variant-numeric:tabular-nums; }
+.terrain-area-slope-distribution p { margin:7px 0 0; color:#64786f; font-size:12px; line-height:1.6; }
 .terrain-area-figure .terrain-area-svg-note { font-size:11px; fill:#617162; }
 .terrain-area-svg-scale path { fill:none; stroke:#354b3a; stroke-width:1.6; }
 .terrain-area-svg-scale text { font-size:12px; }
@@ -132,6 +149,12 @@
   .terrain-area-panel .terrain-area-figure text.terrain-area-svg-note[x="756"][y="443"] { font-size:11px; }
 }
 @media(max-width:640px) {
+  .terrain-area-height-controls button { min-height:44px; }
+  .terrain-area-height-controls p { flex-basis:100%; margin:0; font-size:12px; }
+  .terrain-area-slope-distribution th { font-size:12px; overflow-wrap:anywhere; }
+  .terrain-area-slope-distribution th i { display:block; margin-bottom:4px; }
+  .terrain-area-slope-distribution td { font-size:20px; }
+  .terrain-area-slope-distribution th,.terrain-area-slope-distribution td { padding-inline:6px; }
   .terrain-area-heading { flex-direction:column; align-items:stretch; gap:10px; }
   .terrain-area-heading button { align-self:flex-start; }
   .terrain-area-view-row { align-items:flex-start; flex-wrap:wrap; }
@@ -156,6 +179,7 @@
   .terrain-area-rotation-controls>.terrain-area-quiet-button { grid-area:reset; }
 }
 @media(pointer:coarse) {
+  .terrain-area-height-controls button { min-height:44px; }
   .terrain-area-panel .secondary-button,.terrain-area-panel .terrain-area-view-switch button,.terrain-area-panel .terrain-area-quiet-button,.terrain-area-panel .terrain-area-evidence>summary,.terrain-area-camera-modes button,.terrain-area-camera-zoom button { min-height:44px; }
   .terrain-area-panel .secondary-button.terrain-area-primary-action { min-height:44px; }
 }

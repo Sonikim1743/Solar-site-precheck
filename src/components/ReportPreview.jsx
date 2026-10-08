@@ -914,7 +914,7 @@ export default function ReportPreview({ report }) {
         />
       )}
       {(report.generation || report.solarProMemo?.annualYield) && <GenerationReportPage report={report} page={report.powerGrid ? '6' : '5'} />}
-      <ParcelReviewReport review={report.parcelReview} metrics={report.parcelMetrics} position={report.position} startPage={parcelReviewStartPage} />
+      <ParcelReviewReport review={report.parcelReview} metrics={report.parcelMetrics} position={report.position} startPage={parcelReviewStartPage} terrainArea={report.terrainArea} mapRegionLabel={report.placeLabel} fieldMemo={report.fieldMemo} />
       {(report.gridNotes || []).map((note, index) => <ReportPage key={note.id} page={String(parcelReviewStartPage + parcelReviewPageCount + index)} title="設備確認記録" subtitle={note.title}>
         <p className="report-note">保存時の確認内容です。現在の公表資料との再照合は行っていません。記録日時：{new Date(note.recordedAt).toLocaleString('ja-JP')}</p>
         <pre className="report-saved-grid-note">{note.text}</pre>

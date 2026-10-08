@@ -6,7 +6,7 @@ import { buildTerrainSolid } from '../utils/terrainSolid.js'
 import './terrain-area.css'
 
 const COLORS = ['#cfe3cd', '#efe8ad', '#eabd8d', '#df9d9b']
-const LABELS = ['10°未満', '10–20°未満', '20–30°未満', '30°以上']
+const LABELS = ['0–10°未満', '10–20°未満', '20–30°未満', '30°以上']
 const W = 800, H = 520
 const finite = Number.isFinite
 const colorIndex = (slope) => !finite(slope) ? -1 : slope < 10 ? 0 : slope < 20 ? 1 : slope < 30 ? 2 : 3
@@ -45,14 +45,29 @@ function figurePoint(position, grid) {
   try { return terrainPointToLocal(position, grid.origin) } catch { return null }
 }
 
-function Legend({ y = 481 }) {
+const slopeShare = (summary, index) => {
+  const bin = summary?.slopeBins?.find(bin => bin.min === index * 10 && bin.max === (index === 3 ? 90 : (index + 1) * 10))
+  return finite(bin?.percent) ? `${bin.percent.toLocaleString('ja-JP', { maximumFractionDigits: 1 })}%` : '未計算'
+}
+
+function Legend({ y = 481, summary }) {
   return <g className="terrain-area-svg-legend" transform={`translate(60 ${y})`}>
     {LABELS.map((label, index) => <g key={label} transform={`translate(${index * 173} 0)`}>
       <rect width="27" height="14" y="-12" fill={COLORS[index]} stroke="#8b918b" strokeWidth="0.4" />
       <text x="35" y="0">{label}</text>
+      <text x="35" y="25" className="terrain-area-svg-share">{slopeShare(summary, index)}</text>
     </g>)}
-    <text x="0" y="24" className="terrain-area-svg-note">色は地形勾配の区分です。施工可否の基準ではありません。</text>
   </g>
+}
+
+function SlopeDistribution({ summary }) {
+  return <div className="terrain-area-slope-distribution">
+    <table><caption>10m幅で見た局所勾配 <span>割合</span></caption>
+      <thead><tr>{LABELS.map((label, index) => <th key={label} scope="col"><i style={{ background: COLORS[index] }} />{label}</th>)}</tr></thead>
+      <tbody><tr>{LABELS.map((label, index) => <td key={label}>{slopeShare(summary, index)}</td>)}</tr></tbody>
+    </table>
+    <p>割合は範囲内で勾配を計算できた格子点の分布です。色と数値は実際のDEMによる参考値で、施工可否の基準ではありません。</p>
+  </div>
 }
 
 function Scale({ project, bounds }) {
@@ -127,9 +142,9 @@ export function TerrainAreaPlan({ analysis, position, reportMode = false }) {
       <g transform="translate(755 49)" className="terrain-area-north"><text textAnchor="middle" y="-13">N</text><path d="M0 -5 L-6 11 L0 7 L6 11 Z" /><path d="M0 7 V27" /></g>
       <Scale project={project} bounds={bounds} />
       <text x="756" y="443" textAnchor="end" className="terrain-area-svg-note">黄色線：地形の検討範囲{partial ? '　斜線：未取得・未計算' : ''}</text>
-      <Legend />
+      <Legend summary={analysis.summary} />
     </svg>
-    <figcaption>等高線2m間隔・10mごとに太線。地図上の参考範囲です。{position && !pointVisible ? '選択地点は図の範囲外です。' : ''}</figcaption>
+    <figcaption>等高線2m間隔・10mごとに太線。割合は勾配を計算できた範囲内の格子点が分母です。色分けは施工可否の基準ではありません。{position && !pointVisible ? '選択地点は図の範囲外です。' : ''}</figcaption>
   </figure>
 }
 
@@ -178,12 +193,15 @@ function segmentCrossesCell(a, b, west, south, east, north) {
   return true
 }
 
-export function TerrainArea3D({ analysis, position, reportMode = false, azimuth = 35, interactive = false }) {
+export function TerrainArea3D({ analysis, position, reportMode = false, azimuth = 35, interactive = false, heightScale = 1 }) {
   const id = `terrain-3d-${useId().replace(/:/g, '')}`
   const canRotate = interactive && !reportMode
   const initialView = normalizeTerrainView({ azimuth, pitch: 32 })
   const [view, setView] = useState(initialView)
   const [viewMode, setViewMode] = useState('rotate')
+  const [displayHeightScale, setDisplayHeightScale] = useState(heightScale === 2 ? 2 : 1)
+  const verticalScale = canRotate ? displayHeightScale : heightScale === 2 ? 2 : 1
+  const modelHeight = canRotate ? 440 : H
   const canvasRef = useRef(null), modelRef = useRef(null), dragRef = useRef(null), frameRef = useRef(null), pendingView = useRef(null)
   const latestView = useRef(view)
   latestView.current = view
@@ -198,8 +216,8 @@ export function TerrainArea3D({ analysis, position, reportMode = false, azimuth 
     pendingView.current = null
   }
   useEffect(() => {
-    releaseDrag(); discardFrame(); setView(normalizeTerrainView({ azimuth, pitch: 32 }))
-  }, [analysis, azimuth, canRotate])
+    releaseDrag(); discardFrame(); setView(normalizeTerrainView({ azimuth, pitch: 32 })); setDisplayHeightScale(heightScale === 2 ? 2 : 1)
+  }, [analysis, azimuth, canRotate, heightScale])
   useEffect(() => () => { releaseDrag(); discardFrame() }, [])
   const camera = canRotate ? view : initialView
 
@@ -249,7 +267,7 @@ export function TerrainArea3D({ analysis, position, reportMode = false, azimuth 
   }, [analysis])
   const drawing = useMemo(() => {
     if (!mesh) return null
-    const projection = createTerrainProjection({ bounds: mesh.bounds, base: mesh.base, maxElevation: mesh.maximum, ...camera })
+    const projection = createTerrainProjection({ bounds: mesh.bounds, base: mesh.base, maxElevation: mesh.maximum, ...camera, heightScale: verticalScale })
     const faces = [...mesh.floorFaces, ...mesh.walls, ...mesh.faces].map((face, index) => {
       let color = face.color
       if (face.kind === 'floor') color = '#b2bcb4'
@@ -261,22 +279,22 @@ export function TerrainArea3D({ analysis, position, reportMode = false, azimuth 
         const shade = Math.round(139 + 35 * light)
         color = `rgb(${shade}, ${shade + 8}, ${shade + 2})`
       }
-      return { ...face, color, index, visible: terrainFaceVisible(face.normal, camera), depth: projection.transform(face.centroid)[2] }
+      return { ...face, color, index, visible: terrainFaceVisible(face.normal, camera, verticalScale), depth: projection.transform(face.centroid)[2] }
     }).sort((a,b) => a.depth - b.depth)
     return { ...mesh, ...projection, faces, faceCount: mesh.faces.length, outlinePaths: mesh.outlines.map(points => pathOf(points, projection.project)) }
-  }, [mesh, camera.azimuth, camera.pitch, camera.zoom])
+  }, [mesh, camera.azimuth, camera.pitch, camera.zoom, verticalScale])
 
   // Keep a single raster surface in the interactive view. Each clipped polygon
   // is filled separately, so overlap never cancels holes by compound evenodd.
   useEffect(() => {
     if (!canRotate || !drawing || !canvasRef.current) return
     const canvas = canvasRef.current, ratio = Math.min(2, window.devicePixelRatio || 1)
-    const width = Math.round(W * ratio), height = Math.round(H * ratio)
+    const width = Math.round(W * ratio), height = Math.round(modelHeight * ratio)
     if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height }
     const context = canvas.getContext('2d')
     if (!context) return
     context.setTransform(ratio, 0, 0, ratio, 0, 0)
-    context.clearRect(0,0,W,H)
+    context.clearRect(0,0,W,modelHeight)
     context.save(); context.beginPath(); context.rect(25,35,750,395); context.clip()
     const trace = rings => {
       context.beginPath()
@@ -287,7 +305,7 @@ export function TerrainArea3D({ analysis, position, reportMode = false, azimuth 
       trace(face.rings); context.fillStyle = face.color; context.fill('evenodd'); context.strokeStyle = face.color; context.lineWidth = .35; context.lineJoin = 'round'; context.stroke()
     }
     context.restore()
-  }, [drawing, canRotate])
+  }, [drawing, canRotate, modelHeight])
 
   const queueView = next => {
     pendingView.current = next
@@ -324,6 +342,7 @@ export function TerrainArea3D({ analysis, position, reportMode = false, azimuth 
   }
   const resetView = () => { releaseDrag(); discardFrame(); latestView.current = initialView; setView(initialView) }
   const changeViewMode = mode => { releaseDrag(); discardFrame(); setViewMode(mode) }
+  const changeHeightScale = scale => { releaseDrag(); discardFrame(); setDisplayHeightScale(scale) }
   const zoomView = factor => { releaseDrag(); discardFrame(); const next = zoomTerrainView(latestView.current, factor); latestView.current = next; setView(next) }
   useEffect(() => {
     const target = modelRef.current
@@ -348,14 +367,18 @@ export function TerrainArea3D({ analysis, position, reportMode = false, azimuth 
   const axisX = bounds.west, axisY = bounds.south
   const north = project([(bounds.west + bounds.east) / 2, bounds.north, base]), south = project([(bounds.west + bounds.east) / 2, bounds.south, base]), east = project([bounds.east, (bounds.south + bounds.north) / 2, base]), west = project([bounds.west, (bounds.south + bounds.north) / 2, base])
   return <figure className={`terrain-area-figure${reportMode ? ' terrain-area-figure--report' : ''}${canRotate ? ' terrain-area-figure--interactive' : ''}`}>
+    {canRotate && <div className="terrain-area-height-controls" role="group" aria-label="3Dの高さ表示">
+      <span>高さ表示</span><button type="button" aria-pressed={verticalScale === 1} onClick={() => changeHeightScale(1)}>実寸 1:1</button><button type="button" aria-pressed={verticalScale === 2} onClick={() => changeHeightScale(2)}>高さ2倍 1:2</button>
+      <p>{verticalScale === 2 ? '横1：縦2の強調表示。標高・勾配の数値は変わりません。' : '縦横同尺度。実際の高低差のバランスを確認。'}</p>
+    </div>}
     <div className="terrain-area-model">
     {canRotate && <canvas ref={canvasRef} aria-hidden="true" className="terrain-area-surface" />}
-    <svg viewBox={`0 0 ${W} ${H}`} role={canRotate ? 'group' : 'img'} tabIndex={canRotate ? 0 : undefined} aria-roledescription={canRotate ? '回転・視点の高さを変更できる地形図' : undefined} aria-labelledby={`${id}-title ${id}-desc`} aria-describedby={canRotate ? `${id}-controls` : undefined} onKeyDown={keyDown}>
+    <svg viewBox={`0 0 ${W} ${modelHeight}`} data-height-scale={verticalScale} role={canRotate ? 'group' : 'img'} tabIndex={canRotate ? 0 : undefined} aria-roledescription={canRotate ? '回転・視点の高さを変更できる地形図' : undefined} aria-labelledby={`${id}-title ${id}-desc`} aria-describedby={canRotate ? `${id}-controls` : undefined} onKeyDown={keyDown}>
       <title id={`${id}-title`}>参考範囲の実DEM地形3D</title>
-      <desc id={`${id}-desc`}>等高線図と同じ標高データ・参考範囲を用いた立体図。高さ強調なし、縦横同尺度。黄色線は地表に沿う対象範囲。側面・底面は表示用で、地層・土量を示しません。樹木、建物、擁壁、造成後の形状は含みません。欠測や除外の部分を面で埋めません。</desc>
+      <desc id={`${id}-desc`}>等高線図と同じ標高データ・参考範囲を用いた立体図。{verticalScale === 2 ? '横1：縦2の高さ強調表示。標高・勾配の数値と色は実DEMのままです。' : '高さ強調なし、縦横同尺度。'}黄色線は地表に沿う対象範囲。側面・底面は表示用で、地層・土量を示しません。樹木、建物、擁壁、造成後の形状は含みません。欠測や除外の部分を面で埋めません。</desc>
       {!canRotate && <rect width={W} height={H} fill="#fbfcfa" />}
       <defs><clipPath id={`${id}-viewport`}><rect x="25" y="35" width="750" height="395" /></clipPath></defs>
-      <text x="44" y="25" className="terrain-area-svg-caption">実DEM地形　高さ強調なし（1:1）</text>
+      <text x="44" y="25" className="terrain-area-svg-caption">実DEM地形　{verticalScale === 2 ? '高さ2倍（横1：縦2）' : '高さ強調なし（1:1）'}</text>
       <text x="756" y="25" textAnchor="end" className="terrain-area-svg-note">視点：北から時計回り{Math.round(camera.azimuth)}°{canRotate ? ` ／ 見下ろし${Math.round(camera.pitch)}°` : ''}</text>
       <g clipPath={`url(#${id}-viewport)`}>
       <g className="terrain-area-3d-axis">
@@ -367,8 +390,7 @@ export function TerrainArea3D({ analysis, position, reportMode = false, azimuth 
       {point && point[0] > 25 && point[0] < 770 && point[1] > 32 && point[1] < 430 && <g transform={`translate(${point[0]} ${point[1]})`} className="terrain-area-selected-point"><circle r="5" fill="#197ca0" stroke="#fff" strokeWidth="2" /><text x="9" y="-8">選択地点</text></g>}
       <g className="terrain-area-3d-cardinals">{[['N', north], ['S', south], ['E', east], ['W', west]].map(([label, p]) => <text key={label} x={p[0]} y={p[1] + (label === 'N' ? -9 : 18)} textAnchor="middle">{label}</text>)}</g>
       </g>
-      <text x="44" y="443" className="terrain-area-svg-note">地表面と黄色線は同じ標高データ。樹木・建物・造成後の形状は含みません。</text>
-      <Legend />
+      {!canRotate && <><text x="44" y="443" className="terrain-area-svg-note">地表面と黄色線は同じ標高データ。樹木・建物・造成後の形状は含みません。</text><Legend summary={analysis.summary} /></>}
       {canRotate && <rect ref={modelRef} className="terrain-area-drag-target" x="25" y="35" width="750" height="395" fill="transparent" onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerEnd} onPointerCancel={pointerEnd} onLostPointerCapture={pointerEnd} />}
     </svg>
     </div>
@@ -378,6 +400,7 @@ export function TerrainArea3D({ analysis, position, reportMode = false, azimuth 
       <div className="terrain-area-camera-zoom" role="group" aria-label="3Dの拡大縮小"><button type="button" aria-label="3Dを縮小" disabled={camera.zoom <= .65} onClick={() => zoomView(1/1.2)}>−</button><span>{camera.zoom.toFixed(1)}×</span><button type="button" aria-label="3Dを拡大" disabled={camera.zoom >= 2.5} onClick={() => zoomView(1.2)}>＋</button></div>
       <button type="button" className="terrain-area-quiet-button" onClick={resetView}>最初の視点</button>
     </div>}
-    <figcaption>{drawing.faceCount ? '地表はDEM。側面・底面は表示用で、地層・土量を示しません。' : '連続した地表面を描ける標高点が不足しています。'} {analysis.summary?.coveragePercent < 100 ? '未取得部分の面は表示していません。' : ''}</figcaption>
+    {canRotate && <SlopeDistribution summary={analysis.summary} />}
+    <figcaption>{drawing.faceCount ? '地表面と黄色線は同じDEM。樹木・建物・造成後の形状は含みません。側面・底面は表示用で、地層・土量を示しません。' : '連続した地表面を描ける標高点が不足しています。'} {analysis.summary?.coveragePercent < 100 ? '未取得部分の面は表示していません。' : ''}</figcaption>
   </figure>
 }

@@ -185,3 +185,88 @@ test('rotation preserves the current zoom and invalid drag input keeps the view'
   const normalized = normalizeTerrainView(view)
   assert.deepEqual(view, normalized, 'helpers leave the input camera unchanged')
 })
+
+test('height exaggeration doubles only display-space vertical distances without mutating terrain inputs', () => {
+  const basePoint = [10, 20, settings.base]
+  const points = [basePoint, [20, 20, settings.base], [10, 30, settings.base], [10, 20, settings.base + 10]]
+  const source = { bounds: structuredClone(settings.bounds), elevations: points.map(p => p[2]), summary: { minElevation: 300, maxElevation: 360 } }
+  const before = structuredClone({ source, points })
+  for (const azimuth of [0, 35, 145, 270]) for (const pitch of [0, 32, 75]) {
+    const actual = createTerrainProjection({ ...settings, bounds: source.bounds, azimuth, pitch })
+    const doubled = createTerrainProjection({ ...settings, bounds: source.bounds, azimuth, pitch, heightScale: 2 })
+    assert.equal(actual.heightScale, 1)
+    assert.equal(doubled.heightScale, 2)
+    assert.deepEqual(doubled.transform(basePoint), actual.transform(basePoint), 'the display base remains anchored')
+    for (const horizontal of points.slice(1, 3)) {
+      close(distance(doubled.transform(basePoint), doubled.transform(horizontal)), 10)
+      assert.deepEqual(doubled.transform(horizontal), actual.transform(horizontal))
+    }
+    close(distance(doubled.transform(basePoint), doubled.transform(points[3])), 20)
+    close(distance(actual.transform(basePoint), actual.transform(points[3])), 10)
+    for (let axis = 0; axis < 3; axis++) {
+      close(doubled.transform(points[3])[axis] - doubled.transform(basePoint)[axis],
+        2 * (actual.transform(points[3])[axis] - actual.transform(basePoint)[axis]))
+    }
+  }
+  assert.deepEqual({ source, points }, before)
+})
+
+test('only numeric height factors 1 and 2 are supported and height is not part of camera normalization', () => {
+  const view = { azimuth: 145, pitch: 50, zoom: 1.4 }
+  const baseline = createTerrainProjection({ ...settings, ...view, heightScale: 1 })
+  for (const heightScale of [undefined, null, NaN, Infinity, -Infinity, -1, 0, .5, 1.5, 3, '2', true, {}]) {
+    const projection = createTerrainProjection({ ...settings, ...view, heightScale })
+    assert.equal(projection.heightScale, 1)
+    assert.deepEqual(projection.transform([15, 10, 325]), baseline.transform([15, 10, 325]))
+    assert.deepEqual(projection.project([15, 10, 325]), baseline.project([15, 10, 325]))
+    assert.equal(terrainFaceVisible([0, 1, 1], view, heightScale), terrainFaceVisible([0, 1, 1], view, 1))
+  }
+  assert.deepEqual(normalizeTerrainView({ ...view, heightScale: 2 }), view)
+})
+
+test('the exaggerated bounding box stays finite and fits without distorting x/y at default zoom', () => {
+  for (const azimuth of [0, 35, 145, 270]) for (const pitch of [0, 32, 75]) {
+    for (const maxElevation of [settings.base, settings.base + .01, settings.maxElevation]) {
+      const projection = createTerrainProjection({ ...settings, maxElevation, azimuth, pitch, heightScale: 2 })
+      assert.ok(Number.isFinite(projection.scale) && projection.scale > 0)
+      for (const x of [settings.bounds.west, settings.bounds.east]) for (const y of [settings.bounds.south, settings.bounds.north]) {
+        for (const z of [settings.base, maxElevation]) {
+          const [u, v] = projection.project([x, y, z])
+          assert.ok(Number.isFinite(u) && Number.isFinite(v) && u >= 0 && u <= 800 && v >= 0 && v <= 450)
+        }
+      }
+    }
+  }
+})
+
+test('surface culling follows the displayed slope threshold after height exaggeration', () => {
+  // The synthetic surface z=-y has upward normal [0,1,1]. From the south,
+  // it is visible above 45 degrees at 1:1, and above atan(2) at 2x height.
+  const normal = [0, 1, 1], original = [...normal]
+  for (const factor of [1, 2]) {
+    const threshold = Math.atan(factor) * 180 / Math.PI
+    assert.equal(terrainFaceVisible(normal, { azimuth: 180, pitch: threshold - .001 }, factor), false)
+    assert.equal(terrainFaceVisible(normal, { azimuth: 180, pitch: threshold }, factor), false, 'an edge-on face is hidden')
+    assert.equal(terrainFaceVisible(normal, { azimuth: 180, pitch: threshold + .001 }, factor), true)
+    assert.equal(terrainFaceVisible(normal.map(v => v * 100), { azimuth: 180, pitch: threshold + .001 }, factor), true)
+  }
+  assert.equal(terrainFaceVisible(normal, { azimuth: 180, pitch: 50 }, 1), true)
+  assert.equal(terrainFaceVisible(normal, { azimuth: 180, pitch: 50 }, 2), false)
+  assert.deepEqual(normal, original)
+})
+
+test('scaled-normal culling agrees with a cross product of displayed surface tangents', () => {
+  const normal = [-.4, 1.2, 1]
+  const cross = (a, b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]]
+  for (const heightScale of [1, 2]) {
+    const displayedNormal = cross([1, 0, .4 * heightScale], [0, 1, -1.2 * heightScale])
+    for (const azimuth of [0, 35, 90, 145, 180, 270]) for (const pitch of [0, 32, 50, 75]) {
+      const view = { azimuth, pitch }
+      assert.equal(terrainFaceVisible(normal, view, heightScale), terrainFaceVisible(displayedNormal, view), 'culling must follow transformed geometry')
+      for (const wall of [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0]]) {
+        assert.equal(terrainFaceVisible(wall, view, heightScale), terrainFaceVisible(wall, view), 'height exaggeration does not turn a vertical wall')
+      }
+      assert.equal(terrainFaceVisible([0,0,-1], view, heightScale), false)
+    }
+  }
+})

@@ -1,0 +1,27 @@
+.map-shell > .map-region-label {
+  position:absolute;
+  z-index:650;
+  top:14px;
+  left:260px;
+  right:60px;
+  box-sizing:border-box;
+  max-width:420px;
+  min-width:0;
+  min-height:32px;
+  margin-inline:auto;
+  padding:5px 10px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  border:1px solid #cbd9d0;
+  border-radius:7px;
+  background:rgba(255,255,255,.94);
+  color:#294e3d;
+  box-shadow:0 1px 4px #183c351c;
+  pointer-events:none;
+}
+.map-region-label > span { flex:0 0 auto; font-size:10px; line-height:1.4; font-weight:500; color:#62796d; }
+.map-region-label > strong { min-width:0; font-size:13px; font-weight:600; line-height:1.5; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+@media(max-width:760px) {
+  .map-shell > .map-region-label { top:128px; left:60px; right:12px; max-width:none; min-height:30px; padding:4px 9px; }
+}

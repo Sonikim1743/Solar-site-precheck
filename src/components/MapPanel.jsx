@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import GridEquipmentDetails from './GridEquipmentDetails.jsx'
 import TerrainAreaMapOverlay from './TerrainAreaMapOverlay.jsx'
+import MapRegionLabel, { getMapRegionLabel } from './MapRegionLabel.jsx'
 import L from 'leaflet'
 import { Circle, CircleMarker, GeoJSON, LayersControl, MapContainer, Marker, Polygon, Polyline, Popup, Rectangle, ScaleControl, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet'
 import { parcelInfo } from '../services/cadastre.js'
@@ -646,6 +647,7 @@ export default function MapPanel({
   googleMapsUrl,
 }) {
   const hasTerrainOverlay = !!terrainSection?.lines?.length
+  const hasRegionLabel = Boolean(getMapRegionLabel(position, placeInfo))
   const [showTerrainArea, setShowTerrainArea] = useState(true)
   useEffect(() => setShowTerrainArea(true), [terrainArea?.geometryKey, terrainArea?.fetchedAt])
   const [isCompactMap, setIsCompactMap] = useState(false)
@@ -784,9 +786,10 @@ export default function MapPanel({
         <CurrentLocationLayer currentLocation={currentLocation} />
         <TerrainSectionMapOverlay analysis={terrainSection} dimmed={isDrawing} />
         {terrainArea && showTerrainArea && <TerrainAreaMapOverlay analysis={terrainArea} dimmed={isDrawing} />}
-        <SiteMarker position={position} placeInfo={placeInfo} suppressPopup={hasTerrainOverlay || (terrainArea && showTerrainArea) || parcelMode !== 'point'} />
+        <SiteMarker position={position} placeInfo={placeInfo} suppressPopup={hasRegionLabel || hasTerrainOverlay || (terrainArea && showTerrainArea) || parcelMode !== 'point'} />
         <ReviewGeometryLayers review={parcelReview} vertices={draftVertices} onClose={finishDrawing} locked={mapLocked} dimmed={isDrawing} />
       </MapContainer>
+      <MapRegionLabel position={position} placeInfo={placeInfo} />
       <div className="map-draw-controls" role="group" aria-label="地図に範囲を描く">
         <button type="button" className={parcelMode === 'boundary' ? 'is-active' : ''} aria-pressed={parcelMode === 'boundary'} onClick={() => onParcelModeChange?.(parcelMode === 'boundary' ? 'point' : 'boundary')} disabled={!onParcelModeChange}>範囲を描く</button>
         <button type="button" className={parcelMode === 'exclusion' ? 'is-active' : ''} aria-pressed={parcelMode === 'exclusion'} onClick={() => onParcelModeChange?.(parcelMode === 'exclusion' ? 'point' : 'exclusion')} disabled={!onParcelModeChange}>除外</button>
