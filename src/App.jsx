@@ -953,6 +953,7 @@ export default function App() {
 
   function resetWorkTools() {
     candidateRequests.current.invalidateAll()
+    setLocationStatus({ status: 'idle', message: '' })
     setCandidateRevision(current => current + 1)
     setGenerationNotice('')
     setGenerationInputs({ peakpower: 50, angle: 20, aspect: 0, loss: 14 })
