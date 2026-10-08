@@ -1,6 +1,12 @@
 # Project Workflow for Split Codex Threads
 
-Last updated: 2026-07-08
+最終確認：2026-10-08 / v1.28.1。新しい作業は `AGENTS.md`、`docs/PROJECT_CONTEXT_KO.md`、`docs/DEPLOYED_VERSION.md`、`docs/TERRAIN_AREA_V1_28_KO.md`、`docs/NEXT_TASKS_KO.md` の順に読みます。
+
+同じ依頼の分業はエージェントで担当ファイルと検証責任を分け、別のチャットは利用者が依頼した場合に作成します。Mac OpenClaw中心の開発方針と今回のWindows作業の許可を区別します。地図・範囲・地形・資料出力の主作業を優先し、旧ポータル案を自動的な次期課題にはしません。
+
+変更した操作、テスト、ビルド、CSP、同梱資産を確認し、コミット済みのクリーンなソースから `pnpm package:deployment` で配布物を作ります。GitHubへの反映、既存Cloudflare Pagesへの配布、公開ファイルの照合、各PCのインストール更新は別工程です。完了の証拠と未確認範囲を公開記録に残します。個別案件・認証情報を公開ソースへ入れません。
+
+以下は2026-07-08時点の分業背景です。現在の作業順と優先順位には上記の案内を使います。
 
 ## 1. Why split the work?
 
@@ -193,4 +199,3 @@ Before creating many threads, start with three:
 3. Portal Development
 
 Add Data Validation and Deployment threads when the next concrete task needs them.
-

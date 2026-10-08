@@ -2,6 +2,8 @@
 .parcel-report-map { margin: 0 0 16px; }
 .parcel-report-map svg { display: block; width: 100%; max-height: 300px; border: 1px solid #dce5dc; border-radius: 8px; }
 .parcel-report-map figcaption { margin-top: 7px; color: #67776d; font-size: 10px; line-height: 1.6; }
+.parcel-report-region { margin-bottom: 6px; color: #405b49; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.parcel-report-map-warning { margin: 7px 0; padding: 7px 9px; background: #fff4dd; color: #785426; font-size: 11px; line-height: 1.5; }
 .parcel-report-shape { stroke-width: 1.8; stroke-linejoin: round; }
 .parcel-report-shape--target { fill: #efc951; fill-opacity: .26; stroke: #a77e1c; }
 .parcel-report-shape--reference { fill: #80b7dd; fill-opacity: .15; stroke: #5489b4; stroke-dasharray: 6 3; }
@@ -14,12 +16,18 @@
 .parcel-report-legend .is-boundary { background: #e1efe8; border-color: #1c7653; }
 .parcel-report-legend .is-exclusion { background: #edcbcb; border-color: #b84747; border-style: dashed; }
 .parcel-report-legend .is-position { width: 8px; height: 8px; background: #ab3434; border-color: #ab3434; border-radius: 50%; }
-.parcel-report-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 16px 0; }
+.parcel-report-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 12px 0 8px; }
 .parcel-report-metrics > div { min-width: 0; padding: 12px; border: 1px solid #d9e5dd; border-radius: 7px; background: #f4f8f4; }
-.parcel-report-metrics > div:last-child { background: #eaf4ec; border-color: #bcd7c4; }
+.parcel-report-metrics > div:first-child { background: #eaf4ec; border-color: #bcd7c4; }
 .parcel-report-metrics dt { color: #637368; font-size: 10px; }
 .parcel-report-metrics dd { margin: 7px 0 0; color: #274b36; font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .parcel-report-metrics small { font-size: 10px; font-weight: 500; white-space: nowrap; }
+.parcel-report-terrain-evidence { margin: 7px 0 12px; color: #5b6d60; font-size: 10px; line-height: 1.6; overflow-wrap: anywhere; }
+.parcel-report-terrain-evidence--missing { padding: 7px 9px; background: #f4f6ef; }
+.parcel-report-next { margin: 12px 0; padding: 10px 12px; background: #f2f7f2; border-left: 3px solid #6b9479; }
+.parcel-report-next h3 { margin: 0 0 6px; color: #365a43; font-size: 12px; }
+.parcel-report-next ol { padding-left: 19px; margin: 0; color: #46604e; font-size: 11px; line-height: 1.7; }
+.parcel-report-next p { margin: 6px 0 0; color: #5b6d60; font-size: 10px; line-height: 1.6; overflow-wrap: anywhere; }
 .parcel-report-conditions { border-top: 1px solid #dce6df; padding-top: 3px; }
 .parcel-report-conditions h3 { margin: 13px 0 4px; color: #3b5946; font-size: 12px; }
 .parcel-report-conditions p, .parcel-report-note { margin: 5px 0; color: #5b6d60; font-size: 11px; line-height: 1.75; overflow-wrap: anywhere; }
@@ -54,9 +62,16 @@
   .parcel-report-map { margin-bottom: 10px; }
   .parcel-report-map svg { max-height: 76mm; }
   .parcel-report-map figcaption, .parcel-report-legend { font-size: 9px; }
-  .parcel-report-metrics { gap: 7px; margin: 12px 0; }
-  .parcel-report-metrics > div { padding: 10px; }
+  .parcel-report-region { font-size: 10px; margin-bottom: 4px; }
+  .parcel-report-map-warning { font-size: 9px; padding: 5px 7px; }
+  .parcel-report-metrics { gap: 7px; margin: 8px 0 5px; }
+  .parcel-report-metrics > div { padding: 8px; }
   .parcel-report-metrics dd { font-size: 19px; }
+  .parcel-report-terrain-evidence { font-size: 9px; margin: 5px 0 8px; line-height: 1.5; }
+  .parcel-report-next { margin: 8px 0; padding: 7px 9px; break-inside: avoid; }
+  .parcel-report-next h3 { font-size: 11px; margin-bottom: 4px; }
+  .parcel-report-next ol { font-size: 10px; line-height: 1.55; }
+  .parcel-report-next p { font-size: 9px; line-height: 1.5; }
   .parcel-report-conditions h3 { margin-top: 10px; font-size: 11px; }
   .parcel-report-conditions p, .parcel-report-note { font-size: 10px; line-height: 1.55; }
   .parcel-report-table { font-size: 10px; }

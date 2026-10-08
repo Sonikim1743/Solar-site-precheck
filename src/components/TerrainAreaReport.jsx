@@ -1,6 +1,7 @@
 import { TerrainAreaPlan, TerrainArea3D } from './TerrainAreaFigures.jsx'
 import { terrainGeometryKey } from '../utils/terrainArea.js'
 import { measureParcelReview } from '../utils/parcelReview.js'
+import { terrainSlopeDistribution, formatTerrainSlopeArea } from '../utils/terrainSlopeDistribution.js'
 import './terrain-area-report.css'
 
 const number = (value, digits = 1) => Number.isFinite(value) ? value.toLocaleString('ja-JP', { maximumFractionDigits: digits }) : '—'
@@ -25,6 +26,7 @@ export default function TerrainAreaReport({ report }) {
   // candidate check report/record; don't silently let them add overflow pages.
   const memoExcerpt = report.fieldMemo?.replace(/\s+/g, ' ').slice(0, 180)
   const partial = summary.coveragePercent < 100 || summary.slopeCoveragePercent < 100
+  const distribution = terrainSlopeDistribution(summary)
   const steepPercent = summary.slopeBins.filter(bin => bin.min >= 20).reduce((sum, bin) => sum + (Number.isFinite(bin.percent) ? bin.percent : 0), 0)
   const interpretation = !Number.isFinite(summary.medianSlope) ? '勾配を確認できる標高点が不足しています。取得範囲を確認して再取得してください。' : summary.medianSlope >= 20 ? '参考範囲には傾斜が広がっています。配置・接道・排水・造成の前提をそろえて、詳細検討へ進めてください。' : summary.medianSlope >= 10 ? '一枚の平地として扱わず、起伏と勾配に合わせた配置を検討してください。' : '勾配が比較的小さい部分があります。局所的な段差と現況を確認して配置を検討してください。'
   return <section className="report-card report-card--print-set terrain-area-report" id="terrain-area-report" aria-label="同じ範囲の等高線・3D地形参考図">
@@ -38,8 +40,9 @@ export default function TerrainAreaReport({ report }) {
           <div><dt>局所勾配 上位10%の境目</dt><dd>{number(summary.p90Slope)}°</dd></div>
         </dl>
         <p className="terrain-report-observation">{interpretation}</p>
-        <h3>勾配の分布</h3><table className="terrain-report-bins"><thead><tr><th>10m幅で見た局所勾配</th><th>割合</th></tr></thead><tbody>{summary.slopeBins.map(bin => <tr key={bin.min}><th>{bin.max === 90 ? `${bin.min}°以上` : `${bin.min}–${bin.max}°未満`}</th><td>{Number.isFinite(bin.percent) ? `${number(bin.percent)}%` : '未計算'}</td></tr>)}</tbody></table>
-        <p>割合は勾配を計算できた範囲内の格子点が分母です。登記面積を分母にした値ではありません。</p>
+        <h3>勾配の分布</h3><table className="terrain-report-bins"><thead><tr><th>10m幅で見た局所勾配</th><th>割合 / 推定面積</th></tr></thead><tbody>{distribution.bins.map(bin => <tr key={bin.min}><th>{bin.max === 90 ? `${bin.min}°以上` : `${bin.min}–${bin.max}°未満`}</th><td>{Number.isFinite(bin.percent) ? `${number(bin.percent)}%` : '未計算'} / {formatTerrainSlopeArea(bin.areaM2)}</td></tr>)}</tbody></table>
+        <p className="terrain-report-distribution-summary">有効範囲（除外後）：{formatTerrainSlopeArea(distribution.totalAreaM2)}{(distribution.unknownAreaM2 === null || distribution.unknownAreaM2 > 0) && ` / 未計算：${formatTerrainSlopeArea(distribution.unknownAreaM2)}`}</p>
+        <p className="terrain-report-distribution-note">割合は勾配を計算できた格子点内の分布。推定面積は除外後の図形面積と格子点の比率で換算し、未計算分を配分しません。登記面積ではありません。</p>
         {Number.isFinite(summary.medianSlope) && <p>20°以上の参考割合：約{number(steepPercent)}%。色分けは施工可否の判定基準ではありません。</p>}
         {partial && <p className="terrain-report-warning">取得できた範囲：標高 {number(summary.coveragePercent)}% / 勾配 {number(summary.slopeCoveragePercent)}%。欠測を除いた参考値であり、範囲全体の確定値ではありません。</p>}
       </aside></div>

@@ -1,16 +1,24 @@
 # Codex Thread Role Index
 
-Use this folder when splitting the project into multiple Codex threads.
+v1.28.1のリリース対象に合わせた分業案内です。実際の公開版は `docs/DEPLOYED_VERSION.md` を確認してください。利用者との会話・進捗報告は韓国語、利用者向け文書・画面・図表は日本語です。
+
+同じ依頼の分業はエージェントを使い、担当ファイルと検証責任を先に決めます。別のチャットは利用者が作成を依頼した場合に使います。このフォルダーは役割別の参考資料です。
 
 Every new thread should first read:
 
-1. `docs/project/PROJECT_CONTEXT.md`
-2. `docs/project/PROJECT_WORKFLOW.md`
-3. The role file for that thread
+1. `AGENTS.md`
+2. `docs/PROJECT_CONTEXT_KO.md`
+3. `docs/DEPLOYED_VERSION.md`
+4. `docs/TERRAIN_AREA_V1_28_KO.md`
+5. `docs/NEXT_TASKS_KO.md`
+
+その後、担当する役割ファイルと `docs/project/PROJECT_WORKFLOW.md` を読みます。`docs/project/PROJECT_CONTEXT.md` の旧v1.21・ポータル記録は歴史的背景です。Macへの引継ぎでは `docs/MAC_OPENCLAW_START_KO.md` も確認します。
+
+表示倍率と実数値、地名・公開地番の参考表示と検討範囲、実装済みJSON保存と未確認の環境間再開を区別します。複数タブの保存衝突とMac/Safari実機を検証済みにしないでください。個別案件・認証情報を公開リポジトリへ追加しません。
 
 ## Recommended starting set
 
-Start with these three threads:
+当初の役割案は次の三つです。今回の依頼で必要な役割だけを分担し、ポータル開発を自動的な次期課題にはしません。
 
 1. **PM / Overall Coordination**
    - Role file: `THREAD_PM.md`
@@ -46,7 +54,11 @@ When creating a new thread, paste this and replace the role file:
 This is a specialist thread for the Solar Site Precheck / Solar実務Portal project.
 
 Please read:
-- docs/project/PROJECT_CONTEXT.md
+- AGENTS.md
+- docs/PROJECT_CONTEXT_KO.md
+- docs/DEPLOYED_VERSION.md
+- docs/TERRAIN_AREA_V1_28_KO.md
+- docs/NEXT_TASKS_KO.md
 - docs/project/PROJECT_WORKFLOW.md
 - docs/threads/THREAD_XXXX.md
 
@@ -56,7 +68,9 @@ Then summarize:
 3. what you should avoid
 4. the next practical task you recommend
 
-Do not modify files until the task is confirmed.
+Work within the current user-authorized task and assigned files. Preserve other agents' changes.
+Distinguish implementation, verification, packaging, GitHub merge, and live deployment.
+Keep private candidate records and source documents out of the public repository.
 ```
 
 ## PM handoff rule
@@ -79,4 +93,3 @@ Risks / not checked:
 Recommended next step:
 - ...
 ```
-

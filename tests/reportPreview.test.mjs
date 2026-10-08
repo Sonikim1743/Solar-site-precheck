@@ -34,7 +34,7 @@ test('parcel report preserves every selected row and adds sequential pages witho
   const report={position:{lat:34.9005,lon:133.5005},obstructionHeight:20,snowBase:1,parcelReview:review,parcelMetrics:measureParcelReview(review)}
   const html=renderToStaticMarkup(React.createElement(ReportPreview,{report}))
   for(let i=0;i<9;i++) assert.match(html,new RegExp('試験-'+i))
-  assert.match(html,/筆界・検討範囲/)
+  assert.match(html,/検討範囲・地形と次の確認/)
   assert.match(html,/一覧 2 \/ 2/)
   assert.match(html,/fill-rule="evenodd"/)
   const numbers=Array.from(html.matchAll(/class="report-page-number">(\d+)</g),x=>Number(x[1]))

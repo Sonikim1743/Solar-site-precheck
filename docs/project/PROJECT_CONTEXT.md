@@ -1,8 +1,45 @@
 # Solar Site Precheck / Solar実務Portal Project Context
 
-Last updated: 2026-07-08  
-Current app version: v1.21  
-Current portal preview: `solar-portal-preview-v2.1.html`
+最終更新：2026-10-08。現在のリリース対象は **v1.28.1** です。本書の実装説明は公開完了の記録ではありません。実際の公開版・ソース・ZIP・配布IDは [DEPLOYED_VERSION.md](../DEPLOYED_VERSION.md) を確認してください。
+
+## 最新の読み始め
+
+新しい作業では次の順で読みます。
+
+1. [AGENTS.md](../../AGENTS.md)
+2. [PROJECT_CONTEXT_KO.md](../PROJECT_CONTEXT_KO.md)
+3. [DEPLOYED_VERSION.md](../DEPLOYED_VERSION.md)
+4. [TERRAIN_AREA_V1_28_KO.md](../TERRAIN_AREA_V1_28_KO.md)
+5. [NEXT_TASKS_KO.md](../NEXT_TASKS_KO.md)
+
+Macへの引継ぎでは [MAC_OPENCLAW_START_KO.md](../MAC_OPENCLAW_START_KO.md) も確認します。会話と進捗報告は韓国語、アプリの利用者向け説明・図表・提出資料は日本語です。
+
+## 現在の実装と操作方針
+
+- 航空写真を主作業面とし、地点・範囲・除外を選んで同じ有効範囲の等高線・勾配・平面・3D・報告書を確認します。画面の開閉やメニュー往復だけで入力・結果を初期化しません。
+- 地名は初期表示、公開地番（2024年）は初期オフの参考レイヤーです。表示した筆界を面積や検討範囲へ自動採用しません。ファイルによる筆選択と管理は「ツール → 範囲・地番の詳細」で開きます。
+- 地図の「範囲を描く」「除外」で作図します。3点以上は開始点の再クリック、または「確定」で完成。通常最大ズーム19、作図中21で、追加拡大は原資料の解像度を変えません。
+- 対象筆と指定範囲の共通部分から除外を引き、参考筆は面積に加えません。有効範囲の面積を地図下の凡例と同じ行に表示します。
+- 局所勾配は東西・南北10m幅の差分による参考分類です。割合と推定面積を同じ有効範囲で表示し、欠測は「勾配未確認」として分けます。5mの表示・集計格子を測量精度と混同しません。
+- 3Dの「回転」「視点の移動」とホイールで地形を確認します。「高さ2倍 1:2」は横1：縦2の表示強調だけで、標高・勾配・面積・割合は維持します。側面・底面は表示用で、地層や土量ではありません。A3横2ページの地形PDFは1:1・固定視点です。
+- 選択地点はSolar Pro用の度・分形式で表示・コピーします。位置照会と計算には元の精密座標を維持します。
+- 発電量と系統確認は上部「ツール」の別画面です。地平線・積雪・レポート・資料・Solar Proガイドはメインの折りたたみ構成を維持します。GEONEX確認タブは再導入しません。
+- JSON保存・再開は実装済みです。schema 3は範囲と取得済み標高・資料・取得時刻を含み、読込時に派生値を再計算します。schema 1/2の読込も維持します。PDF原本、地番原資料全体、設計ソフトの編集状態は記録に含みません。
+- 別PC・実行環境間の記録互換、複数タブの保存衝突、Mac/Safari実機は未確認または未解決です。Windowsでの確認をMac実証の代わりにしません。面積から容量・施工可否・接続承認・収益を自動確定しません。
+
+GitHubは公開ソースです。候補地記録・登記資料・私用CAD・認証情報・会話アーカイブを追加しません。基本の開発引継ぎ先はMac OpenClawで、今回のWindows作業は利用者が認めた例外です。
+
+パッケージ作成はコミット済みのクリーンなソースで `pnpm package:deployment` を使います。GitHub pushとCloudflare公開は別工程です。テスト・ビルド・CSP・同梱資産・変更した操作を確認し、公開後の実証は `DEPLOYED_VERSION.md` に記録します。
+
+---
+
+## 過去の製品・ポータル背景（2026-07-08時点）
+
+以下は当時の背景記録です。バージョン、配布スクリプト、ポータルの「current」、スレッド開始順は現在の指示ではありません。最新の作業には上記の読み始めと方針を使用します。
+
+Historical app version: v1.21
+
+Historical portal preview: `solar-portal-preview-v2.1.html`
 
 ## 1. Project identity
 
@@ -168,4 +205,3 @@ Use separate Codex threads for:
 6. UX / Practical Review
 
 Each thread should read this file first, then read its own role file under `docs/threads/`.
-

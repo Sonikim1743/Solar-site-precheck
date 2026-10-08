@@ -1,8 +1,12 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import GridEquipmentDetails from './GridEquipmentDetails.jsx'
 import TerrainAreaMapOverlay from './TerrainAreaMapOverlay.jsx'
+import MapRegionLabel, { getMapRegionLabel } from './MapRegionLabel.jsx'
+import MapPlaceNamesOverlay from './MapPlaceNamesOverlay.jsx'
+import PublicParcelOverlay, { PublicParcelOverlayStatus } from './PublicParcelOverlay.jsx'
 import L from 'leaflet'
-import { Circle, CircleMarker, GeoJSON, LayersControl, MapContainer, Marker, Polygon, Polyline, Popup, Rectangle, ScaleControl, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet'
+import { Circle, CircleMarker, GeoJSON, LayersControl, MapContainer, Marker, Polygon, Polyline, Popup, Rectangle, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet'
+import MapDistanceScale from './MapDistanceScale.jsx'
 import { parcelInfo } from '../services/cadastre.js'
 import { featureInteriorPoint, validatePolygonGeometry } from '../services/parcelGeometry.js'
 import { getParcelKey } from '../utils/parcelReview.js'
@@ -13,14 +17,16 @@ import '../parcel-review.css'
 
 const INITIAL_MAP_CENTER = [36.2048, 138.2529]
 const INITIAL_MAP_ZOOM = 5
+const NORMAL_MAX_ZOOM = 19
+const DRAWING_MAX_ZOOM = 21
 const EMPTY_PARCEL_REVIEW = { version: 1, parcels: [], boundary: null, exclusions: [] }
 const EMPTY_FEATURE_COLLECTION = { type: 'FeatureCollection', features: [] }
 const PARCEL_MODE_HINTS = {
   point: '地図をクリックして計算地点を指定',
   target: '筆をクリックして対象に追加・変更',
   reference: '筆をクリックして参考に追加・変更',
-  boundary: '角を順に指定 · 開始点を押すと完成',
-  exclusion: '除外する角を順に指定 · 開始点を押すと完成',
+  boundary: '角を順に指定 · 作図中はさらに拡大できます · 開始点で完成',
+  exclusion: '除外する角を指定 · 作図中はさらに拡大できます · 開始点で完成',
 }
 
 const markerIcon = L.divIcon({
@@ -75,6 +81,9 @@ function MapInteractionController({ locked, drawing }) {
   const map = useMap()
 
   useEffect(() => {
+    // Leave the candidate and geometry intact; Leaflet clamps only the zoom
+    // when drawing ends. Raster/vector sources keep their original resolution.
+    map.setMaxZoom(drawing ? DRAWING_MAX_ZOOM : NORMAL_MAX_ZOOM)
     const handlers = [
       map.dragging,
       map.touchZoom,
@@ -635,6 +644,7 @@ export default function MapPanel({
   focusParcelId,
   onParcelSelect,
   parcelReview = EMPTY_PARCEL_REVIEW,
+  reviewAreaM2 = null,
   parcelMode = 'point',
   onReviewGeometry,
   onParcelDrawingError,
@@ -646,7 +656,10 @@ export default function MapPanel({
   googleMapsUrl,
 }) {
   const hasTerrainOverlay = !!terrainSection?.lines?.length
+  const hasRegionLabel = Boolean(getMapRegionLabel(position, placeInfo))
   const [showTerrainArea, setShowTerrainArea] = useState(true)
+  const [publicParcelStatus, setPublicParcelStatus] = useState({ state: 'off', message: '' })
+  const [placeNameStatus, setPlaceNameStatus] = useState(null)
   useEffect(() => setShowTerrainArea(true), [terrainArea?.geometryKey, terrainArea?.fetchedAt])
   const [isCompactMap, setIsCompactMap] = useState(false)
   const [mapInteractionEnabled, setMapInteractionEnabled] = useState(false)
@@ -745,6 +758,7 @@ export default function MapPanel({
         center={INITIAL_MAP_CENTER}
         zoom={INITIAL_MAP_ZOOM}
         minZoom={4}
+        maxZoom={NORMAL_MAX_ZOOM}
         scrollWheelZoom
         className="map"
       >
@@ -753,17 +767,26 @@ export default function MapPanel({
             <TileLayer
               attribution='<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noreferrer">国土地理院 全国最新写真（シームレス）</a>'
               url="https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg"
-              maxZoom={18}
+              maxZoom={DRAWING_MAX_ZOOM}
+              maxNativeZoom={18}
             />
           </LayersControl.BaseLayer>
           <LayersControl.BaseLayer name="標準地図">
             <TileLayer
               attribution='<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noreferrer">地理院タイル</a>'
               url="https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png"
+              maxZoom={DRAWING_MAX_ZOOM}
+              maxNativeZoom={18}
             />
           </LayersControl.BaseLayer>
+          <LayersControl.Overlay checked name="地名（都道府県・市区町村）">
+            <MapPlaceNamesOverlay dimmed={isDrawing} onStatus={setPlaceNameStatus} />
+          </LayersControl.Overlay>
+          <LayersControl.Overlay name="地番（公開2024）">
+            <PublicParcelOverlay onStatus={setPublicParcelStatus} />
+          </LayersControl.Overlay>
         </LayersControl>
-        <ScaleControl position="bottomleft" metric imperial={false} />
+        <MapDistanceScale position="bottomleft" />
         <ClickHandler onSelect={onSelect} mode={parcelMode} locked={mapLocked} onAddVertex={addDraftVertex} onFinish={finishDrawing} />
         <MapController position={position} />
         <MapInteractionController locked={mapLocked} drawing={isDrawing} />
@@ -784,9 +807,10 @@ export default function MapPanel({
         <CurrentLocationLayer currentLocation={currentLocation} />
         <TerrainSectionMapOverlay analysis={terrainSection} dimmed={isDrawing} />
         {terrainArea && showTerrainArea && <TerrainAreaMapOverlay analysis={terrainArea} dimmed={isDrawing} />}
-        <SiteMarker position={position} placeInfo={placeInfo} suppressPopup={hasTerrainOverlay || (terrainArea && showTerrainArea) || parcelMode !== 'point'} />
+        <SiteMarker position={position} placeInfo={placeInfo} suppressPopup={hasRegionLabel || hasTerrainOverlay || (terrainArea && showTerrainArea) || parcelMode !== 'point'} />
         <ReviewGeometryLayers review={parcelReview} vertices={draftVertices} onClose={finishDrawing} locked={mapLocked} dimmed={isDrawing} />
       </MapContainer>
+      <MapRegionLabel position={position} placeInfo={placeInfo} />
       <div className="map-draw-controls" role="group" aria-label="地図に範囲を描く">
         <button type="button" className={parcelMode === 'boundary' ? 'is-active' : ''} aria-pressed={parcelMode === 'boundary'} onClick={() => onParcelModeChange?.(parcelMode === 'boundary' ? 'point' : 'boundary')} disabled={!onParcelModeChange}>範囲を描く</button>
         <button type="button" className={parcelMode === 'exclusion' ? 'is-active' : ''} aria-pressed={parcelMode === 'exclusion'} onClick={() => onParcelModeChange?.(parcelMode === 'exclusion' ? 'point' : 'exclusion')} disabled={!onParcelModeChange}>除外</button>
@@ -820,6 +844,8 @@ export default function MapPanel({
       </div>
       {parcelData && <div className="parcel-map-badge">地番レイヤー {parcelData.features.length.toLocaleString()}筆</div>}
     </div>
+    <PublicParcelOverlayStatus status={publicParcelStatus} />
+    {placeNameStatus?.state === 'error' && <p className="public-parcel-overlay-status is-error" role="status">地名を取得できません。標準地図でも確認できます。</p>}
     {isDrawing && <div className="parcel-drawing-toolbar" aria-label="範囲の作図操作">
       <div className="parcel-drawing-toolbar__instruction">
         <strong>{parcelMode === 'boundary' ? '検討範囲' : '除外範囲'}を作図</strong>
@@ -835,9 +861,9 @@ export default function MapPanel({
     </div>}
     {drawingMessage && <p className="parcel-review-message parcel-review-message--error" role="alert">{drawingMessage}</p>}
     {terrainArea && <div className="terrain-map-legend" aria-label="検討範囲の勾配凡例"><button type="button" aria-pressed={showTerrainArea} onClick={() => setShowTerrainArea(value => !value)}>{showTerrainArea ? '等高線・勾配 ON' : '等高線・勾配 OFF'}</button>{showTerrainArea && <><span><i style={{ background: '#cfe3cd' }} />10°未満</span><span><i style={{ background: '#efe8ad' }} />10–20°</span><span><i style={{ background: '#eabd8d' }} />20–30°</span><span><i style={{ background: '#df9d9b' }} />30°以上</span><span><i style={{ background: '#b5bcb5' }} />勾配未確認</span><small>黄色線：分析した参考範囲 / 色は施工可否を示しません</small></>}</div>}
-    {!!(parcelReview?.parcels?.length || parcelReview?.boundary || parcelReview?.exclusions?.length) && <div className="parcel-map-legend" aria-label="地図の凡例">
+    {!!(parcelReview?.parcels?.length || parcelReview?.boundary || parcelReview?.exclusions?.length) && <div className="parcel-map-footer"><div className="parcel-map-legend" aria-label="地図の凡例">
       <span><i className="parcel-map-legend__target" />対象</span><span><i className="parcel-map-legend__reference" />参考</span><span><i className="parcel-map-legend__boundary" />検討範囲</span><span><i className="parcel-map-legend__exclusion" />除外</span>
-    </div>}
+    </div>{Number.isFinite(reviewAreaM2) && <p className="parcel-map-area">有効範囲 <strong>約{reviewAreaM2.toLocaleString('ja-JP', { maximumFractionDigits: 0 })} m²</strong>{parcelReview.exclusions?.length > 0 && <span>（除外後）</span>}</p>}</div>}
     </>
   )
 }

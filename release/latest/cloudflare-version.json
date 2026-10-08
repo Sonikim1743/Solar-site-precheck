@@ -1,16 +1,16 @@
 {
   "app": "Solar Site Precheck",
-  "version": "1.28",
+  "version": "1.28.1",
   "buildDate": "2026-10-08",
-  "sourceCommit": "91191eec5c9a4c525d4f05b3b0a014eff1e644ed",
+  "sourceCommit": "f05864141c2f7d0ca769574654b917d3e3eb7cb5",
   "target": "cloudflare",
-  "buildId": "1.28-2026-10-08-a8ffbe6f0927",
-  "packageName": "SolarSitePrecheck_v1.28_2026-10-08_cloudflare.zip",
-  "zipUrl": "https://raw.githubusercontent.com/Sonikim1743/Solar-site-precheck/main/release/latest/SolarSitePrecheck_v1.28_2026-10-08_cloudflare.zip",
-  "sha256": "a8ffbe6f0927fb0776e1fc8cd4149e8cda239ebd2059013c24b190f4bd34730a",
-  "etag": "a8ffbe6f0927fb07",
-  "bundleName": "index-BdaWY2P2.js",
+  "buildId": "1.28.1-2026-10-08-5794e9b736e4",
+  "packageName": "SolarSitePrecheck_v1.28.1_2026-10-08_cloudflare.zip",
+  "zipUrl": "https://raw.githubusercontent.com/Sonikim1743/Solar-site-precheck/main/release/latest/SolarSitePrecheck_v1.28.1_2026-10-08_cloudflare.zip",
+  "sha256": "5794e9b736e4349caad3fc0ce6a11db03e5c08ee64b37b112005710f63ef2ff1",
+  "etag": "5794e9b736e4349c",
+  "bundleName": "index-DzqmE1sk.js",
   "minRequiredRuntime": "1.2",
-  "notes": "Cloudflare Pages: deploy from extracted root including functions and shared. Not a dashboard drag-and-drop ZIP.",
-  "sizeBytes": 14248141
+  "notes": "範囲地形・3D・推定面積、公開地番と度分コピーを更新。dist・functions・sharedを含む展開先ルートから配布してください。",
+  "sizeBytes": 14295372
 }

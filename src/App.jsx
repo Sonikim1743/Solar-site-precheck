@@ -1433,7 +1433,7 @@ export default function App() {
 
   async function copySelectedCoordinates() {
     if (!position) return
-    const text = `${position.lat.toFixed(6)}, ${position.lon.toFixed(6)}`
+    const text = selectedSolarProCoordinateText
     try {
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(text)
@@ -1448,7 +1448,7 @@ export default function App() {
         document.execCommand('copy')
         document.body.removeChild(textarea)
       }
-      setPointActionStatus('緯度経度をコピーしました。')
+      setPointActionStatus('緯度・経度（度・分）をコピーしました。')
     } catch {
       setPointActionStatus(text)
     }
@@ -2755,6 +2755,7 @@ export default function App() {
   const confirmedMeshPlaceName = confirmedSnowStation?.placeName || ''
   const selectedPlaceLabel = placeInfo.status === 'success' ? normalizeDisplayText(placeInfo.data.label) : ''
   const selectedCoordinateText = position ? `${position.lat.toFixed(6)}, ${position.lon.toFixed(6)}` : ''
+  const selectedSolarProCoordinateText = position ? `${toDegreeMinutes(position.lat, 'lat')} / ${toDegreeMinutes(position.lon, 'lon')}` : ''
   const googleMapsUrl = position ? `https://www.google.com/maps?q=${position.lat.toFixed(6)},${position.lon.toFixed(6)}` : ''
   const solarReference = useMemo(() => solarAltitudeReference(position, terrain), [position, terrain])
   const matchedCapacityArea = useMemo(
@@ -3468,6 +3469,7 @@ export default function App() {
                 setSelectedParcel(null); setFocusParcelId(null)
               }}
               parcelReview={parcelReview}
+              reviewAreaM2={parcelMetrics.geometry ? parcelMetrics.usableAreaM2 : null}
               parcelMode={parcelMode}
               onParcelModeChange={setParcelMode}
               onReviewGeometry={receiveReviewGeometry}
@@ -3488,8 +3490,13 @@ export default function App() {
               googleMapsUrl={googleMapsUrl}
             />
 
-            <details className="parcel-settings" id="parcel-review-tools">
-              <summary>範囲・地番の詳細{parcelMetrics.geometry && <small>約{parcelMetrics.usableAreaM2.toLocaleString('ja-JP', { maximumFractionDigits: 0 })} m²</small>}</summary>
+            <details className="parcel-settings" id="parcel-review-tools" onToggle={event => {
+              const details = event.currentTarget
+              if (!details.open && details.contains(document.activeElement)) {
+                document.querySelector('.workspace-tools > summary')?.focus({ preventScroll: true })
+              }
+            }}>
+              <summary>範囲・地番の詳細</summary>
               <div className="cadastre-option__body">
             <ParcelReviewPanel
               review={parcelReview} metrics={parcelMetrics} mode={parcelMode} showDrawControls={false}
@@ -3566,13 +3573,13 @@ export default function App() {
             <div className="map-analysis-strip">
               {simpleDesign ? <div className="simple-point">
                 <div className="simple-point-title"><span>選択地点</span><strong>{position ? selectedPlaceLabel || '住所を確認中' : '住所検索または地図で地点を選択'}</strong></div>
-                <div className="simple-point-meta"><span>{position ? selectedCoordinateText : '緯度・経度 —'}</span><span>標高 <b>{elevation.status === 'success' ? `${elevation.value.toFixed(1)} m` : elevation.status === 'loading' ? '取得中…' : '—'}</b></span></div>
-                <div className="simple-point-actions">{position && <><button type="button" onClick={copySelectedCoordinates}>緯度経度コピー</button><a href={googleMapsUrl} target="_blank" rel="noreferrer">Google マップ ↗</a></>}{pointActionStatus && <span role="status">{pointActionStatus}</span>}</div>
+                <div className="simple-point-meta"><span>{position ? selectedSolarProCoordinateText : '緯度・経度 —'}</span><span>標高 <b>{elevation.status === 'success' ? `${elevation.value.toFixed(1)} m` : elevation.status === 'loading' ? '取得中…' : '—'}</b></span></div>
+                <div className="simple-point-actions">{position && <><button type="button" onClick={copySelectedCoordinates}>コピー</button><a href={googleMapsUrl} target="_blank" rel="noreferrer">Google マップ ↗</a></>}{pointActionStatus && <span role="status">{pointActionStatus}</span>}</div>
               </div> : <div className="selected-point-mini">
                 <div className="selected-point-mini__location"><span>選択地点</span><strong>{position ? selectedPlaceLabel || '住所を確認中' : '住所検索または地図で地点を選択'}</strong></div>
-                <div className="selected-point-mini__coordinates"><span>座標</span><strong>{position ? `${position.lat.toFixed(6)}, ${position.lon.toFixed(6)}` : '—'}</strong></div>
+                <div className="selected-point-mini__coordinates"><strong>{position ? <><b>{toDegreeMinutes(position.lat, 'lat')}</b><b>{toDegreeMinutes(position.lon, 'lon')}</b></> : '緯度・経度 —'}</strong></div>
                 <div className="selected-point-mini__elevation"><span>標高</span><strong>{elevation.status === 'success' ? `${elevation.value.toFixed(1)} m` : elevation.status === 'loading' ? '取得中…' : elevation.status === 'error' ? '未取得' : '—'}</strong></div>
-                {position && <button type="button" className="mini-copy-button" onClick={copySelectedCoordinates} aria-label="緯度経度をコピー" title={selectedCoordinateText}>コピー</button>}
+                {position && <button type="button" className="mini-copy-button" onClick={copySelectedCoordinates} aria-label="緯度・経度（度・分）をコピー" title={selectedSolarProCoordinateText}>コピー</button>}
                 {pointActionStatus && <em role="status">{pointActionStatus}</em>}
               </div>}
               {position && !Number.isFinite(elevation.value) && <button className="secondary-button" disabled={elevation.status === 'loading'} onClick={fetchMissingElevation}>{elevation.status === 'loading' ? '標高を取得中…' : 'この地点の標高を取得'}</button>}

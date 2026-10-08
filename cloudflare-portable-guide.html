@@ -18,7 +18,7 @@
 <body>
 <main>
   <h1>Solar Site Precheck 配布ガイド</h1>
-  <p>この軽量更新ZIPには、Portable更新用ファイルに加えて Cloudflare Pages 用の <code>functions/api</code> と設定メモを同梱しています。</p>
+  <p>v1.28.1 / 2026-10-08。Windows更新用の <code>release_light.zip</code> とCloudflare公開用の <code>cloudflare.zip</code> は別パッケージです。最新の配布状態とハッシュは <a href="https://github.com/Sonikim1743/Solar-site-precheck/blob/main/docs/DEPLOYED_VERSION.md">公開記録</a>、詳しい手順は <a href="https://github.com/Sonikim1743/Solar-site-precheck/blob/main/docs/DEPLOYMENT_PACKAGE.md">配布案内</a>を参照してください。</p>
 
   <h2>Portable版を更新する場合</h2>
   <ol>
@@ -28,9 +28,9 @@
   </ol>
 
   <h2>Cloudflare Pagesへ反映する場合</h2>
-  <p>ZIPを展開したフォルダで、Wranglerを使って以下を実行します。</p>
-  <pre>npx wrangler pages deploy dist --project-name=solar-site-precheck</pre>
-  <p class="note">Cloudflare Pagesのドラッグ&ドロップ配布では <code>functions</code> が反映されません。ZIP展開後のフォルダ直下に <code>dist</code> と <code>functions</code> がある状態でWrangler配布を使ってください。Wrangler 4系では <code>--functions=functions</code> は不要です。</p>
+  <p>Cloudflare用ZIPを展開したルートで、認証済みWranglerを使って以下を実行します。</p>
+  <pre>pnpm dlx wrangler@4 pages deploy dist --project-name solar-site-precheck --branch main</pre>
+  <p class="note">展開先の同階層に <code>dist</code>・<code>functions</code>・<code>shared</code>・<code>wrangler.toml</code> が必要です。Windows更新ZIPやdistだけではFunctionsを含む公開になりません。GitHubへのpushとPages公開は別工程です。</p>
 
   <h2>機能差の目安</h2>
   <ul>

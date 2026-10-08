@@ -255,6 +255,8 @@ test('coordinate parser returns null for unusable text', () => {
 test('degree-minute formatter keeps Japanese Solar Pro style', () => {
   assert.equal(toDegreeMinutes(34.8617, 'lat', 1), '北緯 34度 51.7分')
   assert.equal(toDegreeMinutes(133.2433, 'lon', 1), '東経 133度 14.6分')
+  assert.equal(toDegreeMinutes(35.999999, 'lat', 1), '北緯 36度 0.0分')
+  assert.equal(toDegreeMinutes(-135.999999, 'lon', 1), '西経 136度 0.0分')
 })
 
 test('display text normalization collapses full-width and repeated spaces', () => {

@@ -1,5 +1,6 @@
 import { terrainGeometryKey } from './terrainArea.js'
 import { measureParcelReview } from './parcelReview.js'
+import { terrainSlopeDistribution, formatTerrainSlopeArea } from './terrainSlopeDistribution.js'
 
 const PAGE_MM = [420, 297]
 const DPI = 240
@@ -205,10 +206,11 @@ function pageOne(ctx, model, images) {
   y = drawText(ctx, model.observation, 280, y + 2, 128, { size: 3.6, lineHeight: 5.2, maxLines: 4 }) + 4
   y = heading(ctx, '勾配の分布（10m幅で見た局所勾配）', 280, y, 128)
   for (const [label, value] of model.bins) {
-    drawText(ctx, label, 282, y, 84, { size: 3.2, maxLines: 1 })
-    drawText(ctx, value, 373, y, 33, { size: 3.4, weight: 700, maxLines: 1 })
+    drawText(ctx, label, 282, y, 45, { size: 3.2, maxLines: 1 })
+    drawText(ctx, value, 331, y, 75, { size: 3.4, weight: 700, maxLines: 1 })
     rule(ctx, 280, y + 5.7, 128); y += 7
   }
+  y = drawText(ctx, model.distributionSummary, 280, y + 2, 128, { size: 2.9, lineHeight: 4.3, maxLines: 2 })
   y = drawText(ctx, model.denominator, 280, y + 2, 128, { size: 2.9, lineHeight: 4.3, maxLines: 3 })
   drawText(ctx, model.coverage, 280, y + 2, 128, { size: 2.9, lineHeight: 4.3, maxLines: 3 })
   heading(ctx, '範囲の扱い', 12, 242, 396)
@@ -250,6 +252,12 @@ function modelFromElement(report, element, checkDeadline) {
   const expected = [`${numeric(s.polygonAreaM2, 0)} m²`, `${numeric(s.minElevation)}–${numeric(s.maxElevation)} m`, `${numeric(s.heightRange)} m`, `${numeric(s.medianSlope)}°`, `${numeric(s.p90Slope)}°`]
   // Do not combine an old report argument with the DOM of a newer analysis.
   if (values.length !== 5 || values.some((row, index) => row[1] !== expected[index])) fail('表示と計算結果が更新されました。地形図面を開き直してください。')
+  const distribution = terrainSlopeDistribution(s), bins = rows('.terrain-report-bins tbody > tr')
+  const expectedBins = distribution.bins.map(bin => [bin.max === 90 ? `${bin.min}°以上` : `${bin.min}–${bin.max}°未満`, `${Number.isFinite(bin.percent) ? `${numeric(bin.percent)}%` : '未計算'} / ${formatTerrainSlopeArea(bin.areaM2)}`])
+  if (bins.length !== expectedBins.length || bins.some((row, index) => row[0] !== expectedBins[index][0] || row[1] !== expectedBins[index][1])) fail('勾配の割合・推定面積の表示が計算結果と一致しません。地形図面を開き直してください。')
+  const distributionSummary = text(element.querySelector('.terrain-report-distribution-summary'))
+  const expectedDistributionSummary = `有効範囲（除外後）：${formatTerrainSlopeArea(distribution.totalAreaM2)}${distribution.unknownAreaM2 === null || distribution.unknownAreaM2 > 0 ? ` / 未計算：${formatTerrainSlopeArea(distribution.unknownAreaM2)}` : ''}`
+  if (distributionSummary !== expectedDistributionSummary) fail('推定面積の集計表示が更新されました。地形図面を開き直してください。')
   const evidenceSections = [...element.querySelectorAll('.terrain-report-evidence-layout > section')]
   if (evidenceSections.length !== 2) fail('出典・確認事項が不足しています。')
   const sourceDate = new Date(analysis.fetchedAt)
@@ -260,9 +268,10 @@ function modelFromElement(report, element, checkDeadline) {
     fetchedAt: Number.isFinite(sourceDate.getTime()) ? sourceDate.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '未記録',
     snapshots: svgs.map((svg, index) => snapshotSvg(svg, index === 0 ? 260 : 192, checkDeadline)),
     captions: [...element.querySelectorAll('.terrain-area-figure figcaption')].map(text), values,
-    bins: rows('.terrain-report-bins tbody > tr'),
+    bins,
     observation: text(element.querySelector('.terrain-report-observation')),
-    denominator: '割合は勾配を計算できた範囲内の格子点が分母です。登記面積を分母にした値ではありません。',
+    distributionSummary,
+    denominator: text(element.querySelector('.terrain-report-distribution-note')),
     coverage: `有効範囲：標高 ${numeric(s.coveragePercent)}% / 勾配 ${numeric(s.slopeCoveragePercent)}%。${s.coveragePercent < 100 || s.slopeCoveragePercent < 100 ? '欠測を除いた参考値です。' : ''}色分けは施工可否の基準ではありません。`,
     scope: text(element.querySelector('.terrain-report-bottom-note > span')),
     evidence: rows('.terrain-report-evidence > div'),

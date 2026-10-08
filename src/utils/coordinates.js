@@ -1,8 +1,12 @@
 export function toDegreeMinutes(value, axis, minuteDigits = 1) {
   if (!Number.isFinite(value)) return '—'
   const absolute = Math.abs(value)
-  const degrees = Math.floor(absolute)
-  const minutes = (absolute - degrees) * 60
+  let degrees = Math.floor(absolute)
+  let minutes = Number(((absolute - degrees) * 60).toFixed(minuteDigits))
+  if (minutes === 60) {
+    degrees += 1
+    minutes = 0
+  }
   const hemisphere = axis === 'lat'
     ? (value >= 0 ? '北緯' : '南緯')
     : (value >= 0 ? '東経' : '西経')
