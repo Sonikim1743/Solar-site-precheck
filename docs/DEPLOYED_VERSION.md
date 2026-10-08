@@ -1,4 +1,50 @@
-# 公開・配布版の状態 — v1.28.0 / 2026-10-08
+# 公開・配布版の状態 — v1.28.1 / 2026-10-08
+
+利用者のGitHub・オンライン版更新依頼に基づき、[PR #4](https://github.com/Sonikim1743/Solar-site-precheck/pull/4) をmainへ反映し、既存Cloudflare Pagesへ公開しました。公開サイトは **Version 1.28.1 / Build 2026-10-08**。アプリ・両ZIP・manifestの版表記も1.28.1です。
+
+## 公開の根拠
+
+- 運用URL：https://solar-site-precheck.pages.dev/
+- 配布URL：https://08da02c2.solar-site-precheck.pages.dev/
+- Cloudflare Production ID：`08da02c2-1263-4fba-94e0-ae6a20a85817` / branch `main`
+- 両パッケージのソース：`f05864141c2f7d0ca769574654b917d3e3eb7cb5`
+- 配布物コミット：`ca2cff621f22e45f065416eb5d614fa64bc02feb`
+- PR #4のmainマージ：`ea3399f9b3f666b8e117f995ea214878dc646258`
+- 公開JS：`index-DzqmE1sk.js` / portable JS：`index-CZBb-LXf.js`
+- [PR CI 37739808959](https://github.com/Sonikim1743/Solar-site-precheck/actions/runs/37739808959)：success
+- [main CI 37740059209](https://github.com/Sonikim1743/Solar-site-precheck/actions/runs/37740059209)：success
+
+後続の確認文書のコミットは、配布物のソースコミットとは異なります。GitHub pushだけではこのPagesプロジェクトは更新されません。検証したCloudflareパッケージのルートから、Functions・sharedとともに直接配布しました。
+
+## 配布ファイルと実確認
+
+| 対象 | ファイル | サイズ（bytes） | SHA-256 |
+|---|---|---:|---|
+| Cloudflare | SolarSitePrecheck_v1.28.1_2026-10-08_cloudflare.zip | 14,295,372 | 5794e9b736e4349caad3fc0ce6a11db03e5c08ee64b37b112005710f63ef2ff1 |
+| Windows更新 | SolarSitePrecheck_v1.28.1_release_light.zip | 15,024,624 | 36ad74c029c1473c425c563bb9e776b748cc7a32ac2bed8a9ec2ddc29deedba0 |
+
+- 自動テスト **320/320**、両ターゲットのビルド、CSP、同梱PDF/OCR、Functionsのedge依存検査が通過。
+- 両ZIPで、それぞれ58個のmanifest対象ファイル、ZIP内ハッシュ、ソース・対象・版・日付・bundle・サイズを独立照合。地図描画ソフトウェアのライセンスを含み、.git・認証情報・個別CAD・社内.sptは含みません。
+- 運用URLから取得した **45個の公開distファイル** がmanifestのSHA-256と一致。`_headers`はHTTP対象外とし、実応答のCSP・キャッシュ等とローカルファイルで確認。mainルート、配布URLのHTML/JS、PWA設定、版・日付・Cloudflare対象、欠落PDFの404も確認。HTTP照合完了：2026-10-08 15:53:52 JST。
+- API確認6項目：main HTML、操作PDFのContent-Type/シグネチャ、power-gridの不正入力400 JSON、NEDO正常200、異常メッシュ400、inheritance-pdf GET 405。
+- GitHub mainの二つのメタデータと公開ZIPを実取得し、ローカルとの差 **59/59照合通過**。ソース・target・bundle・版・日付・ハッシュ・サイズが一致。確認：2026-10-08 15:55:09 JST。
+- GitHubのAboutに現行の地図・地番・等高線・勾配・3Dの紹介とオンラインURLを追加し、公開APIとブラウザで読み返して確認。README、更新履歴、配布・共有・レビュー・引継ぎ案内も現行版へ整理。
+
+## 公開画面で確認した範囲
+
+Windowsの独立した配布URLを使い、個別案件ではない合成テスト位置・範囲で確認しました。地名ON・公開地番OFFの初期値、地番ONでの参考筆界表示、作図中の3mスケールまでの追加拡大、開始点で範囲を完成して通常15mスケール上限へ戻る動作を確認。地点の北緯・東経の度分表示、地域名、標高、同じ範囲のDEM、3Dの高さ2倍と勾配別推定面積、中心固定の回り込み・上方向ドラッグ・ホイールズーム、背景地図付き範囲レポートの実描画を確認しました。
+
+発電量画面への往復で選択地点・範囲面積・取得済み地形結果を保持。今回、新しい発電量の計算は実行していません。公開検証タブで警告・エラーのログはありませんでした。公開画像・座標の表示を実案件の筆界精度確認とは扱いません。ローカルの狭い画面、除外取消、A3生成等の確認範囲と履歴は `TERRAIN_AREA_V1_28_KO.md`、公開画面の補足は `V1_28_1_BROWSER_CHECK_JA.md` に記録しています。
+
+## 未完了と復旧先
+
+作業中のローカル5284/5285の地点・範囲は初期化していません。配布ZIPの公開と全PCのインストール置換は別です。Mac/Safari実機、複数タブの保存競合、異なる実行環境のgeometry key互換、最大範囲PDFは未確認または未解決のままです。
+
+前回の本番 `8610274a-0872-4a11-9f2e-928558b17dee` とv1.28 ZIPを復旧用履歴として保持します。以下は以前の公開記録です。
+
+---
+
+# 以前の公開・配布版 — v1.28.0 / 2026-10-08
 
 利用者の明示依頼とPR #3のmainへのマージ承認に基づき、GitHub mainと既存Cloudflare Pagesを更新しました。公開サイトは **Version 1.28.0 / Build 2026-10-08** です。ZIP・manifestの版表記は `1.28` です。
 
