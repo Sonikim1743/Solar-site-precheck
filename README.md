@@ -1,247 +1,99 @@
 # Solar Site Precheck
 
-太陽光発電候補地をSolar Proへ入力する前に、候補地情報・NEDO積雪データ・地平線影響・図面変換・相続登記資料の整理を行うための社内向け入力支援ツールです。
+太陽光発電候補地を航空写真で探し、検討範囲・除外範囲を描いて、等高線・勾配・立体地形と根拠資料を確認する実務向けWebアプリです。座標・地平線CSV・積雪資料・候補地レポートを整理し、Solar ProやCADの詳細設計へ引き継ぎます。
 
-Solar Pro本体を置き換えるものではありません。発電量の最終計算はSolar ProやPVsystなどの専用ソフトで行い、本ツールはその前段階の調査・入力準備・チーム共有を短時間で行うことを目的にしています。
+参考発電量は上部のツールメニューから比較できます。地形・発電量の結果は初期検討用であり、測量、設計、接続可否、採算判断を代替しません。
 
-ポートフォリオや技術レビュー向けの設計背景は [Solar Site Precheck — Portfolio Case Study](docs/PORTFOLIO_CASE_STUDY.md) にまとめています。
+- リリース版：**v1.28.1 / 2026-10-08**
+- [オンライン版を開く](https://solar-site-precheck.pages.dev/)
+- [Windows更新ZIP](release/latest/SolarSitePrecheck_v1.28.1_release_light.zip) — 既存のNode.js実行環境を使う更新用
+- [公開・配布の確認記録](docs/DEPLOYED_VERSION.md) — ソース、配布物、実際のデプロイを区別
+- [更新内容](CHANGELOG.md) · [更新手順](RELEASE_UPDATE_GUIDE.md)
 
-## 現在の位置づけ
+## 基本の使い方
 
-- 対象：日本国内の太陽光発電候補地の初期検討
-- 想定利用者：Solar Proで発電量シミュレーションを行う担当者、候補地調査担当者
-- 運用段階：チーム内運用・作業補助ツール
-- 現行バージョン：v1.23
-- 最終更新：2026-08-07
-- 最新オンライン版：https://solar-site-precheck.pages.dev
-- 最新軽量更新ZIP：`release/latest/SolarSitePrecheck_v1.23_release_light.zip`
-- 操作案内PDF：https://solar-site-precheck.pages.dev/manual/site-operation-guide-v1.23.pdf
+1. 住所・地名・緯度経度で候補地を探すか、地図上をクリックします。地点の座標は北緯・東経の度・分で表示し、同じ表記をコピーできます。
+2. 地図の「範囲を描く」で角を順に指定し、開始点をもう一度押すか「確定」で閉じます。「除外」で検討しない部分を指定できます。
+3. 「検討範囲の等高線・勾配・3D」を開き、有効範囲の地形を取得します。等高線・勾配色・平面図・3Dを同じ範囲で確認します。
+4. 必要に応じて地平線・積雪を確認し、候補地レポート、A3地形PDF、地平線CSV、検討記録を保存します。
 
-## 主な機能
+主要作業はメインページの折りたたみ構成で続けられます。「発電量計算」「系統確認」は上部「ツール」から開きます。地番ファイルや範囲管理は「ツール → 範囲・地番の詳細」です。
 
-### 1. 太陽光候補地チェック
+## v1.28.1で改善したこと
 
-- 国土地理院タイルを使った地図表示
-- 住所・地名検索と緯度経度検索の統合入力
-- 地図クリックまたはGPS現在地による候補地選択
-- 緯度経度をSolar Proで入力しやすい度・分形式で表示
-- 国土地理院DEMによる補助標高取得
-- 候補地の3次メッシュ番号を計算
-- NEDO MONSOLA-11 Web値・PDF値の取得補助
-- 積雪深10cm以上出現率の月別表示
-- `0.95 − 積雪出現率` による月別発電量係数の算出
-- 3次メッシュ境界が近い場合の隣接メッシュ比較
-- 250m〜5km範囲のDEMサンプリングによる地平線影響の概算
-- 通常8方位分析と、詳細10度間隔・36方位分析
-- 冬至9〜15時の太陽高度と地平線角の比較
-- Solar Proで読み込めるSunEye形式 `ObstructionElevations.csv` の出力
-- 候補地を中心にした周辺100mの東西・南北断面表示
-- 地図上への100m確認範囲、断面線、平均勾配オーバーレイ表示
-- 地平線グラフ、断面図、積雪表をまとめた1枚の簡易分析レポート表示
+- 範囲レポートに背景地図と範囲線を表示し、面積・地形・次の現場確認を一緒に整理。
+- 勾配区分の割合に推定面積（㎡）を追加。欠測部分は未確認として区別。
+- 画面3Dの「高さ2倍」で高低差を見やすく表示。標高・勾配・面積の計算値は変わらず、A3図面は1:1を維持。
+- 「視点の移動」で地形の中心を固定し、左右に回り込んで側面を確認。上下のドラッグとホイールで視点・拡大を調整。
+- 地名レイヤーは基本ON、公開地番（2024年）は基本OFF。地図のレイヤーメニューで切り替え。
+- 作図中だけ通常より2段階細かく拡大。終了時は通常上限に戻り、範囲と面積を保持。
+- 有効範囲の面積を地図下の凡例横へ移し、詳細操作をツールメニューへ整理。地域名・座標・コピー・距離選択の余白を調整。
 
-### 2. Solar Pro入力補助・教育メモ
+## 出力と補助機能
 
-- 設置場所、地平線、積雪補正の入力画面スクリーンショット表示
-- Solar Pro内でどのメニューを開くかの説明
-- 地平線CSV読込、設置場所、積雪補正などの作業順を整理
-- 入力マニュアル・作業メモを追加していける折りたたみ式セクション
-- 社内共有用の操作案内PDFをトップ画面から直接ダウンロード
-- JINKO SOLAR `JKM655N-66QL6-BDV-F1-JP` / `JKM720N-66HL5-BDV` のSolar Pro用 `.MD0W` データ保存と取込手順
-- Huawei PCSとJINKOモジュール枚数から、Solar Proの電気回路構成に入力するPCS台数・最大並列・最大直列の候補を計算
-- PCS最大入力電圧とモジュールVoc条件から、直列数の上限目安を計算候補へ反映
-- PCS詳細設定、全アレイ自動結線、PV設備容量・PCS比率確認までの操作手順をスクリーンショット付きで案内
-- Groundy地図、Laplace Solar Pro管理・ダウンロードページへの外部リンク
+| 用途 | 内容 |
+|---|---|
+| 範囲の地形確認 | 実DEMの等高線、10m幅の局所勾配、分布・推定面積、平面図、3D |
+| 地形図面 | A3横2ページの画像形式PDF。平面図と1:1の固定視点 |
+| 候補地レポート | 地形・積雪・参考発電量・設備メモ・範囲と未確認項目を整理する複数ページ |
+| Solar Pro入力 | 度・分の座標、SunEye形式ObstructionElevations.csv、積雪補正の入力ガイド |
+| 記録の再開 | JSONに条件・結果・メモ・範囲・取得済み標高を保存。schema 1/2/3を読込 |
+| その他の補助 | 法務省XML/ZIP/GeoJSON、PDF編集・JPG変換、登記資料チェック、機器入力ガイド |
 
-### 3. 地番・図面補助
+## 開発・検証
 
-- 法務省の登記所備付地図XML / ZIP / GeoJSONの読込
-- 地図上への筆界表示と候補地付近の確認
-- PDF図面をJPGへ変換
-- 複数ページPDFのページプレビューと必要ページのみ保存
-- 対応ブラウザでは保存先・ファイル名を指定して保存
+Node.js **22.13以上または24以上**、pnpm、Gitを用意します。GitHub CIはNode22・pnpm9を使用しています。依存関係はlockfileで固定します。
 
-### 4. 相続登記資料チェック
-
-- 法務局・相続関連PDFから土地の単独相続候補を抽出
-- `第○号 / ○月○日受付 / 単独 / 所有権移転・相続 / 土地 / 所在 / 外○件` のような受付ブロックを解析
-- 受付番号、受付日、土地、住所、外記載数を一覧表示
-- 外記載が多い順、住所順、受付順の並び替え
-- 行単位コピーとExcel用CSV出力
-- 受付番号の最初・最後・読取件数・抜け番候補を確認
-- モバイルSafariでPDF.jsが失敗する場合は、ローカルサーバー側解析へフォールバック
-
-### 5. チーム共有・更新
-
-- 社内LAN共有用のローカルサーバー起動
-- ngrok等を使った短期デモ共有
-- Node.js同梱のポータブルZIP作成
-- 25MB制限に対応した軽量更新ZIP作成
-- GitHub上の `release/latest` から最新ZIPを取得する更新スクリプト
-- private repository向けの `github-token.txt` 読込
-
-## すぐ使う方法
-
-### 開発・検証用に起動
-
-Node.js 20.19以上、または22.12以上を用意してください。
-
-```bash
-npm install
-npm run dev
+```sh
+pnpm install --frozen-lockfile
+pnpm test
+pnpm build
+pnpm verify:csp
+pnpm verify:assets
+pnpm develop --host 127.0.0.1 --port 5173
 ```
 
-通常は `http://127.0.0.1:5173/` で開きます。
+本番ビルドの確認には `pnpm preview`、APIを含むローカル実行には `node work/serve-dist.mjs` を使います。MacとWindowsのlocalhostはそれぞれ別の環境です。[Mac OpenClawへの引継ぎ](docs/MAC_OPENCLAW_START_KO.md)を参照してください。
 
-`npm run dev` は本番ビルドを作成してから表示します。コード変更を即時反映したい場合は次を使います。
+## 配布・更新
 
-```bash
-npm run develop
+変更をコミットし、作業ツリーがクリーンな状態で実行します。
+
+```sh
+pnpm package:deployment
 ```
 
-### テスト
+テスト、Cloudflare/portableの別ビルド、CSP、同梱PDF/OCR、Functions、ZIP内SHA-256を検証し、`outputs/v1.28.1-日付-…/` に配布物を作ります。Windowsでは `MAKE_RELEASE_PACKAGE.cmd` から同じ処理を呼べます。
 
-```bash
-npm run test
-```
+- Cloudflare：検証済みパッケージのdist・functions・shared・wrangler.tomlをそろえたルートから、既存PagesへWranglerで配布。
+- Windows：記録を保存してから更新ZIPを適用し、既存runtime/node.exeと個人データを維持。オンライン更新はGitHub mainのmetadataとZIPを参照。
+- GitHubへのpush、Pagesへの配布、各PCのインストール更新は別作業です。既存CIは検査用で、Pagesへの自動配布はありません。
 
-3次メッシュ、座標パーサー、NEDO積雪値検証、発電量係数、CSV出力補助などの主要な純粋関数を確認します。
+詳しい手順と最終確認は [配布パッケージ案内](docs/DEPLOYMENT_PACKAGE.md) を参照してください。Node.jsを含む旧一式作成スクリプトは今回の配布経路ではありません。
 
-### 社内LANで共有
+## 資料と精度
 
-```bash
-npm run share
-```
+- 地図・航空写真・標高：国土地理院。地名は最適化ベクトルタイルの試験公開資料をアプリで選別表示。
+- 公開地番：法務省2024年資料をAMXが加工した公共座標の参考表示。未収録地域があり、測量済み境界・所有権を保証せず、検討範囲や面積に自動採用しません。
+- 積雪：NEDO MONSOLA-11。3次メッシュ単位の統計であり、個別土地の実測積雪ではありません。
+- 参考発電量：PVGIS。設備条件と資料を示す初期検討値です。
+- データの出典は地図上に表示。地図表示に使うソフトウェアのライセンスは [同梱ライセンス](public/licenses/geospatial-overlays.txt) に記載。
 
-または `start-team-server.cmd` を実行します。
+表示・集計格子と原資料の解像度は区別します。追加ズームや高さ2倍は見せ方の変更です。樹木・建物・造成後地形、地層、造成量、設備容量、施工可否は地形モデルから確定しません。地平線の樹高加算も仮定であり、現地確認が必要です。
 
-詳細は [TEAM_SHARING.md](TEAM_SHARING.md) を参照してください。
+相続登記PDFのサーバー解析はPortable/Local版で利用します。Cloudflare側は未対応の理由を返します。A3地形PDFはブラウザ内で作成し、画像形式のため文字検索・CAD編集はできません。
 
-## 別PCへ配布する方法
+## 保存・共有の範囲
 
-### 初回配布用：Node.js同梱ポータブルZIP
+検討記録は条件・結果・メモを引き継ぐファイルです。PDF原本・PDF編集状態、地番原資料の全図形、系統の全設備地図、CAD/Solar Pro原本、機器設定は含みません。必要な原資料は別途保管します。会社資料や認証情報を公開GitHubに入れないでください。
 
-作業PCで次を実行します。
+複数タブの保存衝突、異なる実行環境での範囲識別、Mac/Safari実機での記録再開は引き続き確認が必要です。[次の課題](docs/NEXT_TASKS_KO.md)には実際の未解決事項を残しています。収益化は業務利用の試験結果を見て判断し、有料資料は販売未開始です。
 
-```text
-MAKE_PORTABLE_PACKAGE.cmd
-```
+## 関連文書
 
-作成されるファイル：
-
-```text
-outputs/SolarSitePrecheck_v1.23_portable.zip
-```
-
-ZIPを展開し、`RUN_PORTABLE.cmd` を実行すると、Node.jsを別途インストールしていないPCでも起動できます。
-
-### 更新用：軽量ZIP
-
-既にポータブル版を導入済みのPCへ更新だけ配布する場合は次を使います。
-
-```text
-MAKE_RELEASE_PACKAGE.cmd
-```
-
-作成・更新される主なファイル：
-
-```text
-release/latest/latest-version.json
-release/latest/SolarSitePrecheck_v1.23_release_light.zip
-```
-
-GitHubへpushした後、デスクトップ側では次を実行します。
-
-```text
-UPDATE_APP_FROM_RELEASE.cmd
-```
-
-private repositoryの場合は、アプリフォルダー直下に `github-token.txt` を置くと、GitHubのrawファイルを認証付きで取得できます。詳しくは [RELEASE_UPDATE_GUIDE.md](RELEASE_UPDATE_GUIDE.md) を参照してください。
-
-## ファイル構成
-
-```text
-.
-├─ src/
-│  ├─ components/          # 地図・レポートなどのUI部品
-│  ├─ services/            # GSI、NEDO、PDF、図面変換などの入出力・業務ロジック
-│  ├─ utils/               # 座標、3次メッシュ、CSV、積雪係数などの純粋関数
-│  ├─ App.jsx              # 画面全体の状態管理
-│  └─ styles.css           # 画面デザイン
-├─ tests/                  # node:testによる回帰テスト
-├─ work/
-│  ├─ serve-dist.mjs       # ポータブル配信用ローカルサーバー
-│  └─ inheritance-server.mjs
-├─ release/latest/         # 軽量更新ZIPと最新版情報
-├─ public/data/            # NEDO MONSOLA-11補助データ
-├─ MAKE_PORTABLE_PACKAGE.cmd
-├─ MAKE_RELEASE_PACKAGE.cmd
-├─ UPDATE_APP_FROM_RELEASE.cmd
-├─ CHANGELOG.md
-├─ RELEASE_UPDATE_GUIDE.md
-└─ README.md
-```
-
-## 使用データ・出典
-
-- 背景地図・航空写真：国土地理院タイル
-- 住所検索：国土地理院 住所検索API
-- 標高：国土地理院DEM、およびNEDO帳票内標高
-- 積雪・日射関連：NEDO 年間月別日射量データベース MONSOLA-11
-- 地番・筆界：法務省 登記所備付地図データ
-- 参考確認リンク：地理院地図、ハザードマップポータル、農地ナビ、文化財総覧WebGIS、自治体GIS等
-
-公開・社外展開・商用運用へ進める場合は、各データの利用規約、出典表記、再配布可否を必ず確認してください。
-
-## 精度と制限
-
-- 地平線分析はDEM点サンプリングによる概算です。建物、個別樹木、造成後地形、現地障害物は反映されません。
-- 想定樹高は保守的な入力補助であり、実測値ではありません。
-- NEDO積雪値は3次メッシュ単位です。境界付近では隣接メッシュ確認が必要です。
-- Solar Proへの直接入力は行いません。現時点では画面確認、Solar Pro地平線CSV出力、積雪補正値の入力支援が基本です。
-- 相続登記PDFチェックは、テキスト抽出可能なPDFを対象にした業務補助です。最終判断は原本PDFと登記情報提供サービスの画面で確認してください。
-- Cloudflare Pages版ではNEDO Web取得はFunctionsで利用できますが、相続PDFのサーバー解析はPortable / Local版を使用してください。Cloudflare側の `/api/inheritance-pdf` は、未対応であることを明示してHTMLフォールバックを防ぐためのエンドポイントです。
-- 内部用Solar Proテンプレート `.spt` は配布物に含めません。必要な場合は利用者がローカルファイルとして選択します。
-
-## 一次確認の判定方針
-
-レポート表紙の「一次確認」は、事業可否を自動で断定するものではありません。
-Solar Pro入力前に重点確認すべき項目を、`通常` / `要確認` / `要注意` / `データ不足` として整理する補助表示です。
-
-主な確認フラグは次の通りです。
-
-- 地平線：最大地平線角5°以上は確認、2°以上はやや高めとして表示
-- 冬季太陽：冬至9〜15時の太陽高度と地平線角の余裕を確認
-- 積雪：NEDO MONSOLA-11の積雪深10cm以上出現率0.50以上は注意、0.01以上は補正確認
-- 3次メッシュ：候補地点がメッシュ境界付近の場合は隣接メッシュを確認
-- DEM精度：10mメッシュ相当の取得点が多い場合は参考値として注意
-- 周辺断面：候補地点周辺の高低差が5mを超える場合は造成・進入路を確認
-
-判定ロジックは `src/utils/verdict.js` に分離し、UI上の表示とは別にテストできる形にしています。
-
-## 運用上の注意
-
-- ngrok等でインターネット公開する場合は、短期デモ用途に限定し、可能ならBasic認証やIP制限を使ってください。
-- 入力内容や候補地メモはブラウザのlocalStorageに残る場合があります。共有PCでの利用には注意してください。
-- `github-token.txt` はGitHubへコミットしないでください。`.gitignore` 対象です。
-- ポータブル版ではService Workerを無効化し、旧キャッシュによる表示ずれを避けています。
-
-## 関連ドキュメント
-
-- [CHANGELOG.md](CHANGELOG.md) — 更新履歴
-- [RELEASE_UPDATE_GUIDE.md](RELEASE_UPDATE_GUIDE.md) — 軽量ZIP更新運用
-- [TEAM_SHARING.md](TEAM_SHARING.md) — 社内LAN共有手順
-- [CADASTRE_GUIDE.md](CADASTRE_GUIDE.md) — 登記所備付地図データの取得・読込手順
-- [ACCURACY_VALIDATION.md](ACCURACY_VALIDATION.md) — NEDO PDF読取・検証メモ
-- [DEPLOYMENT_AND_KPI_PLAN.md](DEPLOYMENT_AND_KPI_PLAN.md) — 業務改善・KPI説明用メモ
-
-## 今後の改善候補
-
-- 候補地データのJSON保存・読込
-- 地形断面と地平線計算根拠のさらに詳しい可視化
-- 社内標準モジュール・PCS仕様DBとSolar Pro用インポートファイル整備
-- 法務省XMLのproj4変換セルフテスト表示
-- 相続登記PDFのOCR対応
-- 案件一覧、権限管理、チーム共有DB
-- 一次確認フラグの運用実績を見ながら、チーム内の判定基準を調整
-
-本ツールは、現場担当者がSolar Pro入力前に迷いやすい情報を一箇所に集めるための実務補助ツールです。完璧な自動判定よりも、根拠を見ながら短時間で確認できることを重視しています。
+- [地番レイヤーとファイルの使い方](CADASTRE_GUIDE.md)
+- [地形の仕様・検証](docs/TERRAIN_AREA_V1_28_KO.md)
+- [製品の目的・最新判断](docs/PROJECT_CONTEXT_KO.md)
+- [設計背景・ポートフォリオ](docs/PORTFOLIO_CASE_STUDY.md)
+- [社内共有](TEAM_SHARING.md) · [業務評価の計画](DEPLOYMENT_AND_KPI_PLAN.md)
+- [従来操作ガイドPDF v1.23](https://solar-site-precheck.pages.dev/manual/site-operation-guide-v1.23.pdf) — 最新の範囲・3D・地番操作は上記案内を参照

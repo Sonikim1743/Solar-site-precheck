@@ -110,7 +110,7 @@ for (const target of ['cloudflare', 'portable']) {
     buildId: `${version}-${buildDate}-${packageHash.slice(0, 12)}`, packageName,
     zipUrl: `https://raw.githubusercontent.com/Sonikim1743/Solar-site-precheck/main/release/latest/${packageName}`,
     sha256: packageHash, etag: packageHash.slice(0, 16), bundleName, minRequiredRuntime: '1.2',
-    notes: target === 'portable' ? 'Local update: keep runtime/node.exe. Same-origin power API, local OCR assets, manual PDF, 66/77kV progressive search.' : 'Cloudflare Pages: deploy from extracted root including functions and shared. Not a dashboard drag-and-drop ZIP.',
+    notes: target === 'portable' ? '範囲地形・3D・推定面積、公開地番と度分コピーを更新。既存のruntime/node.exeを保持して更新してください。' : '範囲地形・3D・推定面積、公開地番と度分コピーを更新。dist・functions・sharedを含む展開先ルートから配布してください。',
     sizeBytes: archive.length,
   }
   await writeFile(join(output, `${target}-metadata.json`), JSON.stringify(metadata, null, 2) + '\n')
