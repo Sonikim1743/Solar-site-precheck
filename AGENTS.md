@@ -9,11 +9,15 @@ for deployment evidence, rather than assuming package.json is the live version.
 - Converse with the user in Korean. User-facing application copy and deliverable
   documents, reports and figures are Japanese (explicit preference, 2026-09-24). Keep the interface
   compact, place detailed explanations in contextual disclosures, and preserve inputs.
-- Latest explicit user change for v1.27.2: generation alone leaves the
-  initial main page and opens in a separate screen from the upper menu. This is
-  the exception to the v1.27.1 same-page rule; do not split other existing tools.
-  Keep horizon, snow, parcel review, report, reference and SolarPro manual in
-  the main page's established collapsible sections.
+- Current v1.28.1 direction: the main page prioritizes map, range/exclusion drawing,
+  terrain and reports. Generation opens in a separate screen from the upper menu
+  (v1.27.2 user request); grid confirmation also stays in the upper Tools menu
+  (v1.28 user request). Keep horizon, snow, report, reference and SolarPro manual
+  in the main page's established collapsible sections. Range/cadastre details open
+  from Tools; their closed row is hidden without removing the existing controls.
+- Coordinates display and copy north/east degrees and minutes. Do not add a
+  visible "Solar Pro用" label or replace this with decimal-degree-only display.
+  Keep precise internal coordinates for queries, calculations and Google links.
 - Keep the terrain cross-section buttons directly visible without an extra
   disclosure. Clarify spacing between the location, elevation and copy controls.
 - Use short section titles and brief summaries; keep detailed controls and
