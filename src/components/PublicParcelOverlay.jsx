@@ -46,7 +46,7 @@ function createPublicParcelLayer(props, context) {
     sources: { parcels: { url: PUBLIC_PARCEL_SOURCE.url, levelDiff: 0, maxDataZoom: PUBLIC_PARCEL_SOURCE.maxDataZoom } },
     pane: PANE_NAME,
     minZoom: PUBLIC_PARCEL_SOURCE.minZoom,
-    maxZoom: 19,
+    maxZoom: 21,
     noWrap: true,
     bounds: [[20, 120], [50, 155]],
     keepBuffer: 0,

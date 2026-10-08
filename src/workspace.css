@@ -103,7 +103,8 @@
 .app .map-panel .selected-point-mini > .selected-point-mini__location { flex:1 1 180px; }
 .app .map-panel .selected-point-mini > .selected-point-mini__location > strong { font-family:inherit; font-size:13px; }
 .app .map-panel .selected-point-mini > .selected-point-mini__coordinates { flex:0 1 auto; }
-.app .map-panel .selected-point-mini > .selected-point-mini__coordinates > strong { white-space:nowrap; }
+.app .map-panel .selected-point-mini > .selected-point-mini__coordinates > strong { display:flex; flex-wrap:wrap; gap:2px 10px; white-space:normal; }
+.app .map-panel .selected-point-mini > .selected-point-mini__coordinates > strong > b { font-weight:inherit; white-space:nowrap; }
 .app .map-panel .selected-point-mini > .selected-point-mini__elevation { flex:0 0 auto; min-width:0; }
 .app .map-panel .selected-point-mini > .mini-copy-button { flex:0 0 auto; min-height:28px; height:28px; max-width:100%; padding:3px 7px; border-radius:5px; font-size:11px; font-weight:500; line-height:1.4; white-space:nowrap; }
 .app .map-panel .selected-point-mini > em { flex:1 1 100%; margin:0; font-size:11px; font-weight:500; line-height:1.5; overflow-wrap:anywhere; }

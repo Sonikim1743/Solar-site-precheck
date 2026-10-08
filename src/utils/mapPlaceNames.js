@@ -6,7 +6,7 @@ export const GSI_PLACE_NAMES_ATTRIBUTION = '<a href="https://github.com/gsi-cybe
 // These are Leaflet's 256px zoom levels, one greater than GSI's vector zoom.
 // Anno classification: https://maps.gsi.go.jp/help/pdf/vector/optbv_featurecodes.pdf
 export function gsiPlaceNameCategory(zoom, feature) {
-  if (!Number.isFinite(zoom) || zoom < 5 || zoom > 19) return null
+  if (!Number.isFinite(zoom) || zoom < 5 || zoom > 21) return null
   const text = feature?.props?.vt_text
   if (typeof text !== 'string' || !text.trim() || text.length > 80) return null
   const code = Number(feature.props.vt_code)
@@ -40,7 +40,7 @@ export function gsiPlaceNameLayerOptions(protomaps, pane) {
   return {
     pane,
     minZoom: 5,
-    maxZoom: 19,
+    maxZoom: 21,
     noWrap: true,
     bounds: [[20, 122], [46, 154]],
     attribution: GSI_PLACE_NAMES_ATTRIBUTION,
