@@ -2,15 +2,15 @@
   "app": "Solar Site Precheck",
   "version": "1.28",
   "buildDate": "2026-10-08",
-  "sourceCommit": "3c3e57fc01d1febee9c1661a627529e3005127fa",
+  "sourceCommit": "91191eec5c9a4c525d4f05b3b0a014eff1e644ed",
   "target": "portable",
-  "buildId": "1.28-2026-10-08-341c77f06e70",
+  "buildId": "1.28-2026-10-08-4536bdd3a5a6",
   "packageName": "SolarSitePrecheck_v1.28_release_light.zip",
   "zipUrl": "https://raw.githubusercontent.com/Sonikim1743/Solar-site-precheck/main/release/latest/SolarSitePrecheck_v1.28_release_light.zip",
-  "sha256": "341c77f06e70d99595e5e143551242feff98d0d3e76a58ff9938f0999a74f967",
-  "etag": "341c77f06e70d995",
+  "sha256": "4536bdd3a5a62f800fa2dc5475746a4f796f2f82a8aad58eba6ba4b7c4eaa6c8",
+  "etag": "4536bdd3a5a62f80",
   "bundleName": "index-BT65KsBw.js",
   "minRequiredRuntime": "1.2",
   "notes": "Local update: keep runtime/node.exe. Same-origin power API, local OCR assets, manual PDF, 66/77kV progressive search.",
-  "sizeBytes": 14976367
+  "sizeBytes": 14977400
 }

@@ -2,15 +2,15 @@
   "app": "Solar Site Precheck",
   "version": "1.28",
   "buildDate": "2026-10-08",
-  "sourceCommit": "3c3e57fc01d1febee9c1661a627529e3005127fa",
+  "sourceCommit": "91191eec5c9a4c525d4f05b3b0a014eff1e644ed",
   "target": "cloudflare",
-  "buildId": "1.28-2026-10-08-e1c436626d4a",
+  "buildId": "1.28-2026-10-08-a8ffbe6f0927",
   "packageName": "SolarSitePrecheck_v1.28_2026-10-08_cloudflare.zip",
   "zipUrl": "https://raw.githubusercontent.com/Sonikim1743/Solar-site-precheck/main/release/latest/SolarSitePrecheck_v1.28_2026-10-08_cloudflare.zip",
-  "sha256": "e1c436626d4a7c25501e5f5a5f6c7f80b32b61d923d95adf64c99d7b7fd26a12",
-  "etag": "e1c436626d4a7c25",
+  "sha256": "a8ffbe6f0927fb0776e1fc8cd4149e8cda239ebd2059013c24b190f4bd34730a",
+  "etag": "a8ffbe6f0927fb07",
   "bundleName": "index-BdaWY2P2.js",
   "minRequiredRuntime": "1.2",
   "notes": "Cloudflare Pages: deploy from extracted root including functions and shared. Not a dashboard drag-and-drop ZIP.",
-  "sizeBytes": 14247106
+  "sizeBytes": 14248141
 }
