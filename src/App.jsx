@@ -3621,7 +3621,7 @@ export default function App() {
               {terrainSectionOpen && <TerrainSectionPreview analysis={terrainSection} />}
             </div>
             <details id="terrain-area" className="terrain-area-disclosure" open={terrainAreaOpen} onToggle={event => setTerrainAreaOpen(event.currentTarget.open)}>
-              <summary><strong>土地の起伏をみる</strong><span>{currentTerrainArea ? `高低差 ${currentTerrainArea.summary.heightRange?.toFixed(1) ?? '—'}m · 等高線・3D` : '検討範囲の等高線・勾配・3D'}</span></summary>
+              <summary><strong>検討範囲の等高線・勾配・3D</strong><span>{terrainAreaOpen ? '閉じる' : '開く'}</span></summary>
               <TerrainAreaPanel geometry={parcelMetrics.geometry} metrics={parcelMetrics} analysis={currentTerrainArea} status={terrainAreaStatus} progress={terrainAreaProgress} error={terrainAreaError} position={position} onAnalyze={handleTerrainAreaAnalysis} onCancel={cancelTerrainAreaAnalysis} onClear={() => { cancelTerrainAreaWork(); setTerrainArea(null); setTerrainAreaStatus('idle'); setTerrainAreaError(''); setReportView('summary') }} onDrawBoundary={() => { setParcelMode('boundary'); openReviewSection('site-select') }} onOpenReport={openTerrainAreaReport} />
             </details>
             <button type="button" className="power-page-link" disabled={!position} onClick={() => switchPage('power')}>この地点の系統を確認 →</button>

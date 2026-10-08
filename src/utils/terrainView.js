@@ -5,7 +5,7 @@ export function normalizeTerrainView(view = {}) {
   const azimuth = finite(view.azimuth) ? view.azimuth : TERRAIN_INITIAL_VIEW.azimuth
   return {
     azimuth: ((azimuth % 360) + 360) % 360,
-    pitch: Math.max(15, Math.min(75, finite(view.pitch) ? view.pitch : TERRAIN_INITIAL_VIEW.pitch)),
+    pitch: Math.max(0, Math.min(75, finite(view.pitch) ? view.pitch : TERRAIN_INITIAL_VIEW.pitch)),
   }
 }
 
