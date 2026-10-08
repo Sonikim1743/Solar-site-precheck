@@ -1,12 +1,13 @@
 import { useId } from 'react'
 import '../parcel-review.css'
 
-const MODES = [
-  ['point', '計算地点', '地図を押して計算地点を変更します。既存の計算結果は再確認が必要になります。'],
+const PARCEL_MODES = [
   ['target', '対象の筆', '地番ファイルを読み込み、筆を押して対象に追加。計算地点は変わりません。'],
   ['reference', '参考の筆', '地番ファイルから周辺の筆を参考に追加。参考の筆は面積集計に含みません。'],
-  ['boundary', '検討範囲', '角を順に指定。対象筆があれば、描いた範囲との共通部分を検討します。'],
-  ['exclusion', '除外範囲', '設置を除外する範囲の角を地図で順に指定します。複数の範囲を追加できます。'],
+]
+const DRAW_MODES = [
+  ['boundary', '範囲を描く', '地図で角を順に指定してください。対象筆がある場合は、描いた範囲との共通部分を使います。'],
+  ['exclusion', '除外を描く', '除外する範囲の角を地図で順に指定してください。複数の範囲を追加できます。'],
 ]
 
 function areaLabel(value, maximumFractionDigits = 1) {
@@ -26,16 +27,21 @@ export default function ParcelReviewPanel({
   onUseParcel,
   onFocusParcel,
   status,
+  parcelTools,
+  showDrawControls = true,
 }) {
   const headingId = useId()
   const modeHintId = useId()
+  const parcelModeHintId = useId()
   const parcels = review?.parcels || []
   const targetCount = parcels.filter((entry) => entry.role === 'target').length
   const referenceCount = parcels.filter((entry) => entry.role === 'reference').length
   const hasReview = parcels.length > 0 || !!review?.boundary || !!review?.exclusions?.length
   const statusMessage = typeof status === 'string' ? status : status?.message
   const isError = status?.status === 'error' || status?.type === 'error'
-  const modeHint = MODES.find(([value]) => value === mode)?.[2]
+  const parcelMode = PARCEL_MODES.find(([value]) => value === mode)
+  const modeHint = DRAW_MODES.find(([value]) => value === mode)?.[2]
+    || (parcelMode ? `地番から${parcelMode[1]}を選択中です。` : '「範囲を描く」を押して、地図で角を順に指定してください。')
   const areaMetrics = [
     ['対象筆の図形', metrics?.targetAreaM2, '参考の筆は含みません'],
     ['検討範囲', metrics?.reviewAreaM2, review?.boundary ? targetCount ? '対象筆と指定範囲の共通部分' : '対象筆なし・指定範囲を採用' : '範囲未指定時は対象筆の図形'],
@@ -43,15 +49,25 @@ export default function ParcelReviewPanel({
     ['有効範囲', metrics?.usableAreaM2, '検討範囲から除外分を控除'],
   ]
 
-  return <section className="parcel-review-panel" aria-labelledby={headingId}>
+  return <section className="parcel-review-panel" aria-labelledby={showDrawControls ? headingId : undefined} aria-label={showDrawControls ? undefined : '範囲・地番の詳細'}>
+    {showDrawControls && <>
     <div className="parcel-review-panel__heading">
-      <h3 id={headingId}>筆と範囲の選択</h3>
+      <h3 id={headingId}>範囲を決める</h3>
     </div>
 
-    <div className="parcel-mode-selector" role="group" aria-label="地図の操作" aria-describedby={modeHintId}>
-      {MODES.map(([value, label]) => <button key={value} type="button" aria-pressed={mode === value} className={mode === value ? 'is-active' : ''} onClick={() => onModeChange?.(value)} disabled={!onModeChange}>{label}</button>)}
+    <div className="parcel-mode-selector" role="group" aria-label="範囲を描く操作" aria-describedby={modeHintId}>
+      {DRAW_MODES.map(([value, label]) => <button key={value} type="button" aria-pressed={mode === value} className={mode === value ? 'is-active' : ''} onClick={() => onModeChange?.(value)} disabled={!onModeChange}>{label}</button>)}
     </div>
     <p className="parcel-mode-hint" id={modeHintId} aria-live="polite">{modeHint}</p>
+    </>}
+
+    <details className="parcel-review-advanced"><summary>地番ファイルから選ぶ（詳細）</summary>
+      {parcelTools && <div className="parcel-review-file-tools">{parcelTools}</div>}
+      <div className="parcel-mode-selector parcel-mode-selector--advanced" role="group" aria-label="地番から筆を選ぶ操作" aria-describedby={parcelModeHintId}>
+        {PARCEL_MODES.map(([value, label]) => <button key={value} type="button" aria-pressed={mode === value} className={mode === value ? 'is-active' : ''} onClick={() => onModeChange?.(value)} disabled={!onModeChange}>{label}</button>)}
+      </div>
+      <p className="parcel-mode-hint" id={parcelModeHintId}>{parcelMode?.[2] || '地番ファイルの筆を対象・参考に分けて選べます。参考の筆は面積集計に含みません。'}</p>
+    </details>
 
     {hasReview && <><p className="parcel-review-summary"><span>検討面積 <strong>{areaLabel(metrics?.usableAreaM2, 0)}</strong> m²</span><span>· 対象{targetCount}筆 / 参考{referenceCount}筆</span></p>
     <details className="parcel-review-breakdown"><summary>面積の内訳</summary><dl className="parcel-review-metrics">

@@ -1,8 +1,28 @@
 .parcel-review-panel { min-width: 0; margin: 10px 0 0; padding: 0; border: 0; background: transparent; color: #203d34; }
 .parcel-review-panel__heading h3 { margin: 0; font-size: 13px; }
-.parcel-mode-selector { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; margin: 9px 0 6px; }
+.parcel-settings { min-width: 0; margin: 10px 0 0; border-top: 1px solid #e0e9e3; }
+.parcel-settings > summary { box-sizing: border-box; min-height: 36px; padding: 9px 2px; color: #3e5c4b; font-size: 12px; line-height: 1.5; cursor: pointer; }
+.parcel-settings > summary::marker { color: #607b6b; }
+.parcel-settings > summary:focus-visible { outline: 3px solid #0078a8; outline-offset: 3px; border-radius: 3px; }
+.parcel-settings[open] > summary { margin-bottom: 5px; }
+.parcel-settings .parcel-review-panel { margin-top: 0; }
+.map-shell { scroll-margin-top: 80px; }
+.map-location-buttons { display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap; }
+.map-location-control button.map-reset-button { border:1px solid #c6d6cc; border-radius:7px; background:#fff; color:#536759; font-size:12px; font-weight:600; box-shadow:0 1px 4px #183c351c; }
+.map-location-control button.map-reset-button:hover { background:#f2f6f2; }
+.map-draw-controls { position: absolute; z-index: 800; top: 14px; left: 60px; transform: none; display: flex; gap: 8px; max-width: calc(100% - 116px); padding: 0; border: 0; background: transparent; }
+.map-draw-controls button { min-height: 44px; min-width: 0; padding: 8px 13px; border: 1px solid #c6d6cc; border-radius: 7px; background: #fff; color: #2e483c; box-shadow: 0 1px 4px #183c351c; font: inherit; font-size: 12px; font-weight: 650; line-height: 1.4; white-space: nowrap; cursor: pointer; }
+.map-draw-controls button.is-active { border-color: #0d7155; background: #0d7155; color: #fff; }
+.map-draw-controls button:hover:not(:disabled) { box-shadow: inset 0 0 0 1px #82b99d; }
+.map-draw-controls button:focus-visible { outline: 3px solid #0078a8; outline-offset: 2px; }
+.map-draw-controls button:disabled { opacity: .48; cursor: not-allowed; }
+.map-shell:has(.map-draw-controls) .map-hint { top: 76px; }
+.parcel-mode-selector { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin: 9px 0 6px; }
 .parcel-review-panel button, .parcel-review-panel select, .parcel-drawing-toolbar button { min-height: 40px; max-width: 100%; padding: 8px 11px; border: 1px solid #c6d6cc; border-radius: 7px; background: #fff; color: #2e483c; font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
-.parcel-mode-selector button { min-width: 0; padding: 7px 4px; font-size: 12px; }
+.parcel-mode-selector button { min-width: 0; padding: 9px 8px; font-size: 12px; }
+.parcel-review-advanced { margin: 2px 0 8px; }
+.parcel-mode-selector--advanced { margin-top: 2px; max-width: 360px; }
+.parcel-review-file-tools { min-width: 0; margin: 3px 0 10px; }
 .parcel-mode-selector button.is-active, .parcel-drawing-toolbar button.parcel-button--primary { border-color: #0d7155; background: #0d7155; color: #fff; }
 .parcel-review-panel button:hover:not(:disabled), .parcel-review-panel select:hover:not(:disabled), .parcel-drawing-toolbar button:hover:not(:disabled) { box-shadow: 0 0 0 2px #cde9db; }
 .parcel-review-panel button:disabled, .parcel-review-panel select:disabled, .parcel-drawing-toolbar button:disabled { opacity: .48; cursor: not-allowed; }
@@ -45,6 +65,7 @@
 .parcel-drawing-toolbar__buttons { display: flex; gap: 6px; }
 .parcel-drawing-toolbar > small { flex-basis: 100%; }
 .map-shell--parcel-drawing .leaflet-container, .map-shell--parcel-drawing .leaflet-interactive { cursor: crosshair; }
+.map-shell--parcel-drawing .leaflet-marker-pane .leaflet-marker-icon { pointer-events: none; }
 .parcel-draft-tooltip { padding: 1px 5px !important; border: 1px solid #d4e8dc !important; background: #fff !important; color: #184a37 !important; font-size: 10px !important; font-weight: 700; }
 .parcel-map-legend { display: flex; flex-wrap: wrap; gap: 9px 16px; margin: 9px 2px; font-size: 11px; color: #607369; }
 .parcel-map-legend span { display: inline-flex; align-items: center; gap: 5px; }
@@ -54,12 +75,18 @@
 .parcel-map-legend i.parcel-map-legend__exclusion { border-color: #d56262; border-style: dashed; background: #f7d1d1; }
 .parcel-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 @media (max-width: 640px) {
+  .map-draw-controls { max-width: calc(100% - 116px); }
+  .map-draw-controls button { padding: 8px 10px; }
+  .map-location-buttons > button { width:auto; }
+  .map-shell:has(.map-draw-controls) .map-touch-toggle { top:76px; }
+  .map-shell:has(.map-draw-controls) .map-hint { display:none; }
+  .map-shell:has(.map-draw-controls) .map-google-open { top:auto; bottom:66px; }
   .parcel-review-item { padding: 10px; gap: 8px; }
   .parcel-review-item__actions { width: 100%; display: grid; grid-template-columns: auto 1fr; }
   .parcel-review-item__actions button, .parcel-review-item__actions select { width: 100%; min-height: 42px; }
-  .parcel-mode-selector { gap: 3px; }
-  .parcel-mode-selector button { min-height: 44px; padding: 7px 2px; font-size: 11px; }
+  .parcel-mode-selector { gap: 6px; }
+  .parcel-mode-selector button { min-height: 44px; padding: 8px 6px; font-size: 12px; }
   .parcel-drawing-toolbar__buttons { width: 100%; }
   .parcel-drawing-toolbar__buttons button { flex: 1; min-height: 44px; }
 }
-@media print { .parcel-drawing-toolbar, .parcel-review-panel { display: none !important; } }
+@media print { .parcel-drawing-toolbar, .parcel-review-panel, .parcel-settings, .map-draw-controls { display: none !important; } }

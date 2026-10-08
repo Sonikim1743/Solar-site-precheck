@@ -1,4 +1,4 @@
-# 프로젝트 목적과 결정 — 2026-09-24
+# 프로젝트 목적과 결정 — 2026-10-08
 
 ## 무엇을 만드는가
 일본의 태양광 후보지를 찾고, 발전량·주변 지형·적설·계통 정보를 같은 후보지 기준으로 정리하여 SolarPro와 CAD의 상세 설계 전에 검토 근거를 만드는 웹앱이다. 자동 투자 판정이나 계통 접속 승인을 대신하는 제품은 아니다.
@@ -18,6 +18,13 @@
 
 GEONEX 확인 탭·버튼·외부 확인 링크 삭제는 유지한다. GEONEX 재도입이나 API 연동은 현재 다음 과제가 아니다.
 
+## 현재 개발 후보 — v1.28.0
+`feat/terrain-area-v1.28`에서 범위의 실DEM 지형·등고선·경사·3D와 일본어 A3 보고서를 로컬 구현 중이다. 아직 공개 배포하지 않았다. 공개·Windows 운영본 v1.27.2의 기존 완료 근거는 `DEPLOYED_VERSION.md`에 보존한다. 후보의 검증 결과·소스 커밋·배포물 해시·배포 ID·공개 확인은 각각 실제 확인 후 별도로 기록한다.
+
+이번 코드 작업은 사용자가 Windows에서 진행하도록 명시 승인한 예외다. 향후 Mac OpenClaw 중심 개발이라는 기본 방향은 유지하며, Mac 실기 확인을 이번 Windows 결과로 대신하지 않는다.
+
+새 지형 검토는 지도 아래 기본 접힘 영역 하나에서 사용한다. 선택 지점과 검토 범위를 구분하고, 대상·지정 범위·제외를 반영한 같은 유효 범위와 표고를 지도·평면·3D·보고서에 사용한다. 화면의 3D는 드래그·화살표로 시점을 돌려 보고, 보고서는 고정된 두 시점을 사용한다. 높이 과장 없이 1:1이며 결측·제외부를 채우지 않는다. 자료 해상도와 5m 표시·집계 간격을 구분하고 경사색으로 시공 가능·불가능을 자동 판정하지 않는다. 지형 보고서는 A3 가로 두 쪽의 별도 선택이며, 이미지 형식 PDF를 브라우저 안에서 만든다. 세부 조건은 `TERRAIN_AREA_V1_28_KO.md`를 따른다.
+
 ## 계산과 자료의 기존 원칙
 - 주소/지도 → 필요한 검토 → 계통 확인 → 보고서의 연결을 같은 후보지 기준으로 유지한다.
 - 발전량은 연간 핵심값·월별 그래프를 먼저 보여준다. 계산조건·비교조건·상세 수치는 필요한 때 열고, 결과가 없으면 계산에 필요한 조건을 보여준다.
@@ -35,11 +42,16 @@ React/Vite, Leaflet 지도, Cloudflare Pages Functions와 로컬 Node 서버를 
 | 상태·후보지 전환·저장 연결 | src/App.jsx |
 | 지도 조작·필지 선택 | src/components/MapPanel.jsx, ParcelReviewPanel.jsx |
 | 필지 형상·면적·검증 | src/services/parcelGeometry.js, src/utils/parcelReview.js |
+| 범위 지형 취득·집계 | src/services/terrainArea.js, src/utils/terrainArea.js |
+| 범위 지형 지도·평면·3D | src/components/TerrainAreaMapOverlay.jsx, TerrainAreaFigures.jsx, TerrainAreaPanel.jsx |
 | 지번 XML/GeoJSON 가져오기 | src/services/cadastre.js, cadastreXml.js |
 | 발전량과 비교 | shared/generation.js, generationScenario.js, src/components/GenerationPanel.jsx |
 | 계통 정보 | shared/powerGrid.js, src/components/PowerGridPage.jsx |
 | 기록 형식 | src/utils/reviewRecord.js |
 | 보고서 | src/components/ReportPreview.jsx, ParcelReviewReport.jsx |
+| 지형 A3 보고서·PDF | src/components/TerrainAreaReport.jsx, src/utils/terrainPdf.js |
 | 배포 묶음 | build/packageDeployment.js, docs/DEPLOYMENT_PACKAGE.md |
 
-v1.27.1은 공개·Windows 실행판 갱신을 완료했으며 근거는 DEPLOYED_VERSION.md에 기록했다. 그 버전의 화면 확인은 V1_27_1_BROWSER_CHECK_KO.md를 따른다. 이번 v1.27.2 예정 범위는 RELEASE_v1.27.2_KO.md를 읽고, 구현·검증·배포 완료 여부는 각각 새 증거로 확인한다. 실제 토지 조사·CAD/SolarPro 원본·비공개 업무 이력은 별도 비공개 인수인계 자료에 있다.
+v1.27.1과v1.27.2의 과거 배포·화면 확인 근거는 `DEPLOYED_VERSION.md`와 각 버전 확인 문서에 보존한다. 과거 `RELEASE` 문서는 당시 변경 이력이며 현재 후보의 완료 근거가 아니다. 실제 토지 조사·CAD/SolarPro 원본·비공개 업무 이력은 별도 비공개 인수인계 자료에 있다. 개별 안건의 좌표·지번·원자료 이름·후보지 기록은 공개 소스와 배포물에 포함하지 않는다.
+
+최신 범위 조작은 지도 위의 「範囲を描く」「除外」 두 버튼이다. 같은 버튼을 다시 누르면 작도를 종료한다. 파일·지번·면적·관리는 지도 아래 한 줄의 「範囲・地番の詳細」에서만 펼친다. 처음 점 재클릭과 기존 확정 버튼을 함께 제공한다.

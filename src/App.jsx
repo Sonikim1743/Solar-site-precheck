@@ -21,6 +21,10 @@ import UseCasesGuide from './components/UseCasesGuide.jsx'
 import { createReviewRecord, parseReviewRecord, reviewRecordFilename, exampleReviewRecord, MAX_REVIEW_BYTES } from './utils/reviewRecord.js'
 import HorizonGraphPreview from './components/HorizonGraphPreview.jsx'
 import TerrainSectionPreview from './components/TerrainSectionPreview.jsx'
+import TerrainAreaPanel from './components/TerrainAreaPanel.jsx'
+import TerrainAreaReport from './components/TerrainAreaReport.jsx'
+import { analyzeTerrainArea } from './services/terrainArea.js'
+import { normalizeTerrainArea, terrainAreaSnapshot, terrainGeometryKey } from './utils/terrainArea.js'
 import SolarProPreviewButton from './components/SolarProPreviewButton.jsx'
 import DiagnosticPanel from './components/DiagnosticPanel.jsx'
 import CircuitPlanner from './components/CircuitPlanner.jsx'
@@ -632,6 +636,23 @@ export default function App() {
   const [parcelMode, setParcelMode] = useState('point')
   const [parcelReviewStatus, setParcelReviewStatus] = useState('')
   const parcelMetrics = useMemo(() => measureParcelReview(parcelReview), [parcelReview])
+  const terrainAreaKey = useMemo(() => parcelMetrics.geometry ? terrainGeometryKey(parcelMetrics.geometry) : '', [parcelMetrics.geometry])
+  const [terrainArea, setTerrainArea] = useState(() => {
+    try { return draftSeed.terrainArea && parcelMetrics.geometry ? normalizeTerrainArea(draftSeed.terrainArea, parcelMetrics.geometry) : null } catch { return null }
+  })
+  const currentTerrainArea = terrainArea?.geometryKey === terrainAreaKey ? terrainArea : null
+  const currentTerrainAreaSnapshot = useMemo(() => currentTerrainArea ? terrainAreaSnapshot(currentTerrainArea) : null, [currentTerrainArea])
+  const [terrainAreaStatus, setTerrainAreaStatus] = useState(terrainArea ? 'success' : 'idle')
+  const [terrainAreaProgress, setTerrainAreaProgress] = useState(null)
+  const [terrainAreaError, setTerrainAreaError] = useState('')
+  const [terrainAreaOpen, setTerrainAreaOpen] = useState(false)
+  const [reportView, setReportView] = useState('summary')
+  const [recordDownload, setRecordDownload] = useState(null)
+  const [terrainPdfDownload, setTerrainPdfDownload] = useState(null)
+  const [terrainPdfStatus, setTerrainPdfStatus] = useState({ loading: false, message: '', error: false })
+  const terrainAreaJob = useRef({ id: 0, controller: null, key: '' })
+  const terrainAreaKeyRef = useRef(terrainAreaKey)
+  terrainAreaKeyRef.current = terrainAreaKey
   const [siteName, setSiteName] = useState(typeof draftSeed.siteName === 'string' ? draftSeed.siteName : '')
   const [siteNameTouched, setSiteNameTouched] = useState(Boolean(draftSeed.siteNameTouched))
   const [snowData, setSnowData] = useState(isConfirmedSnowStation(draftSeed.snowStation)
@@ -710,6 +731,7 @@ export default function App() {
           generation,
           generationInputs, siteName, siteNameTouched, memo, fieldMemo,
           gridNotes, reviewRecordInfo: recordInfo, terrainSection, selectedParcel, parcelReview,
+          terrainArea: currentTerrainAreaSnapshot,
           recordPlaceLabel: placeInfo.status === 'success' ? placeInfo.data.label : '',
         }))
       } catch {
@@ -718,7 +740,29 @@ export default function App() {
     }, 200)
 
     return () => window.clearTimeout(draftSaveTimer.current)
-  }, [position, elevation, terrain, obstructionHeight, detailedHorizon, snowData.station, snowBase, solarProMemo, generation, generationInputs, siteName, siteNameTouched, memo, fieldMemo, gridNotes, recordInfo, terrainSection, selectedParcel, parcelReview, placeInfo])
+  }, [position, elevation, terrain, obstructionHeight, detailedHorizon, snowData.station, snowBase, solarProMemo, generation, generationInputs, siteName, siteNameTouched, memo, fieldMemo, gridNotes, recordInfo, terrainSection, selectedParcel, parcelReview, placeInfo, currentTerrainAreaSnapshot])
+
+  useEffect(() => {
+    const job = terrainAreaJob.current
+    if (job.key && job.key !== terrainAreaKey) {
+      job.controller?.abort()
+      job.id += 1
+      job.controller = null
+      job.key = ''
+      setTerrainAreaProgress(null)
+      setTerrainAreaStatus('idle')
+      setTerrainAreaError('')
+    }
+    if (terrainArea && terrainArea.geometryKey !== terrainAreaKey) {
+      setTerrainArea(null)
+      setTerrainAreaStatus('idle')
+      setReportView('summary')
+    }
+  }, [terrainAreaKey])
+
+  useEffect(() => () => terrainAreaJob.current.controller?.abort(), [])
+  useEffect(() => () => { if (recordDownload) URL.revokeObjectURL(recordDownload.url) }, [recordDownload])
+  useEffect(() => () => { if (terrainPdfDownload) URL.revokeObjectURL(terrainPdfDownload.url) }, [terrainPdfDownload])
 
   useEffect(() => {
     if (position && placeInfo.status === 'idle') schedulePlaceInfo(position)
@@ -1121,7 +1165,15 @@ export default function App() {
   function updateParcelReview(next) {
     try {
       const valid = normalizeParcelReview(next)
-      measureParcelReview(valid)
+      const nextMetrics = measureParcelReview(valid)
+      const nextKey = nextMetrics.geometry ? terrainGeometryKey(nextMetrics.geometry) : ''
+      if (nextKey !== terrainAreaKey) {
+        cancelTerrainAreaWork()
+        setTerrainArea(null)
+        setTerrainAreaStatus('idle')
+        setTerrainAreaError('')
+        setReportView('summary')
+      }
       setParcelReview(valid)
       setParcelReviewStatus('')
       return true
@@ -1226,6 +1278,54 @@ export default function App() {
       setTerrainSectionStatus('error')
       setTerrainSectionOpen(true)
     }
+  }
+
+  function cancelTerrainAreaWork() {
+    const job = terrainAreaJob.current
+    job.id += 1
+    job.controller?.abort()
+    job.controller = null
+    job.key = ''
+    setTerrainAreaProgress(null)
+  }
+
+  function cancelTerrainAreaAnalysis() {
+    cancelTerrainAreaWork()
+    setTerrainAreaStatus(currentTerrainArea ? 'success' : 'cancelled')
+    setTerrainAreaError('')
+  }
+
+  async function handleTerrainAreaAnalysis() {
+    if (!parcelMetrics.geometry) return
+    cancelTerrainAreaWork()
+    const controller = new AbortController()
+    const id = terrainAreaJob.current.id
+    const key = terrainAreaKey
+    terrainAreaJob.current = { id, key, controller }
+    const isCurrent = () => terrainAreaJob.current.id === id && terrainAreaKeyRef.current === key && !controller.signal.aborted
+    setTerrainAreaStatus('loading')
+    setTerrainAreaError('')
+    setTerrainAreaOpen(true)
+    try {
+      const result = await analyzeTerrainArea(parcelMetrics.geometry, { signal: controller.signal, onProgress: value => { if (isCurrent()) setTerrainAreaProgress(value) } })
+      if (!isCurrent()) return
+      setTerrainArea(result)
+      setTerrainAreaStatus('success')
+      setTerrainAreaProgress(null)
+      terrainAreaJob.current.controller = null
+    } catch (error) {
+      if (!isCurrent()) return
+      setTerrainAreaStatus('error')
+      setTerrainAreaError(error.message || '地形を取得できませんでした。範囲と通信を確認して再試行してください。')
+      setTerrainAreaProgress(null)
+      terrainAreaJob.current.controller = null
+    }
+  }
+
+  function openTerrainAreaReport() {
+    if (!currentTerrainArea) return
+    setReportView('terrain')
+    openReviewSection('report-section')
   }
 
   async function handlePowerGridCheck({ prefer66Or77 = false, radiusMeters = 10000 } = {}) {
@@ -2698,6 +2798,7 @@ export default function App() {
     elevationSource: elevation.source || (elevation.status === 'error' ? '手動確認が必要' : '—'),
     terrain,
     terrainSection,
+    terrainArea: currentTerrainArea,
     siteName,
     parcel: selectedParcel,
     parcelReview,
@@ -2721,10 +2822,53 @@ export default function App() {
     gridCapacity: gridCapacity.data,
     capacityMatches,
     placeCapacityCandidates,
-  }), [position, elevation, terrain, terrainSection, siteName, selectedParcel, parcelReview, parcelMetrics, confirmedSnowStation, expectedSnowMesh, meshBoundary, snowBase, obstructionHeight, solarReference, selectedPlaceLabel, memo, fieldMemo, solarProMemo, generation, gridNotes, recordInfo, powerGrid.data, gridCapacity.data, capacityMatches, placeCapacityCandidates])
+  }), [position, elevation, terrain, terrainSection, currentTerrainArea, siteName, selectedParcel, parcelReview, parcelMetrics, confirmedSnowStation, expectedSnowMesh, meshBoundary, snowBase, obstructionHeight, solarReference, selectedPlaceLabel, memo, fieldMemo, solarProMemo, generation, gridNotes, recordInfo, powerGrid.data, gridCapacity.data, capacityMatches, placeCapacityCandidates])
+  // PDF validity follows the fields used by the terrain sheets. Unrelated
+  // checks and render state must not discard a completed download.
+  const terrainPdfReport = useMemo(() => ({
+    terrainArea: currentTerrainArea, parcelReview, position, siteName,
+    placeLabel: selectedPlaceLabel, fieldMemo, appVersion: APP_VERSION,
+  }), [currentTerrainArea, parcelReview, position, siteName, selectedPlaceLabel, fieldMemo])
+  const terrainPdfReportRef = useRef(terrainPdfReport)
+  terrainPdfReportRef.current = terrainPdfReport
+  const terrainPdfJob = useRef(0)
+  useEffect(() => {
+    terrainPdfJob.current++
+    setTerrainPdfDownload(null)
+    setTerrainPdfStatus({ loading: false, message: '', error: false })
+  }, [terrainPdfReport])
 
   function currentReviewRecord() {
     return createReviewRecord({ report, generationDraft: generationInputs, detailedHorizon, gridNotes, kind: recordInfo?.kind || 'review' })
+  }
+
+  async function saveTerrainPdf() {
+    const sourceReport = terrainPdfReport
+    const sourceKey = currentTerrainArea?.geometryKey
+    if (!sourceKey || terrainPdfStatus.loading) return
+    const job = ++terrainPdfJob.current
+    const isCurrent = () => terrainPdfJob.current === job && terrainPdfReportRef.current === sourceReport && terrainAreaKeyRef.current === sourceKey
+    setTerrainPdfDownload(null)
+    setTerrainPdfStatus({ loading: true, error: false, message: '' })
+    try {
+      const { exportTerrainAreaPdf } = await import('./utils/terrainPdf.js')
+      if (!isCurrent()) return
+      const { blob, fileName } = await exportTerrainAreaPdf({ report: sourceReport, element: document.getElementById('terrain-area-report') })
+      if (!isCurrent()) return
+      const url = await new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result)
+        reader.onerror = () => reject(new Error('PDFファイルを読み出せませんでした。'))
+        reader.readAsDataURL(blob)
+      })
+      if (!isCurrent()) return
+      setTerrainPdfDownload({ url, fileName })
+      const link = document.createElement('a'); link.href = url; link.download = fileName; link.click()
+      setTerrainPdfStatus({ loading: false, error: false, message: 'A3横・2ページのPDFを作成しました。画像として保存するため文字の選択・CAD編集はできません。' })
+    } catch (error) {
+      if (!isCurrent()) return
+      setTerrainPdfStatus({ loading: false, error: true, message: error.message || 'PDFを作成できませんでした。もう一度お試しください。' })
+    }
   }
 
   function saveReviewRecord() {
@@ -2733,7 +2877,11 @@ export default function App() {
       const serialized = JSON.stringify(record, null, 2) + '\n'
       if (new TextEncoder().encode(serialized).length > MAX_REVIEW_BYTES) throw new Error('検討記録が2MBを超えています。不要な筆や範囲を減らしてから保存してください。')
       const url = URL.createObjectURL(new Blob([serialized], { type: 'application/json' }))
-      const link = document.createElement('a'); link.href = url; link.download = reviewRecordFilename(record); link.click()
+      const fileName = reviewRecordFilename(record)
+      // The persistent link remains usable after an automatic download is
+      // ignored by an embedded browser, without keeping a live object URL.
+      setRecordDownload({ url: `data:application/json;charset=utf-8,${encodeURIComponent(serialized)}`, fileName })
+      const link = document.createElement('a'); link.href = url; link.download = fileName; link.click()
       window.setTimeout(() => URL.revokeObjectURL(url), 1000)
       setRecordStatus({ message: '検討記録の保存を開始しました。ダウンロード先のファイルから再開できます。PDF原本・全設備地図・公式DB本体は含みません。', error: false })
     } catch (error) { setRecordStatus({ message: error.message, error: true }) }
@@ -2744,6 +2892,7 @@ export default function App() {
     if (!file) return
     const isCurrent = candidateRequests.current.start('record-import')
     setPendingRecord(null)
+    setRecordDownload(null)
     setRecordStatus({ message: '検討記録の内容を確認しています…', error: false })
     try {
       if (file.size > MAX_REVIEW_BYTES) throw new Error('検討記録は2MB以下のJSONファイルを選んでください。')
@@ -2755,6 +2904,8 @@ export default function App() {
   }
 
   function cancelCandidateWork() {
+    cancelTerrainAreaWork()
+    setRecordDownload(null)
     candidateRequests.current.invalidateAll(); powerGridRequestSeq.current += 1; placeRequestSeq.current += 1
     window.clearTimeout(placeRequestTimer.current); window.clearTimeout(pointActionTimer.current)
     setCandidateRevision(current => current + 1)
@@ -2763,6 +2914,7 @@ export default function App() {
   function restoreReviewRecord(record) {
     cancelCandidateWork()
     const { candidate, inputs, results } = record
+    const restoredTerrainArea = results.terrainArea ? normalizeTerrainArea(results.terrainArea, measureParcelReview(candidate.parcelReview).geometry) : null
     setPosition(candidate.position)
     setSiteName(candidate.name); setSiteNameTouched(true); setMemo(candidate.memo); setFieldMemo(candidate.fieldMemo)
     setParcelReview(candidate.parcelReview); setParcelMode('point'); setParcelReviewStatus('')
@@ -2774,6 +2926,7 @@ export default function App() {
     setElevation({ status: results.elevation.value === null ? 'idle' : 'success', value: results.elevation.value, source: results.elevation.source, message: '' })
     setTerrain(results.terrain); setTerrainStatus(results.terrain ? 'success' : 'idle'); setHorizonPanelOpen(false); setHorizonExportMessage('')
     setTerrainSection(results.terrainSection); setTerrainSectionStatus(results.terrainSection ? 'success' : 'idle'); setTerrainSectionRange(results.terrainSection?.rangeMeters || 100); setTerrainSectionOpen(false)
+    setTerrainArea(restoredTerrainArea); setTerrainAreaStatus(restoredTerrainArea ? 'success' : 'idle'); setTerrainAreaProgress(null); setTerrainAreaError(''); setTerrainAreaOpen(false); setReportView('summary')
     setObstructionHeight(inputs.obstructionHeight); setDetailedHorizon(inputs.detailedHorizon); setSnowBase(inputs.snowBase)
     setSnowData(results.snowStation ? { status: 'success', station: results.snowStation, message: '保存時の積雪記録です。原本との再照合は行っていません。' } : initialSnow)
     setAdjacentMeshCompare({ status: 'idle', stations: [], message: '' }); setPdfProgress('')
@@ -2788,7 +2941,7 @@ export default function App() {
   function applyPendingRecord() {
     if (!pendingRecord) return
     try {
-      const previous = { position, elevation, terrain, terrainSection, terrainSectionRange, obstructionHeight, detailedHorizon, snowBase, snowData, solarProMemo, generationInputs, generation, gridNotes, recordInfo, siteName, siteNameTouched, memo, fieldMemo, selectedParcel, parcelReview, parcelMode, parcelReviewStatus, parcelData, focusParcelId, parcelQuery, parcelStatus, powerGrid, placeInfo, placeApiStatus, currentLocation, locationStatus, address, addressResults, searchStatus, gridCapacity, adjacentMeshCompare, generationNotice }
+      const previous = { position, elevation, terrain, terrainSection, terrainSectionRange, terrainArea: currentTerrainArea, obstructionHeight, detailedHorizon, snowBase, snowData, solarProMemo, generationInputs, generation, gridNotes, recordInfo, siteName, siteNameTouched, memo, fieldMemo, selectedParcel, parcelReview, parcelMode, parcelReviewStatus, parcelData, focusParcelId, parcelQuery, parcelStatus, powerGrid, placeInfo, placeApiStatus, currentLocation, locationStatus, address, addressResults, searchStatus, gridCapacity, adjacentMeshCompare, generationNotice }
       restoreReviewRecord(pendingRecord); setUndoRecord(previous)
       setRecordStatus({ message: '記録を開きました。結果は保存当時の値です。新しい条件で計算すると更新されます。', error: false })
     } catch (error) { setRecordStatus({ message: error.message, error: true }) }
@@ -2801,6 +2954,7 @@ export default function App() {
     const settled = state => state.status === 'loading' ? { ...state, status: state.data || Number.isFinite(state.value) ? 'success' : 'idle', message: '開く前の取得処理は中止しました。必要に応じて再取得してください。' } : state
     setPosition(prior.position); setElevation(settled(prior.elevation)); setTerrain(prior.terrain); setTerrainStatus(prior.terrain ? 'success' : 'idle')
     setTerrainSection(prior.terrainSection); setTerrainSectionStatus(prior.terrainSection ? 'success' : 'idle'); setTerrainSectionRange(prior.terrainSectionRange)
+    setTerrainArea(prior.terrainArea); setTerrainAreaStatus(prior.terrainArea ? 'success' : 'idle'); setTerrainAreaProgress(null); setTerrainAreaError(''); setTerrainAreaOpen(false); setReportView('summary')
     setObstructionHeight(prior.obstructionHeight); setDetailedHorizon(prior.detailedHorizon); setSnowBase(prior.snowBase); setSnowData(settled(prior.snowData))
     setSolarProMemo(prior.solarProMemo); setGenerationInputs(prior.generationInputs); setGeneration(prior.generation); setGenerationNotice('')
     setGridNotes(prior.gridNotes); setRecordInfo(prior.recordInfo); setSiteName(prior.siteName); setSiteNameTouched(prior.siteNameTouched); setMemo(prior.memo); setFieldMemo(prior.fieldMemo)
@@ -2832,6 +2986,22 @@ export default function App() {
       ['候補地名', siteName],
       ['地番', selectedParcel?.number || ''],
       ...parcelReviewCsvRows(parcelReview, parcelMetrics),
+      ...(currentTerrainArea ? [
+        ['範囲地形の取得日時', currentTerrainArea.fetchedAt],
+        ['範囲地形の標高資料', currentTerrainArea.source.layers.map(layer => `${layer.label} / 原資料${layer.nativeResolutionMeters}m級`).join('、')],
+        ['範囲地形の表示・集計格子(m)', currentTerrainArea.grid.step],
+        ['局所勾配の計算幅(m)', 10],
+        ['範囲地形の最低標高(m)', currentTerrainArea.summary.minElevation],
+        ['範囲地形の最高標高(m)', currentTerrainArea.summary.maxElevation],
+        ['範囲地形の高低差(m)', currentTerrainArea.summary.heightRange],
+        ['範囲地形の局所勾配中央値(度)', currentTerrainArea.summary.medianSlope],
+        ['範囲地形の局所勾配上位10%の境目(度)', currentTerrainArea.summary.p90Slope],
+        ['範囲地形の標高確認率(%)', currentTerrainArea.summary.coveragePercent],
+        ['範囲地形の勾配確認率(%)', currentTerrainArea.summary.slopeCoveragePercent],
+        ['範囲地形の割合の分母', '勾配を計算できた範囲内の格子点。登記面積ではありません。'],
+        ...currentTerrainArea.summary.slopeBins.map(bin => [`範囲地形の勾配 ${bin.max === 90 ? `${bin.min}度以上` : `${bin.min}-${bin.max}度未満`}(%)`, bin.percent]),
+        ['範囲地形の用途', '地図上の参考範囲。造成量・設置可能容量・施工可否は未判定。'],
+      ] : []),
       ['地番所在地', [selectedParcel?.municipality, selectedParcel?.area].filter(Boolean).join(' ')],
       ['緯度（度分）', position ? toDegreeMinutes(position.lat, 'lat') : ''],
       ['経度（度分）', position ? toDegreeMinutes(position.lon, 'lon') : ''],
@@ -3089,6 +3259,7 @@ export default function App() {
       }
       if (target === 'site-details' || target === 'simple-snow' || target === 'simple-horizon') { const analysis = document.getElementById('simple-analysis'); if (analysis) analysis.open = true }
       if (target === 'parcel-review-tools' && element) element.open = true
+      if (target === 'terrain-area' && element) { element.open = true; setTerrainAreaOpen(true) }
       if (target === 'report-section' || target === 'solar-generation') { const details = element?.querySelector('details'); if (details) details.open = true }
       if (element) { element.tabIndex = -1; element.focus({ preventScroll: true }); element.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
     }, 0)
@@ -3129,8 +3300,9 @@ export default function App() {
               <div className="workspace-tools-menu" onClick={event => { if (event.target.closest('button, a')) { event.currentTarget.parentElement.open = false; event.currentTarget.parentElement.querySelector('summary')?.focus() } }}>
                 <button type="button" onClick={() => openReviewSection('solar-generation')}>発電量計算</button>
                 <button type="button" onClick={() => openReviewSection('simple-horizon')}>地平線・日影を計算</button>
+                <button type="button" onClick={() => openReviewSection('terrain-area')}>範囲の地形・3Dを見る</button>
                 <button type="button" onClick={() => openReviewSection('simple-snow')}>積雪データを見る</button>
-                <button type="button" onClick={() => openReviewSection('parcel-review-tools')}>地番・範囲</button>
+                <button type="button" onClick={() => openReviewSection('parcel-review-tools')}>範囲・地番の詳細</button>
                 <button type="button" onClick={() => openReviewSection('site-details')}>検討記録・メモ</button>
                 <button type="button" onClick={() => openReviewSection('report-section')}>レポート</button>
                 <hr />
@@ -3145,7 +3317,6 @@ export default function App() {
                 <a href={GROUNDY_URL} target="_blank" rel="noreferrer">Groundy ↗</a>
                 <a href={SOLAR_PRO_PORTAL_URL} target="_blank" rel="noreferrer">Solar Pro 管理・DL ↗</a>
                 <hr />
-                <button type="button" onClick={resetWorkTools}>作業内容を初期化</button>
               </div>
             </details>
           </nav>
@@ -3284,14 +3455,54 @@ export default function App() {
                 )}
               </form>
 
-              <details className="cadastre-option site-extra-option" id="parcel-review-tools">
-              <summary>
-                <span>
-                  <strong>筆・範囲</strong>
-                  <small>地番・範囲を設定</small>
-                </span>
-              </summary>
+
+            </div>
+            {searchStatus === 'empty' && <p className="inline-message">該当する候補がありません。座標の場合は「34.8617, 133.2433」の形式も使えます。</p>}
+            {searchStatus === 'error' && <p className="inline-message inline-message--error">住所検索に接続できませんでした。座標入力または地図クリックを使用してください。</p>}
+
+            <MapPanel
+              position={position}
+              onSelect={(nextPosition) => {
+                const preserve = Boolean(parcelMetrics.geometry && pointInGeometry(nextPosition, parcelMetrics.geometry))
+                selectPosition(nextPosition, { resetCandidate: !preserve, preserveParcelReview: preserve })
+                setSelectedParcel(null); setFocusParcelId(null)
+              }}
+              parcelReview={parcelReview}
+              parcelMode={parcelMode}
+              onParcelModeChange={setParcelMode}
+              onReviewGeometry={receiveReviewGeometry}
+              onParcelDrawingError={setParcelReviewStatus}
+              onUseCurrentLocation={handleUseCurrentLocation}
+              onResetWorkspace={resetWorkTools}
+              currentLocation={currentLocation}
+              locationStatus={locationStatus}
+              placeInfo={placeInfo}
+              parcelData={parcelData}
+              selectedParcelId={selectedParcel?.id || null}
+              focusParcelId={focusParcelId}
+              onParcelSelect={chooseParcel}
+              terrainSection={terrainSection}
+              terrainArea={currentTerrainArea}
+              powerGrid={powerGrid.data}
+              capacityMatches={capacityMatches}
+              googleMapsUrl={googleMapsUrl}
+            />
+
+            <details className="parcel-settings" id="parcel-review-tools">
+              <summary>範囲・地番の詳細{parcelMetrics.geometry && <small>約{parcelMetrics.usableAreaM2.toLocaleString('ja-JP', { maximumFractionDigits: 0 })} m²</small>}</summary>
               <div className="cadastre-option__body">
+            <ParcelReviewPanel
+              review={parcelReview} metrics={parcelMetrics} mode={parcelMode} showDrawControls={false}
+              onModeChange={mode => { setParcelMode(mode); setParcelReviewStatus('') }}
+              onRemoveParcel={id => updateParcelReview(removeReviewParcel(parcelReview, id))}
+              onClearBoundary={() => updateParcelReview({ ...parcelReview, boundary: null })}
+              onClearExclusions={() => updateParcelReview({ ...parcelReview, exclusions: [] })}
+              onClear={() => updateParcelReview(createEmptyParcelReview())}
+              onUseParcel={useReviewParcel}
+              onFocusParcel={id => setFocusParcelId(id)}
+              onChangeRole={(id, role) => updateParcelReview({ ...parcelReview, parcels: parcelReview.parcels.map(entry => entry.id === id ? { ...entry, role } : entry) })}
+              status={[parcelReviewStatus, position && parcelMetrics.geometry && !pointInGeometry(position, parcelMetrics.geometry) ? '計算地点が有効な検討範囲の外にあります。地図で範囲内の地点を選び直してください。' : '', (parcelReview.boundary || parcelMetrics.targetCount) && !parcelMetrics.geometry ? '有効な検討面積がありません。対象・検討範囲・除外範囲を確認してください。' : ''].filter(Boolean).join(' ')}
+              parcelTools={<>
                 <details className="cadastre-guide"><summary>地番データの入手方法</summary>
                   <div>
                     <strong>地番ファイルの使い方</strong>
@@ -3346,50 +3557,11 @@ export default function App() {
                   </div>
                 </div>
                 {parcelStatus.message && <p className={`inline-message ${parcelStatus.status === 'error' ? 'inline-message--error' : ''}`}>{parcelStatus.message}</p>}
-            <ParcelReviewPanel
-              review={parcelReview} metrics={parcelMetrics} mode={parcelMode}
-              onModeChange={mode => { setParcelMode(mode); setParcelReviewStatus('') }}
-              onRemoveParcel={id => updateParcelReview(removeReviewParcel(parcelReview, id))}
-              onClearBoundary={() => updateParcelReview({ ...parcelReview, boundary: null })}
-              onClearExclusions={() => updateParcelReview({ ...parcelReview, exclusions: [] })}
-              onClear={() => updateParcelReview(createEmptyParcelReview())}
-              onUseParcel={useReviewParcel}
-              onFocusParcel={id => setFocusParcelId(id)}
-              onChangeRole={(id, role) => updateParcelReview({ ...parcelReview, parcels: parcelReview.parcels.map(entry => entry.id === id ? { ...entry, role } : entry) })}
-              status={[parcelReviewStatus, position && parcelMetrics.geometry && !pointInGeometry(position, parcelMetrics.geometry) ? '計算地点が有効な検討範囲の外にあります。地図で範囲内の地点を選び直してください。' : '', (parcelReview.boundary || parcelMetrics.targetCount) && !parcelMetrics.geometry ? '有効な検討面積がありません。対象・検討範囲・除外範囲を確認してください。' : ''].filter(Boolean).join(' ')}
+              </>}
             />
 
               </div>
               </details>
-            </div>
-            {searchStatus === 'empty' && <p className="inline-message">該当する候補がありません。座標の場合は「34.8617, 133.2433」の形式も使えます。</p>}
-            {searchStatus === 'error' && <p className="inline-message inline-message--error">住所検索に接続できませんでした。座標入力または地図クリックを使用してください。</p>}
-
-            <MapPanel
-              position={position}
-              onSelect={(nextPosition) => {
-                const preserve = Boolean(parcelMetrics.geometry && pointInGeometry(nextPosition, parcelMetrics.geometry))
-                selectPosition(nextPosition, { resetCandidate: !preserve, preserveParcelReview: preserve })
-                setSelectedParcel(null); setFocusParcelId(null)
-              }}
-              parcelReview={parcelReview}
-              parcelMode={parcelMode}
-              onParcelModeChange={setParcelMode}
-              onReviewGeometry={receiveReviewGeometry}
-              onParcelDrawingError={setParcelReviewStatus}
-              onUseCurrentLocation={handleUseCurrentLocation}
-              currentLocation={currentLocation}
-              locationStatus={locationStatus}
-              placeInfo={placeInfo}
-              parcelData={parcelData}
-              selectedParcelId={selectedParcel?.id || null}
-              focusParcelId={focusParcelId}
-              onParcelSelect={chooseParcel}
-              terrainSection={terrainSection}
-              powerGrid={powerGrid.data}
-              capacityMatches={capacityMatches}
-              googleMapsUrl={googleMapsUrl}
-            />
 
             <div className="map-analysis-strip">
               {simpleDesign ? <div className="simple-point">
@@ -3447,6 +3619,10 @@ export default function App() {
               )}
               {terrainSectionOpen && <TerrainSectionPreview analysis={terrainSection} />}
             </div>
+            <details id="terrain-area" className="terrain-area-disclosure" open={terrainAreaOpen} onToggle={event => setTerrainAreaOpen(event.currentTarget.open)}>
+              <summary><strong>土地の起伏をみる</strong><span>{currentTerrainArea ? `高低差 ${currentTerrainArea.summary.heightRange?.toFixed(1) ?? '—'}m · 等高線・3D` : '検討範囲の等高線・勾配・3D'}</span></summary>
+              <TerrainAreaPanel geometry={parcelMetrics.geometry} metrics={parcelMetrics} analysis={currentTerrainArea} status={terrainAreaStatus} progress={terrainAreaProgress} error={terrainAreaError} position={position} onAnalyze={handleTerrainAreaAnalysis} onCancel={cancelTerrainAreaAnalysis} onClear={() => { cancelTerrainAreaWork(); setTerrainArea(null); setTerrainAreaStatus('idle'); setTerrainAreaError(''); setReportView('summary') }} onDrawBoundary={() => { setParcelMode('boundary'); openReviewSection('site-select') }} onOpenReport={openTerrainAreaReport} />
+            </details>
             <button type="button" className="power-page-link" disabled={!position} onClick={() => switchPage('power')}>この地点の系統を確認 →</button>
             {selectedParcel && (
               <div className="selected-parcel-card">
@@ -3907,14 +4083,19 @@ export default function App() {
               <span className="report-disclosure__toggle">クリックして開く</span>
             </summary>
             <div className="report-disclosure__body">
+            {currentTerrainArea && <div className="terrain-report-selector no-print" role="group" aria-label="レポートの種類"><button type="button" aria-pressed={reportView === 'summary'} onClick={() => setReportView('summary')}>候補地チェック</button><button type="button" aria-pressed={reportView === 'terrain'} onClick={() => setReportView('terrain')}>地形図面 · A3</button></div>}
+            {reportView !== 'terrain' && <>
             <div className="report-readiness no-print"><div><strong>出力前に確認する内容</strong><p>発電量：{generation ? '計算済み' : '未計算'} ／ 地平線：{terrain?.samples?.length ? '分析済み' : '未分析'} ／ NEDO積雪：{confirmedSnowStation ? '確認済み' : '未取得'} ／ 系統設備：{powerGrid.data ? '取得済み（接続可否は未確認）' : '未取得'}</p><p>未取得の項目は未確認として出力します。設備確認メモは系統画面で保存すると検討記録とレポートに追加されます。</p></div><div className="report-readiness__actions"><button type="button" className="secondary-button" disabled={!position} onClick={() => openReviewSection('solar-generation')}>発電量を確認</button><button type="button" className="secondary-button" onClick={() => { openReviewSection('site-details'); const analysis = document.getElementById('simple-analysis'); if (analysis) analysis.open = true }}>地形・積雪を確認</button></div></div>
+            </>}
             <div className="action-row no-print">
               <button type="button" className="secondary-button" onClick={downloadCsv}>チェックCSV出力</button>
               <button type="button" className="secondary-button" disabled={!position} onClick={saveReviewRecord}>検討記録を保存</button>
               <button type="button" className="secondary-button" onClick={() => openReviewSection('use-cases')}>資料の使い方を見る</button>
-              <button type="button" className="primary-button" onClick={() => window.print()}>PDF印刷</button>
+              {reportView === 'terrain' && currentTerrainArea ? <button type="button" className="primary-button" disabled={terrainPdfStatus.loading} onClick={saveTerrainPdf}>{terrainPdfStatus.loading ? 'PDFを作成中…' : '地形PDFを保存'}</button> : <button type="button" className="primary-button" onClick={() => window.print()}>PDF印刷</button>}
             </div>
-            <details className="solarpro-memo-panel no-print">
+            {recordStatus.message && <p className="review-records__notice no-print" role={recordStatus.error ? 'alert' : 'status'}>{recordStatus.message} {recordDownload && !recordStatus.error && <a href={recordDownload.url} download={recordDownload.fileName}>記録ファイルをダウンロード</a>}</p>}
+            {reportView === 'terrain' && terrainPdfStatus.message && <p className="review-records__notice no-print" role={terrainPdfStatus.error ? 'alert' : 'status'}>{terrainPdfStatus.message} {terrainPdfDownload && !terrainPdfStatus.error && <a href={terrainPdfDownload.url} download={terrainPdfDownload.fileName}>PDFをダウンロード</a>}</p>}
+            {reportView !== 'terrain' && <details className="solarpro-memo-panel no-print">
               <summary>
                 <span>Solar Pro照合メモ</span>
                 <small>発電量レポートと突き合わせる時だけ入力</small>
@@ -3961,8 +4142,8 @@ export default function App() {
                   />
                 </label>
               </div>
-            </details>
-            <ReportPreview report={report} />
+            </details>}
+            {reportView === 'terrain' && currentTerrainArea ? <TerrainAreaReport report={report} /> : <ReportPreview report={report} />}
             </div>
           </details>
         </section>

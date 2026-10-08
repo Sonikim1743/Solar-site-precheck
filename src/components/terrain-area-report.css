@@ -1,0 +1,83 @@
+.terrain-report-selector { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px; }
+.terrain-report-selector button { padding:9px 15px; border:1px solid #c9dcd1; border-radius:7px; background:#fff; color:#245645; cursor:pointer; }
+.terrain-report-selector button[aria-pressed="true"] { background:#17664f; border-color:#17664f; color:white; }
+.terrain-map-legend { display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin:10px 0; color:#5e7569; font-size:11px; }
+.terrain-map-legend button { padding:7px 10px; background:#fff; border:1px solid #c9dcd1; border-radius:6px; color:#245645; cursor:pointer; }
+.terrain-map-legend span { display:inline-flex; align-items:center; gap:5px; }
+.terrain-map-legend i { width:16px; height:10px; border:1px solid #a9b6a8; }
+.terrain-map-legend small { font-size:10px; }
+.terrain-area-disclosure { margin:16px 0; border-top:1px solid #d7e3dc; border-bottom:1px solid #d7e3dc; }
+.terrain-area-disclosure>summary { display:flex; justify-content:space-between; gap:14px; padding:16px 4px; cursor:pointer; list-style:none; }
+.terrain-area-disclosure>summary::after { content:'＋'; }
+.terrain-area-disclosure[open]>summary::after { content:'−'; }
+.terrain-area-disclosure>summary strong { font-size:14px; }
+.terrain-area-disclosure>summary span { margin-left:auto; font-size:12px; color:#61776b; }
+.terrain-area-disclosure>.terrain-area-panel { padding:0 4px 18px; }
+.terrain-area-report .terrain-report-sheet { padding:24px; color:#273f35; }
+.terrain-report-header { display:flex; justify-content:space-between; align-items:flex-start; gap:18px; padding-bottom:14px; border-bottom:1px solid #b9cbbf; }
+.terrain-report-header>div { min-width:0; flex:1; }
+.terrain-report-header p { margin:0 0 3px; font-size:11px; color:#667b6f; }
+.terrain-report-header h2 { margin:0 0 5px; font-size:22px; }
+.terrain-report-header>span { font-size:11px; color:#667b6f; flex-shrink:0; }
+.terrain-report-header div>span { display:block; font-size:13px; overflow-wrap:anywhere; }
+.terrain-report-body { padding-top:16px; }
+.terrain-report-plan-layout { display:grid; grid-template-columns:minmax(0,2fr) minmax(250px,1fr); gap:24px; align-items:start; }
+.terrain-report-main-figure { min-width:0; }
+.terrain-report-findings h3,.terrain-report-evidence-layout h3 { margin:0 0 9px; padding:7px 10px; font-size:13px; background:#eef3ef; }
+.terrain-report-values { display:grid; margin:0 0 15px; }
+.terrain-report-values>div { display:flex; justify-content:space-between; gap:14px; padding:8px 2px; border-bottom:1px solid #e1e9e0; }
+.terrain-report-values dt { color:#657b6e; font-size:11px; }
+.terrain-report-values dd { margin:0; font-size:14px; font-weight:600; white-space:nowrap; }
+.terrain-report-findings p,.terrain-report-evidence-layout p { margin:10px 0; font-size:11px; line-height:1.7; }
+.terrain-report-findings .terrain-report-observation { font-size:13px; color:#24543d; }
+.terrain-report-bins { border-collapse:collapse; width:100%; font-size:11px; }
+.terrain-report-bins th,.terrain-report-bins td { padding:7px; border-bottom:1px solid #dce5dc; text-align:left; }
+.terrain-report-bins td { text-align:right; }
+.terrain-report-bins tbody th { font-weight:400; }
+.terrain-report-bottom-note { display:flex; gap:14px; padding:12px; margin-top:18px; border-top:1px solid #d1dfd3; font-size:11px; line-height:1.7; }
+.terrain-report-bottom-note strong { flex-shrink:0; }
+.terrain-report-footer { display:flex; justify-content:space-between; gap:14px; margin-top:18px; padding:9px 0 0; border-top:1px solid #c8d8cb; background:transparent; font-size:10px; color:#667b6f; }
+.terrain-report-footer>span { min-width:0; overflow-wrap:anywhere; }
+.terrain-report-3d-layout { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+.terrain-report-3d-layout>div { min-width:0; }
+.terrain-report-evidence-layout { display:grid; grid-template-columns:1.15fr 1fr; gap:24px; margin-top:16px; }
+.terrain-report-evidence { margin:0; font-size:11px; line-height:1.7; }
+.terrain-report-evidence>div { display:grid; grid-template-columns:80px minmax(0,1fr); padding:5px 0; gap:10px; }
+.terrain-report-evidence dt { color:#667b6f; }
+.terrain-report-evidence dd { margin:0; overflow-wrap:anywhere; }
+.terrain-report-evidence-layout ul { margin:0; padding-left:20px; font-size:11px; line-height:1.9; }
+.terrain-report-warning { background:#fff6e8; color:#7b5b28; padding:8px; }
+.terrain-report-field-memo { white-space:pre-wrap; overflow-wrap:anywhere; max-height:95px; overflow:auto; }
+@media(max-width:800px) {
+  .terrain-report-plan-layout,.terrain-report-3d-layout,.terrain-report-evidence-layout { grid-template-columns:1fr; }
+  .terrain-area-report .terrain-report-sheet { padding:16px; }
+  .terrain-report-header h2 { font-size:18px; }
+  .terrain-report-header,.terrain-report-footer { flex-wrap:wrap; }
+  .terrain-area-disclosure>summary { flex-wrap:wrap; }
+  .terrain-area-disclosure>summary span { margin-left:0; }
+}
+@media print {
+  @page terrainLandscape { size:A3 landscape; margin:8mm; }
+  .terrain-area-report.report-card--print-set { display:block; gap:0; }
+  .terrain-area-report .terrain-report-sheet { page:terrainLandscape; padding:0; width:auto; height:auto; min-height:0; break-inside:avoid-page; break-after:page; page-break-after:always; }
+  .terrain-area-report .terrain-report-sheet:last-child { break-after:auto; page-break-after:auto; }
+  .terrain-report-header { padding-bottom:3mm; }
+  .terrain-report-header h2 { font-size:18pt; }
+  .terrain-report-header div>span { font-size:10pt; line-height:1.35; }
+  .terrain-report-body { padding-top:3mm; }
+  .terrain-report-plan-layout { grid-template-columns:2.1fr 1fr; gap:7mm; }
+  .terrain-report-main-figure .terrain-area-figure svg { width:100%; max-height:209mm; }
+  .terrain-report-values dt,.terrain-report-findings p,.terrain-report-bins,.terrain-report-evidence,.terrain-report-evidence-layout p,.terrain-report-evidence-layout ul,.terrain-report-bottom-note { font-size:9pt; line-height:1.45; }
+  .terrain-report-values>div { padding:1.7mm .5mm; }
+  .terrain-report-values dd { font-size:11pt; line-height:1.4; }
+  .terrain-report-findings h3,.terrain-report-evidence-layout h3 { font-size:10pt; padding:1.6mm 2mm; margin-bottom:2mm; }
+  .terrain-report-findings p,.terrain-report-evidence-layout p { margin:2mm 0; }
+  .terrain-report-bottom-note { padding:2mm 0; margin-top:3mm; }
+  .terrain-report-bins th,.terrain-report-bins td { padding:1.5mm; }
+  .terrain-report-3d-layout { grid-template-columns:1fr 1fr; gap:5mm; }
+  .terrain-report-3d-layout svg { width:100%; max-height:145mm; }
+  .terrain-report-evidence-layout { grid-template-columns:1.15fr 1fr; gap:7mm; margin-top:3mm; }
+  /* The main stylesheet hides all footer elements in print; restore only drawing evidence. */
+  .terrain-area-report .terrain-report-footer { display:flex !important; flex-wrap:nowrap; margin-top:3mm; padding:2mm 0 0; background:transparent; font-size:8pt; line-height:1.4; }
+  .terrain-report-field-memo { max-height:none; overflow:visible; }
+}

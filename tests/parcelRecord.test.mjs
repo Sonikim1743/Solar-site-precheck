@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { exampleReviewRecord, parseReviewRecord } from '../src/utils/reviewRecord.js'
+import { exampleReviewRecord, parseReviewRecord, REVIEW_SCHEMA_VERSION } from '../src/utils/reviewRecord.js'
 import { setReviewParcel, createEmptyParcelReview, measureParcelReview } from '../src/utils/parcelReview.js'
 import { geonexParcelUrl, parcelReviewCsvRows } from '../src/utils/parcelPresentation.js'
 import { readCadastreGeoJson } from '../src/services/cadastre.js'
@@ -22,7 +22,7 @@ test('imported files cannot impersonate an internally restored review parcel', a
 test('legacy schema 1 records reopen without invented parcel geometry', () => {
   const old = exampleReviewRecord('1.25'); old.schemaVersion = 1; delete old.candidate.parcelReview
   const opened = parseReviewRecord(JSON.stringify(old))
-  assert.equal(opened.schemaVersion,2)
+  assert.equal(opened.schemaVersion,REVIEW_SCHEMA_VERSION)
   assert.deepEqual(opened.candidate.parcelReview,createEmptyParcelReview())
   assert.equal(opened.candidate.name,old.candidate.name)
 })

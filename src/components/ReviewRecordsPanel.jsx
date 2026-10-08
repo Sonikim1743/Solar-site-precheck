@@ -11,7 +11,7 @@ export default function ReviewRecordsPanel({ position, onSave, onRead, onApply, 
       <summary>検討資料{recordInfo && <small>{recordInfo.kind === 'example' ? '練習例' : '保存記録'}</small>}</summary>
       <div className="review-toolbar__popover">
         <div className="review-records__actions"><button type="button" onClick={() => { onSave(); closeMenu() }} disabled={!position}>検討記録を保存</button><label className="review-records__file">記録ファイルを選ぶ<input type="file" accept=".json,application/json" onChange={event => { onRead(event); closeMenu() }} aria-label="検討記録ファイルを選ぶ" /></label></div>
-        <p className="review-records__notice">候補地の条件・結果・メモ・選択した筆と検討範囲を保存して再開できます。PDF編集状態、結線アシストの機器設定、系統の全設備地図は含みません。{notesCount > 0 && ` 設備メモ ${notesCount}件を含みます。`}</p>
+        <p className="review-records__notice">候補地の条件・結果・メモ・筆と検討範囲・範囲の地形を保存して再開できます。PDF編集状態、結線アシストの機器設定、系統の全設備地図は含みません。{notesCount > 0 && ` 設備メモ ${notesCount}件を含みます。`}</p>
         {recordInfo && <p className="review-records__notice">{recordInfo.kind === 'example' ? '仮条件の操作例です。計算結果や接続可否を示す実案件ではありません。' : `保存日時 ${new Date(recordInfo.savedAt).toLocaleString('ja-JP')} / 元のアプリ v${recordInfo.appVersion}。ファイル内の記録を復元しました。出典の再取得・原本との照合は行っていません。`}</p>}
       </div>
     </details>

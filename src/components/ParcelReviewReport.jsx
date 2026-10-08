@@ -103,7 +103,7 @@ export default function ParcelReviewReport({ review, metrics, position, startPag
         <h3>計算地点と発電量の扱い</h3>
         <p>{Number.isFinite(position?.lat) && Number.isFinite(position?.lon) ? `計算地点：北緯 ${position.lat.toFixed(6)} / 東経 ${position.lon.toFixed(6)}。` : '計算地点は未指定です。'}1地点の地形・発電量は筆全体を代表するとは限りません。面積から設備容量・発電量は自動確定していません。</p>
         <h3>出典・保存範囲</h3>
-        <p>{pages.length ? '地番・所在地・出典ファイル・読込日時は次ページ以降の選択筆一覧に記載します。' : '選択された原資料の筆はありません。検討・除外範囲は利用者による作図です。'}原資料の境界・基準日・座標系は原本で確認してください。GEONEXでの外部確認結果は自動取得していません。</p>
+        <p>{pages.length ? '地番・所在地・出典ファイル・読込日時は次ページ以降の選択筆一覧に記載します。' : '選択された原資料の筆はありません。検討・除外範囲は利用者による作図です。'}原資料の境界・基準日・座標系は原本で確認してください。</p>
       </div>
     </ParcelReportPage>
     {pages.map((entries, pageIndex) => <ParcelReportPage key={`parcel-list-${pageIndex}`} page={startPage + 1 + pageIndex} title="選択筆一覧・出典" subtitle={`一覧 ${pageIndex + 1} / ${pages.length} · 全 ${(review.parcels || []).length}筆`} list>

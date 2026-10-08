@@ -46,7 +46,9 @@ for deployment evidence, rather than assuming package.json is the live version.
 - Review geometry is an approximate map measurement. Reference parcels do not add
   area. Do not derive installable kW, ownership, connection approval, or investment
   returns automatically from parcel area or nearby public equipment.
-- Preserve schema 1 record loading; schema 2 additionally stores selected parcel
-  geometry, roles, review boundary and exclusions. Imported strings remain plain text.
+- Preserve schema 1/2 record loading. Schema 3 additionally stores acquired terrain
+  area elevations, sources and acquisition time, then recalculates derived statistics
+  when opened. Geometry, roles, boundaries and exclusions must remain consistent.
+  Imported strings remain plain text.
 
 These project defaults do not replace the user's current task instructions.

@@ -9,6 +9,7 @@ import GenerationResults from './GenerationResults.jsx'
 import ParcelReviewReport, { parcelReviewReportPageCount } from './ParcelReviewReport.jsx'
 import './generation-report.css'
 import TerrainSectionPreview from './TerrainSectionPreview.jsx'
+import { normalizeReportTerrainSection, reportTerrainMapLayout, summarizeDemSources } from '../utils/reportTerrain.js'
 
 const MONTHS = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月']
 
@@ -53,8 +54,17 @@ function ReportPage({ page, title, subtitle, children, className = '' }) {
 }
 
 function demReliabilityLabel(source = '') {
-  if (/DEM5|5A|5B|5C|レーザ|航空レーザ/.test(source)) {
-    return { level: 'high', label: '◎ レーザ測量5m相当', note: '地形断面・地平線の概算に比較的使いやすい標高ソースです。' }
+  if (/DEM1A|1A/.test(source)) {
+    return { level: 'high', label: '1m級 DEM1A', note: '国土地理院の標高モデル。取得間隔と原資料の解像度は異なります。' }
+  }
+  if (/DEM5B|DEM5C|5B|5C/.test(source)) {
+    return { level: 'medium', label: '5m級 写真測量', note: 'DEM5B・5Cは写真測量由来の標高モデルです。現況との違いを確認してください。' }
+  }
+  if (/DEM5A|5A|レーザ|航空レーザ/.test(source)) {
+    return { level: 'high', label: '5m級 DEM5A', note: '航空レーザ測量由来の標高モデル。造成後の現況を保証するものではありません。' }
+  }
+  if (/DEM5/.test(source)) {
+    return { level: 'medium', label: '5m級 DEM（種類未確認）', note: '標高モデルの種類と現況を確認してください。' }
   }
   if (/DEM10|10m|DEM標高タイル|基盤地図情報/.test(source)) {
     return { level: 'medium', label: '△ 10mメッシュ相当', note: '山林・急傾斜地では断面・地平線を参考値として扱ってください。' }
@@ -82,17 +92,8 @@ function collectDemSources(report) {
 }
 
 function demSourceSummary(report) {
-  const sources = collectDemSources(report)
-  const total = sources.length
-  const dem5 = sources.filter((source) => /DEM5|5A|5B|5C|レーザ|航空レーザ/.test(source)).length
-  const dem10 = sources.filter((source) => /DEM10|10m|DEM標高タイル|基盤地図情報/.test(source)).length
-  const unknown = Math.max(0, total - dem5 - dem10)
   const primary = demReliabilityLabel(report.elevationSource)
-  const detail = total
-    ? `DEM5系 ${dem5}点 / DEM10系 ${dem10}点${unknown ? ` / その他 ${unknown}点` : ''}`
-    : '地平線・断面を再分析するとDEM内訳を表示できます。'
-  const shouldWarn = total > 0 && dem10 / total >= 0.5
-  return { ...primary, total, dem5, dem10, unknown, detail, shouldWarn }
+  return { ...primary, ...summarizeDemSources(collectDemSources(report)) }
 }
 
 function SnowCompactTable({ station, snowBase }) {
@@ -157,79 +158,6 @@ function lineAverageText(line) {
   const slope = line?.summary?.averageSlopePercent
   if (!Number.isFinite(slope)) return '平均角 —'
   return `平均角${((Math.atan(Math.abs(slope) / 100) * 180) / Math.PI).toFixed(1)}°`
-}
-
-function summarizeTerrainPoints(points) {
-  const valid = (points || []).filter((point) => Number.isFinite(point.elevation))
-  if (valid.length < 2) {
-    return {
-      minElevation: valid[0]?.elevation ?? null,
-      maxElevation: valid[0]?.elevation ?? null,
-      elevationDiff: 0,
-      totalRise: 0,
-      totalFall: 0,
-      averageSlopePercent: 0,
-      maxSlopePercent: 0,
-    }
-  }
-
-  let totalRise = 0
-  let totalFall = 0
-  let maxSlopePercent = 0
-  for (let index = 1; index < valid.length; index += 1) {
-    const previous = valid[index - 1]
-    const current = valid[index]
-    const distance = Math.abs(current.distance - previous.distance)
-    if (!distance) continue
-    const diff = current.elevation - previous.elevation
-    if (diff >= 0) totalRise += diff
-    else totalFall += Math.abs(diff)
-    maxSlopePercent = Math.max(maxSlopePercent, Math.abs(diff / distance) * 100)
-  }
-
-  const first = valid[0]
-  const last = valid[valid.length - 1]
-  const horizontalDistance = Math.abs(last.distance - first.distance) || 1
-  const elevationDiff = last.elevation - first.elevation
-
-  return {
-    minElevation: Math.min(...valid.map((point) => point.elevation)),
-    maxElevation: Math.max(...valid.map((point) => point.elevation)),
-    elevationDiff,
-    totalRise,
-    totalFall,
-    averageSlopePercent: Math.abs(elevationDiff / horizontalDistance) * 100,
-    maxSlopePercent,
-  }
-}
-
-function normalizeReportTerrainSection(analysis) {
-  if (!analysis?.lines?.length) return null
-  const reportRange = Math.min(Math.max(analysis.rangeMeters || 100, 50), 100)
-  const lines = analysis.lines.map((line) => {
-    const points = (line.points || []).filter((point) => Math.abs(point.distance) <= reportRange)
-    return {
-      ...line,
-      rangeMeters: reportRange,
-      points,
-      summary: summarizeTerrainPoints(points),
-    }
-  })
-  const allElevations = lines
-    .flatMap((line) => line.points || [])
-    .map((point) => point.elevation)
-    .filter(Number.isFinite)
-
-  return {
-    ...analysis,
-    rangeMeters: reportRange,
-    lines,
-    summary: {
-      minElevation: allElevations.length ? Math.min(...allElevations) : null,
-      maxElevation: allElevations.length ? Math.max(...allElevations) : null,
-      sampleCount: allElevations.length,
-    },
-  }
 }
 
 function axisLineLabel(line, fallback) {
@@ -310,13 +238,14 @@ function ReportTerrainMapPreview({ analysis, position }) {
   const range = analysis?.rangeMeters || 100
   const eastWestLine = (analysis?.lines || []).find((line) => /東西/.test(line.label || '') || line.positiveDirection === '東' || line.negativeDirection === '西')
   const northSouthLine = (analysis?.lines || []).find((line) => /南北/.test(line.label || '') || line.positiveDirection === '北' || line.negativeDirection === '南')
-  const tileLayout = buildGsiAerialTileLayout(position)
+  const mapMetrics = reportTerrainMapLayout(position, range)
+  const tileLayout = mapMetrics ? buildGsiAerialTileLayout(position, mapMetrics.zoom, { width: mapMetrics.width, height: mapMetrics.height }) : null
   const cx = tileLayout?.cx || 380
   const cy = tileLayout?.cy || 250
   const viewWidth = tileLayout?.width || 900
-  const rangePx = tileLayout ? Math.min(240, Math.max(42, range / tileLayout.metersPerPixel)) : 110
-  const innerPx = tileLayout ? Math.min(rangePx * 0.78, Math.max(36, 50 / tileLayout.metersPerPixel)) : 48
-  const scalePx = tileLayout ? Math.max(90, Math.min(240, 100 / tileLayout.metersPerPixel)) : 180
+  const rangePx = mapMetrics?.rangePx || 0
+  const innerPx = mapMetrics?.innerPx || 0
+  const scalePx = mapMetrics?.scalePx || 0
   const viewHeight = tileLayout?.height || 500
   const scaleY = viewHeight - 30
   const scaleLabelY = scaleY - 10
@@ -353,8 +282,9 @@ function ReportTerrainMapPreview({ analysis, position }) {
           <text x={viewWidth / 2} y="126" className="report-map-preview__fallback" textAnchor="middle">地点選択後に航空写真を表示します</text>
         )}
         <rect x="0" y="0" width={viewWidth} height={viewHeight} rx="16" fill="rgba(0,0,0,.06)" />
+        {tileLayout && <>
         <rect x={cx - rangePx} y={cy - rangePx} width={rangePx * 2} height={rangePx * 2} fill="rgba(25, 136, 102, .15)" stroke="#0f8367" strokeWidth="2.2" strokeDasharray="8 6" />
-        <rect x={cx - innerPx} y={cy - innerPx} width={innerPx * 2} height={innerPx * 2} fill="rgba(255, 255, 255, .06)" stroke="rgba(255,255,255,.92)" strokeWidth="2" strokeDasharray="8 6" />
+        {range > 50 && <rect x={cx - innerPx} y={cy - innerPx} width={innerPx * 2} height={innerPx * 2} fill="rgba(255, 255, 255, .06)" stroke="rgba(255,255,255,.92)" strokeWidth="2" strokeDasharray="8 6" />}
         <line x1={cx - rangePx} y1={cy} x2={cx + rangePx} y2={cy} stroke="#d84c3c" strokeWidth="4" strokeLinecap="round" />
         <line x1={cx} y1={cy - rangePx} x2={cx} y2={cy + rangePx} stroke="#d84c3c" strokeWidth="4" strokeLinecap="round" />
         <g opacity="0.5">
@@ -366,13 +296,14 @@ function ReportTerrainMapPreview({ analysis, position }) {
         <text x={Math.max(28, cx - rangePx - 14)} y={cy + 5} className="report-map-preview__dir" textAnchor="end">西</text>
         <text x={Math.min(viewWidth - 28, cx + rangePx + 14)} y={cy + 5} className="report-map-preview__dir" textAnchor="start">東</text>
         <text x={Math.max(34, cx - rangePx + 18)} y={Math.max(28, cy - rangePx + 32)} className="report-map-preview__tag">周辺{range}m確認範囲</text>
-        <text x={cx + innerPx + 8} y={cy - innerPx + 22} className="report-map-preview__tag">50m確認線</text>
+        {range > 50 && <text x={cx + innerPx + 8} y={cy - innerPx + 22} className="report-map-preview__tag">50m確認線</text>}
         <text x={Math.min(viewWidth - 180, cx + rangePx + 12)} y={cy + 5} className="report-map-preview__callout">東西 {axisLineLabel(eastWestLine, '西↔東')} / {lineAverageText(eastWestLine)}</text>
         <text x={cx - 38} y={Math.max(34, cy - rangePx - 18)} className="report-map-preview__callout report-map-preview__callout--dark">南北 {axisLineLabel(northSouthLine, '南↔北')} / {lineAverageText(northSouthLine)}</text>
         <line x1="30" y1={scaleY} x2={30 + scalePx} y2={scaleY} stroke="#ffffff" strokeWidth="7" strokeLinecap="round" />
         <line x1="30" y1={scaleY} x2={30 + scalePx} y2={scaleY} stroke="#0d5f4f" strokeWidth="3" strokeLinecap="round" />
         <text x={30 + scalePx / 2} y={scaleLabelY} className="report-map-preview__scale" textAnchor="middle">100 m</text>
         <text x={viewWidth - 18} y={creditY} className="report-map-preview__credit" textAnchor="end">国土地理院 全国最新写真（シームレス）</text>
+        </>}
       </svg>
       <p>
         実際の航空写真に、候補地点・確認範囲・東西/南北断面方向を重ねて表示しています。
