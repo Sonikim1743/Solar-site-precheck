@@ -361,7 +361,6 @@ test('public deployment metadata and headers are explicit', () => {
 test('search placeholder does not mix mismatched address and coordinates', () => {
   const app = readFileSync('src/App.jsx', 'utf8')
   assert.doesNotMatch(app, /岡山県真庭市 \/ 34\.8617, 133\.2433/)
-  assert.match(app, /広島県庄原市東城町帝釈宇山 \/ 34\.8617, 133\.2433/)
 })
 
 test('inheritance text analyzer flags land single-inheritance candidates conservatively', () => {

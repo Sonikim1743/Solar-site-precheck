@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import GridEquipmentDetails from './GridEquipmentDetails.jsx'
+import TerrainAreaMapOverlay from './TerrainAreaMapOverlay.jsx'
 import L from 'leaflet'
 import { Circle, CircleMarker, GeoJSON, LayersControl, MapContainer, Marker, Polygon, Polyline, Popup, Rectangle, ScaleControl, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet'
 import { parcelInfo } from '../services/cadastre.js'
@@ -18,8 +19,8 @@ const PARCEL_MODE_HINTS = {
   point: '地図をクリックして計算地点を指定',
   target: '筆をクリックして対象に追加・変更',
   reference: '筆をクリックして参考に追加・変更',
-  boundary: '検討範囲の角を順に指定し「確定」',
-  exclusion: '除外範囲の角を順に指定し「確定」',
+  boundary: '角を順に指定 · 開始点を押すと完成',
+  exclusion: '除外する角を順に指定 · 開始点を押すと完成',
 }
 
 const markerIcon = L.divIcon({
@@ -203,7 +204,15 @@ function lineLabelPoint(line) {
   }
 }
 
-function TerrainSectionMapOverlay({ analysis }) {
+function DrawingContextTooltip({ dimmed = false, ...props }) {
+  const tooltipRef = useRef(null)
+  // Tooltip opacity is an initial Leaflet option, not a mutable React-Leaflet prop.
+  useEffect(() => { tooltipRef.current?.setOpacity(dimmed ? 0.18 : 0.9) }, [dimmed])
+  return <Tooltip {...props} ref={tooltipRef} opacity={dimmed ? 0.18 : 0.9} />
+}
+
+function TerrainSectionMapOverlay({ analysis, dimmed = false }) {
+  const opacity = dimmed ? 0.2 : 1
   const lines = analysis?.lines || []
   const eastWest = lines.find((line) => line.label === '東西断面')
   const northSouth = lines.find((line) => line.label === '南北断面')
@@ -247,7 +256,8 @@ function TerrainSectionMapOverlay({ analysis }) {
           weight: 2,
           dashArray: '6 5',
           fillColor: '#24a36f',
-          fillOpacity: 0.13,
+          fillOpacity: 0.13 * opacity,
+          opacity,
         }}
       />
       <CircleMarker
@@ -255,9 +265,9 @@ function TerrainSectionMapOverlay({ analysis }) {
         radius={0}
         pathOptions={{ opacity: 0, fillOpacity: 0 }}
       >
-        <Tooltip permanent direction="right" className="terrain-range-tooltip">
+        <DrawingContextTooltip dimmed={dimmed} permanent direction="right" className="terrain-range-tooltip">
           周辺{rangeMeters}m確認範囲
-        </Tooltip>
+        </DrawingContextTooltip>
       </CircleMarker>
       {innerBounds && (
         <>
@@ -268,7 +278,7 @@ function TerrainSectionMapOverlay({ analysis }) {
               weight: 1.8,
               dashArray: '4 4',
               fillOpacity: 0,
-              opacity: 0.9,
+              opacity: 0.9 * opacity,
             }}
           />
           <CircleMarker
@@ -276,9 +286,9 @@ function TerrainSectionMapOverlay({ analysis }) {
             radius={0}
             pathOptions={{ opacity: 0, fillOpacity: 0 }}
           >
-            <Tooltip permanent direction="top" className="terrain-range-tooltip terrain-range-tooltip--inner">
+            <DrawingContextTooltip dimmed={dimmed} permanent direction="top" className="terrain-range-tooltip terrain-range-tooltip--inner">
               50m確認線
-            </Tooltip>
+            </DrawingContextTooltip>
           </CircleMarker>
         </>
       )}
@@ -297,14 +307,14 @@ function TerrainSectionMapOverlay({ analysis }) {
               pathOptions={{
                 color: terrainLineColor(line),
                 weight: 4,
-                opacity: 0.92,
+                opacity: 0.92 * opacity,
               }}
             />
             {Number.isFinite(center?.lat) && Number.isFinite(center?.lon) && (
               <CircleMarker
                 center={[center.lat, center.lon]}
                 radius={4}
-                pathOptions={{ color: '#ffffff', weight: 2, fillColor: '#0c7b5e', fillOpacity: 1 }}
+                pathOptions={{ color: '#ffffff', weight: 2, fillColor: '#0c7b5e', fillOpacity: opacity, opacity }}
               />
             )}
             {Number.isFinite(label.point?.lat) && Number.isFinite(label.point?.lon) && (
@@ -313,20 +323,20 @@ function TerrainSectionMapOverlay({ analysis }) {
                 radius={0}
                 pathOptions={{ opacity: 0, fillOpacity: 0 }}
               >
-                <Tooltip permanent direction={label.direction} className="terrain-section-tooltip">
+                <DrawingContextTooltip dimmed={dimmed} permanent direction={label.direction} className="terrain-section-tooltip">
                   {line.label.replace('断面', '')} {terrainLineNote(line)}
-                </Tooltip>
+                </DrawingContextTooltip>
               </CircleMarker>
             )}
             {Number.isFinite(endpoint?.lat) && Number.isFinite(endpoint?.lon) && (
               <CircleMarker
                 center={[endpoint.lat, endpoint.lon]}
                 radius={5}
-                pathOptions={{ color: '#ffffff', weight: 2, fillColor: terrainLineColor(line), fillOpacity: 1 }}
+                pathOptions={{ color: '#ffffff', weight: 2, fillColor: terrainLineColor(line), fillOpacity: opacity, opacity }}
               >
-                <Tooltip direction="top" className="terrain-section-tooltip">
+                <DrawingContextTooltip dimmed={dimmed} direction="top" className="terrain-section-tooltip">
                   {line.positiveDirection || ''}側 {rangeMeters}m
-                </Tooltip>
+                </DrawingContextTooltip>
               </CircleMarker>
             )}
           </Fragment>
@@ -442,10 +452,14 @@ export function PowerGridOverlay({ data, capacityMatches, onEquipmentSelect, sho
   )
 }
 
-function parcelPathStyle(role, selected) {
-  if (role === 'target') return { color: '#f0b429', weight: 3.5, fillColor: '#f0b429', fillOpacity: 0.22, dashArray: null }
-  if (role === 'reference') return { color: '#83c6ff', weight: 3, fillColor: '#5ca9e8', fillOpacity: 0.12, dashArray: '7 4' }
-  return { color: selected ? '#f5b940' : '#f8f1a7', weight: selected ? 4 : 1.5, fillColor: selected ? '#f5b940' : '#e8ef67', fillOpacity: selected ? 0.28 : 0.08, dashArray: null }
+function parcelPathStyle(role, selected, dimmed = false) {
+  const style = role === 'target'
+    ? { color: '#f0b429', weight: 3.5, fillColor: '#f0b429', fillOpacity: 0.22, dashArray: null }
+    : role === 'reference'
+      ? { color: '#83c6ff', weight: 3, fillColor: '#5ca9e8', fillOpacity: 0.12, dashArray: '7 4' }
+      : { color: selected ? '#f5b940' : '#f8f1a7', weight: selected ? 4 : 1.5, fillColor: selected ? '#f5b940' : '#e8ef67', fillOpacity: selected ? 0.28 : 0.08, dashArray: null }
+  const opacity = dimmed ? 0.2 : 1
+  return { ...style, opacity, fillOpacity: style.fillOpacity * opacity }
 }
 
 function parcelTooltipContent(info, role) {
@@ -477,7 +491,7 @@ function restoredParcelFeature(entry) {
   }
 }
 
-function ParcelLayer({ data, review, selectedParcelId, focusParcelId, onParcelSelect, mode, locked, onDrawingPoint, onDrawingFinish, onError }) {
+function ParcelLayer({ data, review, selectedParcelId, focusParcelId, onParcelSelect, mode, locked, onDrawingPoint, onDrawingFinish, onError, dimmed = false }) {
   const map = useMap()
   const layerRef = useRef(null)
   const previousDataRef = useRef(undefined)
@@ -486,7 +500,7 @@ function ParcelLayer({ data, review, selectedParcelId, focusParcelId, onParcelSe
   const entries = review?.parcels || []
   const roleById = useMemo(() => new Map(entries.map((entry) => [entry.id, entry.role])), [entries])
   const latestRef = useRef(null)
-  latestRef.current = { onParcelSelect, mode, locked, onDrawingPoint, onDrawingFinish, onError, roleById, sourceName, selectedParcelId }
+  latestRef.current = { onParcelSelect, mode, locked, onDrawingPoint, onDrawingFinish, onError, roleById, sourceName, selectedParcelId, dimmed }
   const combinedData = useMemo(() => {
     // Review metadata belongs to restored entries, never to imported properties.
     const features = (data?.features || []).map((feature) => {
@@ -517,10 +531,11 @@ function ParcelLayer({ data, review, selectedParcelId, focusParcelId, onParcelSe
       const info = parcelInfo(layer.feature)
       const id = layer.feature.properties?.__parcelReviewId || displayParcelKey(layer.feature, sourceName)
       const role = roleById.get(id)
-      layer.setStyle(parcelPathStyle(role, info.id === selectedParcelId))
+      layer.setStyle(parcelPathStyle(role, info.id === selectedParcelId, dimmed))
       layer.setTooltipContent(parcelTooltipContent(info, role))
+      layer.getTooltip()?.setOpacity(dimmed ? 0.18 : 0.9)
     })
-  }, [combinedData, roleById, sourceName, selectedParcelId])
+  }, [combinedData, roleById, sourceName, selectedParcelId, dimmed])
 
   useEffect(() => {
     if (!focusParcelId) return
@@ -543,14 +558,19 @@ function ParcelLayer({ data, review, selectedParcelId, focusParcelId, onParcelSe
     <GeoJSON
       ref={layerRef}
       data={EMPTY_FEATURE_COLLECTION}
-      style={{ color: '#f8f1a7', weight: 1.5, fillColor: '#e8ef67', fillOpacity: 0.08 }}
+      style={feature => {
+        const state = latestRef.current
+        const info = parcelInfo(feature)
+        const id = feature.properties?.__parcelReviewId || displayParcelKey(feature, state.sourceName)
+        return parcelPathStyle(state.roleById.get(id), info.id === state.selectedParcelId, state.dimmed)
+      }}
       bubblingMouseEvents={false}
       onEachFeature={(feature, layer) => {
         const info = parcelInfo(feature)
         const state = latestRef.current
         const id = feature.properties?.__parcelReviewId || displayParcelKey(feature, state.sourceName)
-        layer.setStyle(parcelPathStyle(state.roleById.get(id), info.id === state.selectedParcelId))
-        layer.bindTooltip(parcelTooltipContent(info, state.roleById.get(id)), { sticky: true, direction: 'top', className: 'parcel-tooltip' })
+        layer.setStyle(parcelPathStyle(state.roleById.get(id), info.id === state.selectedParcelId, state.dimmed))
+        layer.bindTooltip(parcelTooltipContent(info, state.roleById.get(id)), { sticky: true, direction: 'top', className: 'parcel-tooltip', opacity: state.dimmed ? 0.18 : 0.9 })
         layer.on('click', (event) => {
           const current = latestRef.current
           if (current.locked) return
@@ -576,20 +596,29 @@ function ParcelLayer({ data, review, selectedParcelId, focusParcelId, onParcelSe
   )
 }
 
-function ReviewGeometryLayers({ review, vertices }) {
+function ReviewGeometryLayers({ review, vertices, onClose, locked = false, dimmed = false }) {
   const boundary = review?.boundary
+  const opacity = dimmed ? 0.2 : 1
   return <>
-    {boundary && <GeoJSON key={`boundary-${JSON.stringify(boundary)}`} data={boundary} interactive={false} style={{ color: '#ffffff', weight: 3.5, fillColor: '#27b890', fillOpacity: 0.12 }}>
-      <Tooltip permanent direction="center" className="parcel-tooltip">検討範囲</Tooltip>
+    {boundary && <GeoJSON key={`boundary-${JSON.stringify(boundary)}`} data={boundary} interactive={false} style={{ color: '#ffffff', weight: 3.5, fillColor: '#27b890', fillOpacity: 0.12 * opacity, opacity }}>
+      <DrawingContextTooltip dimmed={dimmed} permanent direction="center" className="parcel-tooltip">検討範囲</DrawingContextTooltip>
     </GeoJSON>}
-    {(review?.exclusions || []).map((geometry, index) => <GeoJSON key={`exclusion-${index}-${JSON.stringify(geometry)}`} data={geometry} interactive={false} style={{ color: '#fb8686', weight: 3, dashArray: '6 4', fillColor: '#e75757', fillOpacity: 0.28 }}>
-      <Tooltip permanent direction="center" className="parcel-tooltip">除外範囲 {index + 1}</Tooltip>
+    {(review?.exclusions || []).map((geometry, index) => <GeoJSON key={`exclusion-${index}-${JSON.stringify(geometry)}`} data={geometry} interactive={false} style={{ color: '#fb8686', weight: 3, dashArray: '6 4', fillColor: '#e75757', fillOpacity: 0.28 * opacity, opacity }}>
+      <DrawingContextTooltip dimmed={dimmed} permanent direction="center" className="parcel-tooltip">除外範囲 {index + 1}</DrawingContextTooltip>
     </GeoJSON>)}
     {vertices.length > 2 && <Polygon positions={vertices} interactive={false} pathOptions={{ color: '#ffffff', weight: 2, dashArray: '5 4', fillColor: '#32d1ae', fillOpacity: 0.2 }} />}
     {vertices.length === 2 && <Polyline positions={vertices} interactive={false} pathOptions={{ color: '#ffffff', weight: 3, dashArray: '5 4' }} />}
-    {vertices.map((point, index) => <CircleMarker key={`${index}-${point[0]}-${point[1]}`} center={point} radius={5} interactive={false} pathOptions={{ color: '#183d35', fillColor: '#ffffff', fillOpacity: 1, weight: 2 }}>
-      <Tooltip permanent direction="top" className="parcel-draft-tooltip">{index + 1}</Tooltip>
-    </CircleMarker>)}
+    {vertices.map((point, index) => <Fragment key={`${index}-${point[0]}-${point[1]}`}>
+      {index === 0 && <CircleMarker center={point} radius={22} interactive={!locked} bubblingMouseEvents={false} pathOptions={{ stroke: false, fillColor: '#ffffff', fillOpacity: 0.12 }} eventHandlers={{ click: event => {
+        if (event.originalEvent) L.DomEvent.stop(event.originalEvent)
+        if (!locked) onClose?.()
+      } }}>
+        <Tooltip permanent direction="top" className="parcel-draft-tooltip">{vertices.length >= 3 ? '開始点 · 押して閉じる' : '開始点（3点以上で閉じる）'}</Tooltip>
+      </CircleMarker>}
+      <CircleMarker center={point} radius={index === 0 ? 7 : 5} interactive={false} pathOptions={{ color: '#183d35', fillColor: index === 0 ? '#ffe073' : '#ffffff', fillOpacity: 1, weight: 2 }}>
+        {index > 0 && <Tooltip permanent direction="top" className="parcel-draft-tooltip">{index + 1}</Tooltip>}
+      </CircleMarker>
+    </Fragment>)}
   </>
 }
 
@@ -597,6 +626,7 @@ export default function MapPanel({
   position,
   onSelect,
   onUseCurrentLocation,
+  onResetWorkspace,
   currentLocation,
   locationStatus,
   placeInfo,
@@ -610,19 +640,29 @@ export default function MapPanel({
   onParcelDrawingError,
   onParcelModeChange,
   terrainSection,
+  terrainArea,
   powerGrid,
   capacityMatches,
   googleMapsUrl,
 }) {
   const hasTerrainOverlay = !!terrainSection?.lines?.length
+  const [showTerrainArea, setShowTerrainArea] = useState(true)
+  useEffect(() => setShowTerrainArea(true), [terrainArea?.geometryKey, terrainArea?.fetchedAt])
   const [isCompactMap, setIsCompactMap] = useState(false)
   const [mapInteractionEnabled, setMapInteractionEnabled] = useState(false)
   const [draftVertices, setDraftVertices] = useState([])
   const draftRef = useRef([])
+  const mapShellRef = useRef(null)
   const lastVertexEventRef = useRef(null)
   const [drawingMessage, setDrawingMessage] = useState('')
   const mapLocked = isCompactMap && !mapInteractionEnabled
   const isDrawing = parcelMode === 'boundary' || parcelMode === 'exclusion'
+
+  useEffect(() => {
+    if (!isDrawing) return
+    const reduceMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    mapShellRef.current?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' })
+  }, [parcelMode, isDrawing])
 
   function replaceDraft(vertices) {
     draftRef.current = vertices
@@ -696,7 +736,7 @@ export default function MapPanel({
 
   return (
     <>
-    <div className={`map-shell${isDrawing ? ' map-shell--parcel-drawing' : ''}`} onKeyDown={(event) => {
+    <div ref={mapShellRef} className={`map-shell${isDrawing ? ' map-shell--parcel-drawing' : ''}`} onKeyDown={(event) => {
       if (!isDrawing || event.target.closest?.('input, textarea, select, button, a')) return
       if (event.key === 'Escape') { event.preventDefault(); cancelDrawing() }
       if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); finishDrawing() }
@@ -738,14 +778,20 @@ export default function MapPanel({
           onDrawingPoint={addDraftVertex}
           onDrawingFinish={finishDrawing}
           onError={reportDrawingError}
+          dimmed={isDrawing}
         />
         <PowerGridOverlay data={powerGrid} capacityMatches={capacityMatches} />
         <CurrentLocationLayer currentLocation={currentLocation} />
-        <TerrainSectionMapOverlay analysis={terrainSection} />
-        <SiteMarker position={position} placeInfo={placeInfo} suppressPopup={hasTerrainOverlay || parcelMode !== 'point'} />
-        <ReviewGeometryLayers review={parcelReview} vertices={draftVertices} />
+        <TerrainSectionMapOverlay analysis={terrainSection} dimmed={isDrawing} />
+        {terrainArea && showTerrainArea && <TerrainAreaMapOverlay analysis={terrainArea} dimmed={isDrawing} />}
+        <SiteMarker position={position} placeInfo={placeInfo} suppressPopup={hasTerrainOverlay || (terrainArea && showTerrainArea) || parcelMode !== 'point'} />
+        <ReviewGeometryLayers review={parcelReview} vertices={draftVertices} onClose={finishDrawing} locked={mapLocked} dimmed={isDrawing} />
       </MapContainer>
-      <div className="map-hint">{PARCEL_MODE_HINTS[parcelMode] || PARCEL_MODE_HINTS.point}</div>
+      <div className="map-draw-controls" role="group" aria-label="地図に範囲を描く">
+        <button type="button" className={parcelMode === 'boundary' ? 'is-active' : ''} aria-pressed={parcelMode === 'boundary'} onClick={() => onParcelModeChange?.(parcelMode === 'boundary' ? 'point' : 'boundary')} disabled={!onParcelModeChange}>範囲を描く</button>
+        <button type="button" className={parcelMode === 'exclusion' ? 'is-active' : ''} aria-pressed={parcelMode === 'exclusion'} onClick={() => onParcelModeChange?.(parcelMode === 'exclusion' ? 'point' : 'exclusion')} disabled={!onParcelModeChange}>除外</button>
+      </div>
+      {isDrawing && <div className="map-hint">{PARCEL_MODE_HINTS[parcelMode]}</div>}
       {googleMapsUrl && (
         <a className="map-google-open" href={googleMapsUrl} target="_blank" rel="noreferrer">
           Googleマップで開く
@@ -762,9 +808,12 @@ export default function MapPanel({
         </button>
       )}
       <div className="map-location-control">
+        <div className="map-location-buttons">
         <button type="button" onClick={onUseCurrentLocation} disabled={locationStatus?.status === 'loading'}>
           {locationStatus?.status === 'loading' ? '現在地を取得中…' : '◎ 現在地を取得'}
         </button>
+        {onResetWorkspace && <button type="button" className="map-reset-button" title="候補地・入力・計算結果を初期化" onClick={onResetWorkspace}>初期化</button>}
+        </div>
         {locationStatus?.message && (
           <small className={locationStatus.status === 'error' ? 'is-error' : ''}>{locationStatus.message}</small>
         )}
@@ -774,7 +823,7 @@ export default function MapPanel({
     {isDrawing && <div className="parcel-drawing-toolbar" aria-label="範囲の作図操作">
       <div className="parcel-drawing-toolbar__instruction">
         <strong>{parcelMode === 'boundary' ? '検討範囲' : '除外範囲'}を作図</strong>
-        <span aria-live="polite">{draftVertices.length}点を指定 · 3点以上で確定</span>
+        <span aria-live="polite">{draftVertices.length}点を指定 · 3点以上で開始点を押して閉じる</span>
         {mapLocked && <small>先に「地図操作を有効化」を押してください。</small>}
       </div>
       <div className="parcel-drawing-toolbar__buttons">
@@ -782,9 +831,10 @@ export default function MapPanel({
         <button type="button" onClick={cancelDrawing}>取消</button>
         <button type="button" className="parcel-button--primary" onClick={finishDrawing} disabled={draftVertices.length < 3 || mapLocked || !onReviewGeometry}>確定</button>
       </div>
-      <small>角を順にタップしてください。最後は「確定」。パソコンではダブルクリックでも確定できます。</small>
+      <small>角を順に指定し、開始点をもう一度押すと完成します。「確定」でも完成できます。</small>
     </div>}
     {drawingMessage && <p className="parcel-review-message parcel-review-message--error" role="alert">{drawingMessage}</p>}
+    {terrainArea && <div className="terrain-map-legend" aria-label="検討範囲の勾配凡例"><button type="button" aria-pressed={showTerrainArea} onClick={() => setShowTerrainArea(value => !value)}>{showTerrainArea ? '等高線・勾配 ON' : '等高線・勾配 OFF'}</button>{showTerrainArea && <><span><i style={{ background: '#cfe3cd' }} />10°未満</span><span><i style={{ background: '#efe8ad' }} />10–20°</span><span><i style={{ background: '#eabd8d' }} />20–30°</span><span><i style={{ background: '#df9d9b' }} />30°以上</span><span><i style={{ background: '#b5bcb5' }} />勾配未確認</span><small>黄色線：分析した参考範囲 / 色は施工可否を示しません</small></>}</div>}
     {!!(parcelReview?.parcels?.length || parcelReview?.boundary || parcelReview?.exclusions?.length) && <div className="parcel-map-legend" aria-label="地図の凡例">
       <span><i className="parcel-map-legend__target" />対象</span><span><i className="parcel-map-legend__reference" />参考</span><span><i className="parcel-map-legend__boundary" />検討範囲</span><span><i className="parcel-map-legend__exclusion" />除外</span>
     </div>}

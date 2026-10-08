@@ -1,0 +1,167 @@
+.terrain-area-panel { min-width:0; color:var(--ink,#193e35); }
+.terrain-area-heading { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:14px; }
+.terrain-area-heading h3 { margin:0 0 4px; font-size:17px; }
+.terrain-area-heading p,.terrain-area-scope,.terrain-area-condition { margin:0; color:var(--muted,#64786f); font-size:12px; line-height:1.65; }
+.terrain-area-heading button { flex-shrink:0; }
+.terrain-area-empty { padding:18px; background:#f5f8f4; border-radius:8px; color:#64786f; font-size:13px; line-height:1.7; }
+.terrain-area-empty p { margin:0 0 12px; }
+.terrain-area-progress { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:16px; background:#f3f8f3; border-radius:8px; }
+.terrain-area-progress>div { display:grid; gap:5px; }
+.terrain-area-progress strong { font-size:14px; }
+.terrain-area-progress span { color:#64786f; font-size:12px; }
+.terrain-area-warning { margin:12px 0; padding:10px 13px; background:#fff7e9; border:1px solid #ead7b0; border-radius:6px; color:#785922; font-size:12px; line-height:1.6; overflow-wrap:anywhere; }
+.terrain-area-warning p { margin:0 0 8px; }
+.terrain-area-view-row { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:0 0 12px; }
+.terrain-area-view-row>span { color:#64786f; font-size:11px; }
+.terrain-area-view-switch { display:inline-flex; gap:3px; padding:3px; border:1px solid #d4dfd5; border-radius:8px; background:#f7f9f5; }
+.terrain-area-view-switch button { min-height:38px; padding:7px 18px; border:0; border-radius:5px; background:transparent; color:#476653; font-size:13px; font-weight:600; }
+.terrain-area-view-switch button.is-active { background:#17664f; color:#fff; }
+.terrain-area-figure { width:100%; min-width:0; margin:0; }
+.terrain-area-figure svg { display:block; width:100%; height:auto; overflow:visible; border-radius:8px; }
+.terrain-area-figure figcaption { margin:7px 0 0; color:#64786f; font-size:11px; line-height:1.6; }
+.terrain-area-model { position:relative; background:#fbfcfa; border-radius:8px; }
+.terrain-area-figure--interactive .terrain-area-model { max-width:800px; margin-inline:auto; }
+.terrain-area-model>svg { position:relative; }
+.terrain-area-surface { position:absolute; inset:0; width:100%; height:100%; border-radius:8px; pointer-events:none; }
+.terrain-area-drag-target { cursor:grab; touch-action:none; }
+.terrain-area-drag-target:active { cursor:grabbing; }
+.terrain-area-figure--interactive svg:focus-visible { outline:3px solid #4f9676; outline-offset:3px; }
+.terrain-area-rotation-controls { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:6px; }
+.terrain-area-rotation-controls p { margin:0; color:#64786f; font-size:11px; line-height:1.5; }
+.terrain-area-rotation-controls button { flex-shrink:0; }
+.terrain-area-rotation-controls { flex-wrap:wrap; }
+.terrain-area-camera-modes,.terrain-area-camera-zoom { display:inline-flex; align-items:center; gap:4px; }
+.terrain-area-camera-modes button,.terrain-area-camera-zoom button { min-height:38px; padding:7px 10px; border:1px solid #ccdcd1; border-radius:6px; background:#fff; color:#476653; font:inherit; font-size:14px; font-weight:600; cursor:pointer; }
+.terrain-area-camera-modes button[aria-pressed="true"] { border-color:#17664f; background:#edf6ef; color:#17664f; }
+.terrain-area-camera-zoom button { width:38px; padding:7px 0; font-size:18px; }
+.terrain-area-camera-zoom button:disabled { opacity:.4; cursor:default; }
+.terrain-area-camera-zoom span { min-width:35px; text-align:center; font-size:13px; color:#476653; }
+.terrain-area-rotation-controls p { flex:1 1 180px; }
+.terrain-area-figure svg text { font-family:Meiryo,"Noto Sans JP",system-ui,sans-serif; fill:#3d5646; font-size:13px; }
+.terrain-area-svg-legend text { font-size:14px; }
+.terrain-area-figure .terrain-area-svg-note { font-size:11px; fill:#617162; }
+.terrain-area-svg-scale path { fill:none; stroke:#354b3a; stroke-width:1.6; }
+.terrain-area-svg-scale text { font-size:12px; }
+.terrain-area-north path { fill:#354b3a; stroke:#354b3a; stroke-width:1.5; }
+.terrain-area-north text,.terrain-area-3d-cardinals text { font-size:15px; font-weight:700; paint-order:stroke; stroke:#fbfcfa; stroke-width:3px; }
+.terrain-area-contours path { fill:none; stroke:#8d7d66; }
+.terrain-area-contours text { font-size:11px; fill:#766956; paint-order:stroke; stroke:#fafbf7; stroke-width:3px; stroke-linejoin:round; }
+.terrain-area-selected-point text { font-size:12px; fill:#216a88; paint-order:stroke; stroke:#fff; stroke-width:3px; stroke-linejoin:round; }
+.terrain-area-extreme-label text { font-size:12px; fill:#546b5b; }
+.terrain-area-figure .terrain-area-svg-caption { font-size:15px; font-weight:600; }
+.terrain-area-3d-axis path { fill:none; stroke:#9ba99b; stroke-width:1; }
+.terrain-area-3d-axis text { font-size:11px; fill:#617162; paint-order:stroke; stroke:#fbfcfa; stroke-width:3px; }
+.terrain-area-summary { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; margin:18px 0 10px; padding-top:14px; border-top:1px solid #dce5da; }
+.terrain-area-summary>div { min-width:0; }
+.terrain-area-summary dt { margin:0 0 5px; color:#64786f; font-size:11px; }
+.terrain-area-summary dd { margin:0; font-size:17px; font-weight:600; line-height:1.5; overflow-wrap:anywhere; }
+.terrain-area-summary small { font-size:12px; font-weight:400; }
+.terrain-area-summary .terrain-area-summary-note { display:block; color:#64786f; font-size:10px; }
+.terrain-area-evidence { margin:13px 0 0; border-top:1px solid #e4eadf; padding-top:10px; }
+.terrain-area-evidence summary { cursor:pointer; font-size:12px; color:#456653; }
+.terrain-area-evidence dl { display:grid; gap:8px; margin:13px 0; font-size:12px; line-height:1.6; }
+.terrain-area-evidence dl>div { display:grid; grid-template-columns:90px minmax(0,1fr); gap:10px; }
+.terrain-area-evidence dt { color:#64786f; }
+.terrain-area-evidence dd { margin:0; overflow-wrap:anywhere; }
+.terrain-area-evidence ul { margin:5px 0 0; padding-left:17px; }
+.terrain-area-evidence p { color:#64786f; font-size:11px; line-height:1.6; }
+.terrain-area-result-actions { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:16px; }
+.terrain-area-quiet-button { background:none; border:0; color:#476653; font-size:12px; padding:9px 4px; cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
+.terrain-area-panel button:focus-visible { outline:3px solid #4f9676; outline-offset:3px; }
+.terrain-area-panel button:disabled { cursor:default; opacity:.55; }
+.terrain-area-figure--report { break-inside:avoid; }
+/* Compact controls belong to the working panel, never the shared report figures. */
+.terrain-area-panel .terrain-area-panel-heading { position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+.terrain-area-panel .terrain-area-toolbar { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px 12px; max-width:920px; margin:0 auto 8px; }
+.terrain-area-panel .secondary-button { min-height:38px; padding:7px 10px; border-radius:6px; font-size:14px; font-weight:600; line-height:1.4; }
+.terrain-area-panel .terrain-area-preview { display:flex; align-items:baseline; flex-wrap:wrap; gap:3px 10px; }
+.terrain-area-panel .terrain-area-preview>span { font-size:13px; }
+.terrain-area-panel .terrain-area-preview>strong { color:var(--ink,#193e35); font-size:22px; font-weight:650; line-height:1.35; white-space:nowrap; }
+.terrain-area-panel .terrain-area-preview small { font-size:14px; font-weight:500; }
+.terrain-area-panel .secondary-button.terrain-area-primary-action { min-height:38px; padding:7px 14px; background:#17664f; border:1px solid #17664f; color:#fff; font-size:14px; font-weight:600; }
+.terrain-area-panel .secondary-button.terrain-area-primary-action:hover:not(:disabled) { background:#12563f; border-color:#12563f; }
+.terrain-area-panel .terrain-area-view-switch { gap:4px; padding:0; border:0; background:none; }
+.terrain-area-panel .terrain-area-view-switch button { min-height:38px; padding:7px 14px; border:1px solid #d4dfd5; border-radius:6px; background:#fff; font-size:14px; font-weight:600; }
+.terrain-area-panel .terrain-area-view-switch button.is-active { border-color:#17664f; background:#17664f; }
+.terrain-area-panel .terrain-area-view-switch .terrain-area-3d-button { display:inline-flex; align-items:center; justify-content:center; gap:7px; border-color:#17664f; background:#edf6ef; color:#17664f; }
+.terrain-area-panel .terrain-area-view-switch .terrain-area-3d-button.is-active { background:#17664f; color:#fff; }
+.terrain-area-3d-button svg { width:19px; height:19px; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linejoin:round; flex-shrink:0; }
+.terrain-area-panel .terrain-area-result-actions { gap:8px; margin:0; }
+.terrain-area-panel .terrain-area-quiet-button { min-height:38px; padding:7px 4px; font-size:14px; }
+.terrain-area-panel .terrain-area-empty { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:8px 12px; max-width:920px; margin:0 auto; padding:8px 0; border-radius:0; background:none; }
+.terrain-area-panel .terrain-area-empty p { min-width:0; margin:0; color:var(--ink,#193e35); font-size:15px; font-weight:500; line-height:1.5; overflow-wrap:anywhere; }
+.terrain-area-panel .terrain-area-empty button { white-space:nowrap; }
+.terrain-area-panel .terrain-area-progress { gap:10px; max-width:920px; margin:6px auto; padding:8px 10px; border-radius:6px; }
+.terrain-area-panel .terrain-area-progress>div { gap:2px; }
+.terrain-area-panel .terrain-area-progress strong { font-size:14px; }
+.terrain-area-panel .terrain-area-progress span { font-size:12px; }
+.terrain-area-panel .terrain-area-warning { box-sizing:border-box; max-width:920px; margin:6px auto; padding:7px 10px; font-size:13px; }
+.terrain-area-panel .terrain-area-warning p { margin:0; }
+.terrain-area-panel .terrain-area-summary { max-width:920px; gap:12px; margin:4px auto 8px; padding:0; border:0; }
+.terrain-area-panel .terrain-area-summary dt { margin:0 0 3px; font-size:13px; line-height:1.35; }
+.terrain-area-panel .terrain-area-summary dd { font-size:22px; line-height:1.4; }
+.terrain-area-panel .terrain-area-summary small { font-size:13px; }
+.terrain-area-panel .terrain-area-figure { max-width:920px; margin-inline:auto; }
+.terrain-area-panel .terrain-area-figure figcaption { margin-top:4px; font-size:13px; line-height:1.5; }
+.terrain-area-panel .terrain-area-rotation-controls { gap:8px; margin-top:3px; }
+.terrain-area-panel .terrain-area-rotation-controls .terrain-area-quiet-button { padding:5px 4px; }
+.terrain-area-panel .terrain-area-rotation-controls p { font-size:13px; line-height:1.5; }
+.terrain-area-panel .terrain-area-evidence { max-width:920px; margin:6px auto 0; padding-top:4px; }
+.terrain-area-panel .terrain-area-evidence>summary { min-height:38px; display:flex; align-items:center; flex-wrap:wrap; gap:4px 10px; list-style:none; font-size:13px; }
+.terrain-area-panel .terrain-area-evidence>summary::-webkit-details-marker { display:none; }
+.terrain-area-panel .terrain-area-evidence>summary::before { content:'▸'; color:#6b7b70; }
+.terrain-area-panel .terrain-area-evidence[open]>summary::before { content:'▾'; }
+.terrain-area-panel .terrain-area-evidence>summary span { color:#748176; font-size:12px; }
+.terrain-area-panel .terrain-area-evidence dl { gap:7px; margin:6px 0; font-size:13px; line-height:1.6; }
+.terrain-area-panel .terrain-area-evidence dl>div { grid-template-columns:84px minmax(0,1fr); gap:10px; }
+.terrain-area-panel .terrain-area-evidence ul { margin-top:3px; }
+.terrain-area-panel .terrain-area-evidence p { margin:6px 0; font-size:13px; line-height:1.6; }
+@media screen {
+  .terrain-area-panel .terrain-area-figure--interactive .terrain-area-model { max-width:920px; }
+  .terrain-area-panel .terrain-area-figure svg text { font-size:14px; }
+  .terrain-area-panel .terrain-area-figure .terrain-area-svg-caption { font-size:17px; }
+  .terrain-area-panel .terrain-area-figure .terrain-area-svg-note { font-size:12px; }
+  .terrain-area-panel .terrain-area-svg-legend text { font-size:15px; }
+  .terrain-area-panel .terrain-area-svg-legend .terrain-area-svg-note { font-size:12px; }
+  .terrain-area-panel .terrain-area-svg-scale text { font-size:13px; }
+  .terrain-area-panel .terrain-area-north text,.terrain-area-panel .terrain-area-3d-cardinals text { font-size:16px; }
+  .terrain-area-panel .terrain-area-contours text,.terrain-area-panel .terrain-area-3d-axis text { font-size:12px; }
+  .terrain-area-panel .terrain-area-selected-point text { font-size:13px; }
+  /* This line shares the scale-bar row; widening the figure improves its
+     physical size without pushing the text into the 50m scale ticks. */
+  .terrain-area-panel .terrain-area-figure text.terrain-area-svg-note[x="756"][y="443"] { font-size:11px; }
+}
+@media(max-width:640px) {
+  .terrain-area-heading { flex-direction:column; align-items:stretch; gap:10px; }
+  .terrain-area-heading button { align-self:flex-start; }
+  .terrain-area-view-row { align-items:flex-start; flex-wrap:wrap; }
+  .terrain-area-view-switch button { min-height:44px; padding:8px 20px; }
+  .terrain-area-summary { gap:10px; }
+  .terrain-area-summary dd { font-size:14px; }
+  .terrain-area-summary dt { font-size:10px; }
+  .terrain-area-evidence dl>div { grid-template-columns:1fr; gap:1px; }
+  .terrain-area-progress { align-items:flex-start; }
+  .terrain-area-panel .secondary-button,.terrain-area-panel .terrain-area-view-switch button,.terrain-area-panel .terrain-area-quiet-button,.terrain-area-camera-modes button,.terrain-area-camera-zoom button { min-height:44px; }
+  .terrain-area-panel .terrain-area-toolbar { gap:4px 8px; }
+  .terrain-area-panel .terrain-area-empty { column-gap:10px; }
+  .terrain-area-panel .terrain-area-summary { gap:8px; }
+  .terrain-area-panel .terrain-area-summary dd { font-size:22px; }
+  .terrain-area-panel .secondary-button.terrain-area-primary-action { min-height:44px; }
+  .terrain-area-panel .terrain-area-evidence>summary { min-height:44px; }
+  .terrain-area-panel .terrain-area-evidence dl>div { grid-template-columns:1fr; gap:1px; }
+  .terrain-area-rotation-controls { display:grid; grid-template-columns:1fr auto; grid-template-areas:'modes zoom' 'hint reset'; gap:6px 8px; }
+  .terrain-area-camera-modes { grid-area:modes; }
+  .terrain-area-camera-zoom { grid-area:zoom; }
+  .terrain-area-rotation-controls p { grid-area:hint; min-width:0; }
+  .terrain-area-rotation-controls>.terrain-area-quiet-button { grid-area:reset; }
+}
+@media(pointer:coarse) {
+  .terrain-area-panel .secondary-button,.terrain-area-panel .terrain-area-view-switch button,.terrain-area-panel .terrain-area-quiet-button,.terrain-area-panel .terrain-area-evidence>summary,.terrain-area-camera-modes button,.terrain-area-camera-zoom button { min-height:44px; }
+  .terrain-area-panel .secondary-button.terrain-area-primary-action { min-height:44px; }
+}
+@media print {
+  .terrain-area-figure,.terrain-area-figure svg { print-color-adjust:exact; -webkit-print-color-adjust:exact; }
+  .terrain-area-figure svg { max-width:100%; height:auto; }
+  .terrain-area-view-row,.terrain-area-result-actions,.terrain-area-progress { display:none; }
+  .terrain-area-figure figcaption { font-size:9pt; }
+}

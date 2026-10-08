@@ -3,7 +3,9 @@
 ## 역할
 **Mac OpenClaw에서 코드 수정 → GitHub에 검증된 이력 보관 → 기존 Cloudflare Pages와 Windows 실행판에 같은 릴리스 반영**을 기준으로 한다. Mac에 대한 설정은 이 문서만으로 실행되지 않는다.
 
-코드는 현재 공개 저장소 `https://github.com/Sonikim1743/Solar-site-precheck`를 기준으로 한다. v1.27의 GitHub 원격 반영은 완료되었으며, 현재 후속 정리는 v1.27.1이다. 최초 인수 때 `package.json`, `git log -1`, `docs/DEPLOYED_VERSION.md`를 함께 읽어 받은 소스와 실제 운영 버전을 구분한다. v1.27.1의 최종 원격·공개 반영 여부는 이번 릴리스의 커밋·배포 ID·확인 결과가 기록된 최신 `docs/DEPLOYED_VERSION.md`를 기준으로 확인한다. 이 파일이 아직 v1.25 등 과거 상태를 기록하고 있다면 v1.27.1 배포 완료로 해석하지 않는다.
+코드는 공개 저장소 `https://github.com/Sonikim1743/Solar-site-precheck`를 기준으로 한다. 기존 공개·Windows 운영본은 v1.27.2이며, 완료 근거는 `docs/DEPLOYED_VERSION.md`에 보존되어 있다. 현재 후보 v1.28.0은 `feat/terrain-area-v1.28` 브랜치에서 로컬 구현 중이고 아직 공개 배포하지 않았다. `package.json`의 버전, 받은 브랜치와 커밋, 실제 공개 배포 ID를 구분한다. 후보 소스와 문서를 받았다는 사실만으로 GitHub 원격 반영이나 공개 사이트 갱신을 완료로 해석하지 않는다.
+
+이번 범위 지형·3D·보고서 작업은 사용자가 Windows에서 코드 작업을 진행하도록 명시 승인한 예외다. 이후 개발은 Mac OpenClaw 중심이라는 기본 방향을 유지한다. Mac의 실제 작업 폴더·브랜치·의존성·화면을 확인한 뒤 인계받으며, 이번 Windows 검증으로 Mac 동작을 확인했다고 기록하지 않는다.
 
 ## 첫 실행
 기존 Mac 폴더가 있다면 원격과 미커밋 변경부터 확인하고 보존한다. 없을 때만 다음 새 폴더 예시를 사용한다.
@@ -27,7 +29,7 @@ pnpm develop --host 127.0.0.1 --port 5173
 Nodeは依存パッケージの要求を満たす版を使う。今回のWindows実測はNode24.19.0/pnpm11.19.0、既存GitHub CIはNode22/pnpm9。Macの実際の版を記録し、固定lockfileで検証する。Windowsのnode_modulesをコピーしない。MacとWindowsの127.0.0.1は別々の実行先だ。
 
 ## OpenClawに読ませるもの
-最初にこのリポジトリの `AGENTS.md` → `docs/PROJECT_CONTEXT_KO.md` → `docs/DEPLOYED_VERSION.md` → `docs/NEXT_TASKS_KO.md` の順に読むよう依頼する。OpenClawの実際のworkspaceと作業フォルダはMac上で確認する。既存設定を上書きせず、コード作業先と参照文書を既存の運用指示に追加する。
+最初にこのリポジトリの `AGENTS.md` → `docs/PROJECT_CONTEXT_KO.md` → `docs/DEPLOYED_VERSION.md` → `docs/TERRAIN_AREA_V1_28_KO.md` → `docs/NEXT_TASKS_KO.md` の順に読むよう依頼する。OpenClawの実際のworkspaceと作業フォルダはMac上で確認する。既存設定を上書きせず、コード作業先と参照文書を既存の運用指示に追加する。
 
 OpenClawの `MEMORY.md` は主要な決定、`memory/YYYY-MM-DD.md` は作業結果・コミット・残作業の記録に使う。これらの非公開の記憶と、公開アプリのソースは別々に保管する。文書を参照する仕組みであり、全会話をモデルに再学習させる操作ではない。[公式workspace説明](https://docs.openclaw.ai/concepts/agent-workspace)、[公式memory説明](https://docs.openclaw.ai/concepts/memory)。
 

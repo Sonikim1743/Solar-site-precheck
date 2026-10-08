@@ -1,12 +1,15 @@
+import { fetchPointElevationPng } from './terrainArea.js'
+import { endpointSlope, isProfilePoint, slopeSegments } from '../utils/terrainProfile.js'
+
 const ELEVATION_ENDPOINT =
   'https://cyberjapandata2.gsi.go.jp/general/dem/scripts/getelevation.php'
 const ADDRESS_ENDPOINT = 'https://msearch.gsi.go.jp/address-search/AddressSearch'
 const REVERSE_GEOCODE_ENDPOINT =
   'https://mreversegeocoder.gsi.go.jp/reverse-geocoder/LonLatToAddress'
 const MUNICIPALITY_DATA_URL = 'https://maps.gsi.go.jp/js/muni.js'
-const tileCache = new Map()
 let municipalityDataPromise
-const ELEVATION_CACHE_KEY = 'solar-site-elevation-points-v1'
+// v1 contained discontinued TXT tile results. Do not silently reuse them as PNG.
+const ELEVATION_CACHE_KEY = 'solar-site-elevation-points-v2'
 const ELEVATION_REQUEST_CONCURRENCY = 8
 let pointCache
 let cacheSaveTimer
@@ -32,7 +35,8 @@ async function mapWithConcurrency(items, limit, worker) {
 function loadPointCache() {
   if (pointCache) return pointCache
   try {
-    pointCache = new Map(JSON.parse(window.localStorage.getItem(ELEVATION_CACHE_KEY) || '[]'))
+    const rows = typeof window === 'undefined' ? [] : JSON.parse(window.localStorage.getItem(ELEVATION_CACHE_KEY) || '[]')
+    pointCache = new Map((Array.isArray(rows) ? rows : []).slice(-2000).filter(row => Array.isArray(row) && typeof row[0] === 'string' && Number.isFinite(row[1]?.value) && row[1].value >= -500 && row[1].value <= 10000 && typeof row[1].dataSource === 'string' && /PNG|JSON API/.test(row[1].dataSource) && typeof row[1].fetchedAt === 'string' && Number.isFinite(Date.parse(row[1].fetchedAt))))
   } catch {
     pointCache = new Map()
   }
@@ -49,8 +53,9 @@ function rememberElevation(lat, lon, result) {
   cache.delete(key)
   cache.set(key, result)
   while (cache.size > 2000) cache.delete(cache.keys().next().value)
-  window.clearTimeout(cacheSaveTimer)
-  cacheSaveTimer = window.setTimeout(() => {
+  clearTimeout(cacheSaveTimer)
+  if (typeof window === 'undefined') return
+  cacheSaveTimer = setTimeout(() => {
     try {
       window.localStorage.setItem(ELEVATION_CACHE_KEY, JSON.stringify([...cache.entries()]))
     } catch {
@@ -59,98 +64,70 @@ function rememberElevation(lat, lon, result) {
   }, 150)
 }
 
-async function fetchJson(url, timeoutMs = 8000) {
+async function fetchJson(url, timeoutMs = 8000, options = {}) {
   const controller = new AbortController()
-  const timeout = window.setTimeout(() => controller.abort(), timeoutMs)
+  if (options.signal?.aborted) throw options.signal.reason || new DOMException('取得を中止しました。', 'AbortError')
+  const cancel = () => controller.abort(options.signal.reason || new DOMException('取得を中止しました。', 'AbortError'))
+  options.signal?.addEventListener('abort', cancel, { once: true })
+  const timeout = setTimeout(() => controller.abort(new Error('取得時間を超えました。')), timeoutMs)
+  let onAbort
 
   try {
-    const response = await fetch(url, { signal: controller.signal })
-    if (!response.ok) throw new Error(`HTTP ${response.status}`)
-    return await response.json()
+    const request = (async () => {
+      const response = await (options.fetchImpl || fetch)(url, { signal: controller.signal })
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      return await response.json()
+    })()
+    const aborted = new Promise((_, reject) => {
+      onAbort = () => reject(controller.signal.reason || new DOMException('取得を中止しました。', 'AbortError'))
+      controller.signal.addEventListener('abort', onAbort, { once: true })
+      if (controller.signal.aborted) onAbort()
+    })
+    return await Promise.race([request, aborted])
   } finally {
-    window.clearTimeout(timeout)
+    clearTimeout(timeout)
+    if (onAbort) controller.signal.removeEventListener('abort', onAbort)
+    options.signal?.removeEventListener('abort', cancel)
   }
 }
 
-function tilePosition(lat, lon, zoom) {
-  const scale = 2 ** zoom
-  const xFloat = ((lon + 180) / 360) * scale
-  const latitudeRadians = (lat * Math.PI) / 180
-  const yFloat = (
-    1 - Math.log(Math.tan(latitudeRadians) + 1 / Math.cos(latitudeRadians)) / Math.PI
-  ) / 2 * scale
-
-  return {
-    x: Math.floor(xFloat),
-    y: Math.floor(yFloat),
-    pixelX: Math.min(255, Math.floor((xFloat - Math.floor(xFloat)) * 256)),
-    pixelY: Math.min(255, Math.floor((yFloat - Math.floor(yFloat)) * 256)),
-  }
-}
-
-async function fetchTileText(url) {
-  if (!tileCache.has(url)) {
-    tileCache.set(url, fetch(url).then((response) => {
-      if (!response.ok) throw new Error(`標高タイル HTTP ${response.status}`)
-      return response.text()
-    }))
-  }
-  return tileCache.get(url)
-}
-
-async function fetchElevationTile(lat, lon, layer, zoom) {
-  const position = tilePosition(lat, lon, zoom)
-  const url = `https://cyberjapandata.gsi.go.jp/xyz/${layer}/${zoom}/${position.x}/${position.y}.txt`
-  const text = await fetchTileText(url)
-  const rows = text.trim().split(/\r?\n/)
-  const value = rows[position.pixelY]?.split(',')[position.pixelX]
-  const elevation = Number(value)
-  if (!Number.isFinite(elevation)) throw new Error('標高値なし')
-  return elevation
-}
-
-export async function fetchElevation(lat, lon) {
-  const cached = loadPointCache().get(elevationCacheKey(lat, lon))
+export async function fetchElevation(lat, lon, options = {}) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < 20 || lat > 50 || lon < 120 || lon > 155) throw new Error('標高を取得する日本の座標が不正です。')
+  if (options.signal?.aborted) throw options.signal.reason || new DOMException('取得を中止しました。', 'AbortError')
+  const usePointCache = options.useCache !== false && !options.fetchImpl && !options.decodePng
+  const cached = usePointCache ? loadPointCache().get(elevationCacheKey(lat, lon)) : null
   if (cached) return { ...cached, cached: true }
-  const layers = [
-    ['dem5a', 15, '国土地理院 DEM5A標高タイル'],
-    ['dem5b', 15, '国土地理院 DEM5B標高タイル'],
-    ['dem5c', 15, '国土地理院 DEM5C標高タイル'],
-    ['dem', 14, '国土地理院 DEM標高タイル'],
-  ]
-
-  for (const [layer, zoom, label] of layers) {
-    try {
-      const value = await fetchElevationTile(lat, lon, layer, zoom)
-      const result = { value, dataSource: label }
-      rememberElevation(lat, lon, result)
-      return result
-    } catch {
-      // Coverage differs by DEM layer; try the next official tile layer.
-    }
+  try {
+    const result = await fetchPointElevationPng(lat, lon, options)
+    if (usePointCache) rememberElevation(lat, lon, result)
+    return result
+  } catch (error) {
+    if (options.signal?.aborted || error?.name === 'AbortError') throw options.signal?.reason || error
   }
-
-  const result = await fetchElevationEndpoint(lat, lon)
-  rememberElevation(lat, lon, result)
+  // No TXT fallback: those tiles stopped receiving updates in October 2024.
+  const result = await fetchElevationEndpoint(lat, lon, options)
+  if (usePointCache) rememberElevation(lat, lon, result)
   return result
 }
 
-async function fetchElevationEndpoint(lat, lon) {
+async function fetchElevationEndpoint(lat, lon, options) {
   const params = new URLSearchParams({
     lat: String(lat),
     lon: String(lon),
     outtype: 'JSON',
   })
-  const data = await fetchJson(`${ELEVATION_ENDPOINT}?${params}`)
-  const elevation = Number(data.elevation)
+  const data = await fetchJson(`${ELEVATION_ENDPOINT}?${params}`, 8000, options)
+  const raw = data.elevation
+  const elevation = typeof raw === 'number' || (typeof raw === 'string' && raw.trim() !== '') ? Number(raw) : NaN
 
-  if (!Number.isFinite(elevation)) {
+  if (!Number.isFinite(elevation) || elevation < -500 || elevation > 10000) {
     throw new Error('標高値が取得できませんでした')
   }
 
   return {
     value: elevation,
-    dataSource: data.hsrc || '国土地理院 標高データ',
+    dataSource: `国土地理院 標高JSON API（PNG未取得時）${typeof data.hsrc === 'string' ? ` / ${data.hsrc}` : ''}`,
+    fetchedAt: new Date().toISOString(),
   }
 }
 
@@ -241,95 +218,71 @@ export function pointAtDistance(lat, lon, distanceMeters, bearingDegrees) {
   return { lat: (lat2 * 180) / Math.PI, lon: (lon2 * 180) / Math.PI }
 }
 
-function summarizeProfile(points) {
-  const valid = points.filter((point) => Number.isFinite(point.elevation))
-  if (!valid.length) {
-    return {
-      minElevation: null,
-      maxElevation: null,
-      elevationDiff: null,
-      totalRise: 0,
-      totalFall: 0,
-      averageSlopePercent: null,
-      maxSlopePercent: null,
-    }
-  }
-
-  let totalRise = 0
-  let totalFall = 0
-  let maxSlopePercent = 0
-
-  for (let index = 1; index < valid.length; index += 1) {
-    const previous = valid[index - 1]
-    const current = valid[index]
-    const elevationDelta = current.elevation - previous.elevation
-    const distanceDelta = Math.abs(current.distance - previous.distance) || 1
-    const slopePercent = Math.abs(elevationDelta / distanceDelta) * 100
-    maxSlopePercent = Math.max(maxSlopePercent, slopePercent)
-    if (elevationDelta > 0) totalRise += elevationDelta
-    if (elevationDelta < 0) totalFall += Math.abs(elevationDelta)
-  }
-
-  const first = valid[0]
-  const last = valid[valid.length - 1]
-  const horizontalDistance = Math.abs(last.distance - first.distance) || 1
-  const elevationDiff = last.elevation - first.elevation
-
+function summarizeProfile(line) {
+  const valid = line.points.filter(isProfilePoint)
+  const average = endpointSlope(line)
+  const segments = slopeSegments(line)
   return {
-    minElevation: Math.min(...valid.map((point) => point.elevation)),
-    maxElevation: Math.max(...valid.map((point) => point.elevation)),
-    elevationDiff,
-    totalRise,
-    totalFall,
-    averageSlopePercent: Math.abs(elevationDiff / horizontalDistance) * 100,
-    maxSlopePercent,
+    minElevation: valid.length ? Math.min(...valid.map(point => point.elevation)) : null,
+    maxElevation: valid.length ? Math.max(...valid.map(point => point.elevation)) : null,
+    elevationDiff: average?.elevationDelta ?? null,
+    totalRise: segments.reduce((sum, segment) => sum + Math.max(0, segment.elevationDelta), 0),
+    totalFall: segments.reduce((sum, segment) => sum + Math.max(0, -segment.elevationDelta), 0),
+    averageSlopePercent: average?.slopePercent ?? null,
+    maxSlopePercent: segments.length ? Math.max(...segments.map(segment => segment.slopePercent)) : null,
   }
 }
 
-async function buildCrossSectionLine(lat, lon, label, negativeBearing, positiveBearing, rangeMeters, intervalMeters, negativeDirection, positiveDirection) {
+async function buildCrossSectionLine(lat, lon, label, negativeBearing, positiveBearing, rangeMeters, intervalMeters, negativeDirection, positiveDirection, options) {
   const distances = []
   for (let distance = -rangeMeters; distance <= rangeMeters; distance += intervalMeters) {
     distances.push(distance)
   }
 
   const points = await mapWithConcurrency(distances, ELEVATION_REQUEST_CONCURRENCY, async (distance) => {
+    if (options.signal?.aborted) throw options.signal.reason || new DOMException('断面の取得を中止しました。', 'AbortError')
     const bearing = distance < 0 ? negativeBearing : positiveBearing
     const point = distance === 0
       ? { lat, lon }
       : pointAtDistance(lat, lon, Math.abs(distance), bearing)
-    const result = await fetchElevation(point.lat, point.lon)
-    return {
-      distance,
-      lat: point.lat,
-      lon: point.lon,
-      elevation: result.value,
-      source: result.dataSource,
+    try {
+      const result = await (options.fetchElevationImpl || fetchElevation)(point.lat, point.lon, { signal: options.signal })
+      if (options.signal?.aborted) throw options.signal.reason || new DOMException('断面の取得を中止しました。', 'AbortError')
+      if (!Number.isFinite(result?.value) || result.missing === true) throw new Error('標高データなし')
+      return { distance, ...point, elevation: result.value, source: result.dataSource }
+    } catch (error) {
+      if (options.signal?.aborted || error?.name === 'AbortError') throw options.signal?.reason || error
+      // Keep the original position in the sequence. Joining the neighbours over
+      // this gap would invent an unobserved rise/fall or steepest segment.
+      return { distance, ...point, elevation: null, source: '標高データなし', missing: true }
     }
   })
 
-  return {
+  const line = {
     label,
     negativeDirection,
     positiveDirection,
     rangeMeters,
     intervalMeters,
     points,
-    summary: summarizeProfile(points),
   }
+  return { ...line, summary: summarizeProfile(line) }
 }
 
 export async function analyzeTerrainCrossSection(lat, lon, options = {}) {
   const rangeMeters = options.rangeMeters ?? 100
   const intervalMeters = options.intervalMeters ?? 10
+  if (!Number.isFinite(rangeMeters) || rangeMeters < 1 || rangeMeters > 1000 || !Number.isFinite(intervalMeters) || intervalMeters < 1 || intervalMeters > 1000 || Math.floor(2 * rangeMeters / intervalMeters) + 1 > 501) throw new Error('断面の範囲・間隔が不正です。')
   const [eastWest, northSouth] = await mapWithConcurrency([
     ['東西断面', 270, 90, '西', '東'],
     ['南北断面', 180, 0, '南', '北'],
   ], 1, ([label, negativeBearing, positiveBearing, negativeDirection, positiveDirection]) =>
-    buildCrossSectionLine(lat, lon, label, negativeBearing, positiveBearing, rangeMeters, intervalMeters, negativeDirection, positiveDirection))
+    buildCrossSectionLine(lat, lon, label, negativeBearing, positiveBearing, rangeMeters, intervalMeters, negativeDirection, positiveDirection, options))
 
   const allElevations = [...eastWest.points, ...northSouth.points]
+    .filter(isProfilePoint)
     .map((point) => point.elevation)
-    .filter(Number.isFinite)
+  if (!allElevations.length) throw new Error('断面範囲の標高データを取得できませんでした。通信状態や範囲を確認して再試行してください。')
 
   return {
     rangeMeters,

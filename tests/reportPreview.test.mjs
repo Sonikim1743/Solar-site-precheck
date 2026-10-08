@@ -15,14 +15,14 @@ before(async () => {
     configFile: false,
     root: process.cwd(),
     plugins: [react()],
-    server: { middlewareMode: true, hmr: false },
+    server: { middlewareMode: true, hmr: false, ws: false, watch: null },
     appType: 'custom',
     logLevel: 'error',
     optimizeDeps: { disabled: true },
   })
   const module = await viteServer.ssrLoadModule('/src/components/ReportPreview.jsx')
   ReportPreview = module.default
-})
+}, { timeout: 30_000 })
 
 after(async () => {
   await viteServer?.close()

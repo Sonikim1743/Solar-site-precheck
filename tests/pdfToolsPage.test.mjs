@@ -14,7 +14,7 @@ before(async () => {
     configFile: false,
     root: process.cwd(),
     plugins: [react()],
-    server: { middlewareMode: true, hmr: false },
+    server: { middlewareMode: true, hmr: false, ws: false, watch: null },
     appType: 'custom',
     logLevel: 'error',
     optimizeDeps: {
@@ -24,7 +24,7 @@ before(async () => {
   const module = await viteServer.ssrLoadModule('/src/components/PdfToolsPage.jsx')
   PdfToolsPage = module.default
   clearPendingImagePlacement = module.clearPendingImagePlacement
-})
+}, { timeout: 30_000 })
 
 after(async () => {
   await viteServer?.close()

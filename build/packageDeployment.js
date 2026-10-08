@@ -13,7 +13,12 @@ const run = (file, args = [], env = {}) => execFileSync(process.execPath, [file,
 run('work/assert-clean-tree.mjs')
 const sourceCommit = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
 const tests = (await readdir('tests')).filter((name) => name.endsWith('.test.mjs')).map((name) => `tests/${name}`)
-execFileSync(process.execPath, ['--test', '--test-concurrency=1', ...tests], { stdio: 'inherit' })
+try {
+  execFileSync(process.execPath, ['--test', '--test-concurrency=1', ...tests], { stdio: 'inherit', timeout: 120_000 })
+} catch (error) {
+  if (error.code === 'ETIMEDOUT') throw new Error('Release tests exceeded 120 seconds; packaging stopped.', { cause: error })
+  throw error
+}
 const version = JSON.parse(await readFile('package.json', 'utf8')).version.replace(/\.0$/, '')
 const buildDate = process.env.VITE_BUILD_DATE || new Date().toISOString().slice(0, 10)
 await mkdir('outputs', { recursive: true })
