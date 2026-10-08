@@ -20,10 +20,16 @@ export function dragTerrainView(view, deltaX, deltaY) {
   return normalizeTerrainView({ ...camera, azimuth: camera.azimuth - (finite(deltaX) ? deltaX : 0) * 180, pitch: camera.pitch + (finite(deltaY) ? deltaY : 0) * 90 })
 }
 
-// Upward dragging raises the view above the model without changing its bearing.
-export function elevateTerrainView(view, deltaY) {
+// Orbit around the fixed terrain centre. Horizontal dragging changes the side
+// the observer sees; upward dragging raises the observer to look down farther.
+export function orbitTerrainView(view, deltaX, deltaY) {
   const camera = normalizeTerrainView(view)
-  return normalizeTerrainView({ ...camera, pitch: clamp(camera.pitch - (finite(deltaY) ? deltaY : 0) * 90, 0, 75) })
+  return normalizeTerrainView({ ...camera, azimuth: camera.azimuth - (finite(deltaX) ? deltaX : 0) * 180, pitch: clamp(camera.pitch - (finite(deltaY) ? deltaY : 0) * 90, 0, 75) })
+}
+
+// Compatibility for an elevation-only interaction at the same object centre.
+export function elevateTerrainView(view, deltaY) {
+  return orbitTerrainView(view, 0, deltaY)
 }
 
 export function zoomTerrainView(view, factor) {

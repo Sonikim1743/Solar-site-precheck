@@ -2,8 +2,11 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import GridEquipmentDetails from './GridEquipmentDetails.jsx'
 import TerrainAreaMapOverlay from './TerrainAreaMapOverlay.jsx'
 import MapRegionLabel, { getMapRegionLabel } from './MapRegionLabel.jsx'
+import MapPlaceNamesOverlay from './MapPlaceNamesOverlay.jsx'
+import PublicParcelOverlay, { PublicParcelOverlayStatus } from './PublicParcelOverlay.jsx'
 import L from 'leaflet'
-import { Circle, CircleMarker, GeoJSON, LayersControl, MapContainer, Marker, Polygon, Polyline, Popup, Rectangle, ScaleControl, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet'
+import { Circle, CircleMarker, GeoJSON, LayersControl, MapContainer, Marker, Polygon, Polyline, Popup, Rectangle, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet'
+import MapDistanceScale from './MapDistanceScale.jsx'
 import { parcelInfo } from '../services/cadastre.js'
 import { featureInteriorPoint, validatePolygonGeometry } from '../services/parcelGeometry.js'
 import { getParcelKey } from '../utils/parcelReview.js'
@@ -649,6 +652,8 @@ export default function MapPanel({
   const hasTerrainOverlay = !!terrainSection?.lines?.length
   const hasRegionLabel = Boolean(getMapRegionLabel(position, placeInfo))
   const [showTerrainArea, setShowTerrainArea] = useState(true)
+  const [publicParcelStatus, setPublicParcelStatus] = useState({ state: 'off', message: '' })
+  const [placeNameStatus, setPlaceNameStatus] = useState(null)
   useEffect(() => setShowTerrainArea(true), [terrainArea?.geometryKey, terrainArea?.fetchedAt])
   const [isCompactMap, setIsCompactMap] = useState(false)
   const [mapInteractionEnabled, setMapInteractionEnabled] = useState(false)
@@ -747,6 +752,7 @@ export default function MapPanel({
         center={INITIAL_MAP_CENTER}
         zoom={INITIAL_MAP_ZOOM}
         minZoom={4}
+        maxZoom={19}
         scrollWheelZoom
         className="map"
       >
@@ -755,17 +761,26 @@ export default function MapPanel({
             <TileLayer
               attribution='<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noreferrer">国土地理院 全国最新写真（シームレス）</a>'
               url="https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg"
-              maxZoom={18}
+              maxZoom={19}
+              maxNativeZoom={18}
             />
           </LayersControl.BaseLayer>
           <LayersControl.BaseLayer name="標準地図">
             <TileLayer
               attribution='<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noreferrer">地理院タイル</a>'
               url="https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png"
+              maxZoom={19}
+              maxNativeZoom={18}
             />
           </LayersControl.BaseLayer>
+          <LayersControl.Overlay checked name="地名（都道府県・市区町村）">
+            <MapPlaceNamesOverlay dimmed={isDrawing} onStatus={setPlaceNameStatus} />
+          </LayersControl.Overlay>
+          <LayersControl.Overlay name="地番（公開2024）">
+            <PublicParcelOverlay onStatus={setPublicParcelStatus} />
+          </LayersControl.Overlay>
         </LayersControl>
-        <ScaleControl position="bottomleft" metric imperial={false} />
+        <MapDistanceScale position="bottomleft" />
         <ClickHandler onSelect={onSelect} mode={parcelMode} locked={mapLocked} onAddVertex={addDraftVertex} onFinish={finishDrawing} />
         <MapController position={position} />
         <MapInteractionController locked={mapLocked} drawing={isDrawing} />
@@ -823,6 +838,8 @@ export default function MapPanel({
       </div>
       {parcelData && <div className="parcel-map-badge">地番レイヤー {parcelData.features.length.toLocaleString()}筆</div>}
     </div>
+    <PublicParcelOverlayStatus status={publicParcelStatus} />
+    {placeNameStatus?.state === 'error' && <p className="public-parcel-overlay-status is-error" role="status">地名を取得できません。標準地図でも確認できます。</p>}
     {isDrawing && <div className="parcel-drawing-toolbar" aria-label="範囲の作図操作">
       <div className="parcel-drawing-toolbar__instruction">
         <strong>{parcelMode === 'boundary' ? '検討範囲' : '除外範囲'}を作図</strong>

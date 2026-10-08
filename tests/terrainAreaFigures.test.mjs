@@ -244,6 +244,8 @@ test('the Japanese report remains two sheets with fixed views, source limits and
   assert.match(html,/北から時計回り35°/)
   assert.match(html,/北から時計回り145°/)
   assert.match(html,/3D高さ強調なし（1:1）/)
+  assert.match(html,/data-view-azimuth="35" data-view-pitch="32"/)
+  assert.match(html,/data-view-azimuth="145" data-view-pitch="32"/,'the A3 views retain their fixed directions')
   assert.match(html,/立体の底面/)
   assert.match(html,/地層・土量を示しません/)
   assert.match(html,/<dt>高低差<\/dt><dd>0 m<\/dd>/,'the visual 5m base is not terrain height difference')
@@ -259,6 +261,18 @@ test('report mode rejects interactive controls even when requested on a solid fi
   assert.match(html,/北から時計回り145°/)
   assert.doesNotMatch(html,/<canvas|<button|tabindex=|terrain-area-drag-target/)
   assert.ok(paths(html,'wall').length>0)
+})
+
+test('interactive camera controls expose viewpoint movement without introducing extra buttons or changing terrain values',()=>{
+  const analysis=localFixture(),original=structuredClone(analysis)
+  const html=renderToStaticMarkup(React.createElement(TerrainArea3D,{analysis,interactive:true}))
+  assert.match(html,/data-view-azimuth="35" data-view-pitch="32"/)
+  assert.match(html,/地形の周囲を回って見られる立体図/)
+  const modes=html.match(/<div class="terrain-area-camera-modes"[\s\S]*?<\/div>/)?.[0]||''
+  assert.equal((modes.match(/<button\b/g)||[]).length,2)
+  assert.match(modes,/>回転<\/button>/)
+  assert.match(modes,/>視点の移動<\/button>/)
+  assert.deepEqual(analysis,original)
 })
 
 test('height emphasis and slope shares use real summary values without modifying the analysis',()=>{
@@ -279,6 +293,14 @@ test('height emphasis and slope shares use real summary values without modifying
   assert.match(interactive,/高さ2倍 1:2/)
   assert.match(interactive,/<caption>10m幅で見た局所勾配/)
   assert.match(interactive,/格子点の分布/)
+  assert.match(interactive,/有効範囲 約400 m²（除外後）/)
+  assert.match(interactive,/約323 m²/)
+  assert.match(interactive,/約60 m²/)
+  assert.match(interactive,/約18 m²/)
+  assert.match(interactive,/>0 m²</)
+  const partial=render3D({...analysis,summary:{...analysis.summary,slopeCoveragePercent:75}},{interactive:true,reportMode:false})
+  assert.match(partial,/勾配未確認 約100 m²/)
+  assert.match(partial,/約242 m²/)
   const missing=render3D(localFixture(),{interactive:true,reportMode:false})
   assert.match(missing,/未計算/)
   assert.doesNotMatch(missing,/80.7%/)

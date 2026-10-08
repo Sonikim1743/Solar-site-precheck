@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createTerrainProjection, dragTerrainView, elevateTerrainView, normalizeTerrainView, terrainFaceVisible, zoomTerrainView } from '../src/utils/terrainView.js'
+import { createTerrainProjection, dragTerrainView, elevateTerrainView, orbitTerrainView, normalizeTerrainView, terrainFaceVisible, zoomTerrainView } from '../src/utils/terrainView.js'
 import { buildTerrainSolid } from '../src/utils/terrainSolid.js'
 
 const settings = { bounds: { west: -50, south: -40, east: 50, north: 40 }, base: 300, maxElevation: 360 }
@@ -184,6 +184,68 @@ test('rotation preserves the current zoom and invalid drag input keeps the view'
   assert.deepEqual(dragTerrainView(view, NaN, Infinity), view)
   const normalized = normalizeTerrainView(view)
   assert.deepEqual(view, normalized, 'helpers leave the input camera unchanged')
+})
+
+test('orbit keeps the terrain centre fixed while changing the visible side rather than translating all vertices', () => {
+  const points = [[-50, -40, 300], [50, 40, 360], [10, 20, 320], [0, 0, 340]]
+  const snapshot = structuredClone(points)
+  for (const heightScale of [1, 2]) for (const zoom of [.65, 1, 2.5]) {
+    const view = { azimuth: 0, pitch: 32, zoom }
+    const orbited = orbitTerrainView(view, -.5, -.25)
+    assert.deepEqual(orbited, { ...view, azimuth: 90, pitch: 54.5 })
+    const before = createTerrainProjection({ ...settings, ...view, heightScale })
+    const after = createTerrainProjection({ ...settings, ...orbited, heightScale })
+    for (const projection of [before, after]) {
+      const centre = projection.project([0, 0, 330])
+      close(centre[0], 400); close(centre[1], 225)
+    }
+    const horizontalOffsets = points.map(point => after.project(point)[0] - before.project(point)[0])
+    assert.ok(horizontalOffsets.some(value => Math.abs(value - horizontalOffsets[0]) > 1), 'an orbit is not a common screen-space offset')
+    for (const point of points) {
+      assert.ok(after.project(point).every(Number.isFinite))
+    }
+    assert.equal(terrainFaceVisible([1, 0, 0], view, heightScale), false)
+    assert.equal(terrainFaceVisible([1, 0, 0], orbited, heightScale), true, 'eastward camera orbit reveals the east wall')
+    assert.equal(terrainFaceVisible([-1, 0, 0], orbited, heightScale), false, 'the opposite wall is hidden')
+    assert.equal(terrainFaceVisible([0, 0, -1], orbited, heightScale), false)
+  }
+  assert.deepEqual(points, snapshot)
+})
+
+test('normalized orbit drags work across viewport sizes, wrap bearings, clamp elevation and ignore invalid input', () => {
+  const view = { azimuth: 35, pitch: 32, zoom: 1.5 }
+  const snapshot = structuredClone(view)
+  const results = [130, 520, 780].map(size => orbitTerrainView(view, (size / 4) / size, (-size / 4) / size))
+  assert.deepEqual(results[0], { ...view, azimuth: 350, pitch: 54.5 })
+  assert.deepEqual(results[1], results[0]); assert.deepEqual(results[2], results[0])
+  assert.deepEqual(orbitTerrainView(view, 4, -1e308), { ...view, pitch: 75 })
+  assert.deepEqual(orbitTerrainView(view, -4, 1e308), { ...view, pitch: 0 })
+  for (const delta of [NaN, Infinity, -Infinity, undefined]) assert.deepEqual(orbitTerrainView(view, delta, delta), view)
+  assert.deepEqual(orbitTerrainView(view, .25, NaN), { ...view, azimuth: 350 })
+  assert.deepEqual(orbitTerrainView(view, NaN, -.25), { ...view, pitch: 54.5 })
+  assert.deepEqual(elevateTerrainView(view, -.25), orbitTerrainView(view, 0, -.25))
+  assert.deepEqual(view, snapshot)
+})
+
+test('orbit preserves actual terrain distances and zoom; wheel and height emphasis preserve the current orbit', () => {
+  const initial = { azimuth: 145, pitch: 32, zoom: 1.4 }
+  const view = orbitTerrainView(initial, -.25, -.25)
+  assert.equal(view.zoom, initial.zoom)
+  assert.deepEqual(zoomTerrainView(view, 1.2), { ...view, zoom: 1.68 })
+  const actual = createTerrainProjection({ ...settings, ...view, heightScale: 1 })
+  const emphasized = createTerrainProjection({ ...settings, ...view, heightScale: 2 })
+  for (const projection of [actual, emphasized]) {
+    assert.equal(projection.azimuth, view.azimuth)
+    assert.equal(projection.pitch, view.pitch)
+    assert.equal(projection.zoom, view.zoom)
+    const base = [10, 20, 300]
+    close(distance(projection.transform(base), projection.transform([20, 20, 300])), 10)
+    close(distance(projection.transform(base), projection.transform([10, 30, 300])), 10)
+    close(distance(projection.transform(base), projection.transform([10, 20, 310])), 10 * projection.heightScale)
+    const centre = projection.project([0, 0, 330])
+    close(centre[0], 400); close(centre[1], 225)
+  }
+  assert.deepEqual(normalizeTerrainView(), { azimuth: 35, pitch: 32, zoom: 1 }, 'reset retains the original centred camera')
 })
 
 test('height exaggeration doubles only display-space vertical distances without mutating terrain inputs', () => {

@@ -5,7 +5,8 @@
   left:260px;
   right:60px;
   box-sizing:border-box;
-  max-width:420px;
+  width:max-content;
+  max-width:min(420px, calc(100% - 320px));
   min-width:0;
   min-height:32px;
   margin-inline:auto;
@@ -21,7 +22,7 @@
   pointer-events:none;
 }
 .map-region-label > span { flex:0 0 auto; font-size:10px; line-height:1.4; font-weight:500; color:#62796d; }
-.map-region-label > strong { min-width:0; font-size:13px; font-weight:600; line-height:1.5; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.map-region-label > strong { min-width:0; font-size:13px; font-weight:600; line-height:1.5; white-space:normal; overflow-wrap:anywhere; }
 @media(max-width:760px) {
-  .map-shell > .map-region-label { top:128px; left:60px; right:12px; max-width:none; min-height:30px; padding:4px 9px; }
+  .map-shell > .map-region-label { top:128px; left:60px; right:12px; max-width:calc(100% - 72px); min-height:30px; padding:4px 9px; }
 }

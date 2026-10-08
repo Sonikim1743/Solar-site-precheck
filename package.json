@@ -19,11 +19,13 @@
     "verify:release": "node work/verify-release-metadata.mjs"
   },
   "dependencies": {
+    "@react-leaflet/core": "3.0.0",
     "fflate": "^0.8.3",
     "leaflet": "^1.9.4",
     "pdfjs-dist": "^6.0.227",
     "polygon-clipping": "0.15.7",
     "proj4": "^2.20.9",
+    "protomaps-leaflet": "5.1.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-leaflet": "^5.0.0",

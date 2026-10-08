@@ -1,0 +1,4 @@
+.public-parcel-reference-pane,
+.public-parcel-reference-pane canvas { pointer-events: none !important; }
+.public-parcel-overlay-status { margin: 0; color: #365d58; font-size: 12px; line-height: 1.5; }
+.public-parcel-overlay-status.is-error { color: #985328; }

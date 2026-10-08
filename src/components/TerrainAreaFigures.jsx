@@ -1,8 +1,9 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import polygonClipping from 'polygon-clipping'
 import { terrainPointToLocal } from '../utils/terrainArea.js'
-import { createTerrainProjection, dragTerrainView, normalizeTerrainView, elevateTerrainView, zoomTerrainView, terrainFaceVisible } from '../utils/terrainView.js'
+import { createTerrainProjection, dragTerrainView, normalizeTerrainView, orbitTerrainView, zoomTerrainView, terrainFaceVisible } from '../utils/terrainView.js'
 import { buildTerrainSolid } from '../utils/terrainSolid.js'
+import { terrainSlopeDistribution, formatTerrainSlopeArea } from '../utils/terrainSlopeDistribution.js'
 import './terrain-area.css'
 
 const COLORS = ['#cfe3cd', '#efe8ad', '#eabd8d', '#df9d9b']
@@ -50,23 +51,27 @@ const slopeShare = (summary, index) => {
   return finite(bin?.percent) ? `${bin.percent.toLocaleString('ja-JP', { maximumFractionDigits: 1 })}%` : '未計算'
 }
 
-function Legend({ y = 481, summary }) {
+function Legend({ y = 469, summary }) {
+  const distribution = terrainSlopeDistribution(summary)
   return <g className="terrain-area-svg-legend" transform={`translate(60 ${y})`}>
     {LABELS.map((label, index) => <g key={label} transform={`translate(${index * 173} 0)`}>
       <rect width="27" height="14" y="-12" fill={COLORS[index]} stroke="#8b918b" strokeWidth="0.4" />
       <text x="35" y="0">{label}</text>
       <text x="35" y="25" className="terrain-area-svg-share">{slopeShare(summary, index)}</text>
+      <text x="35" y="44" className="terrain-area-svg-area">{formatTerrainSlopeArea(distribution.bins[index].areaM2)}</text>
     </g>)}
   </g>
 }
 
 function SlopeDistribution({ summary }) {
+  const distribution = terrainSlopeDistribution(summary)
   return <div className="terrain-area-slope-distribution">
-    <table><caption>10m幅で見た局所勾配 <span>割合</span></caption>
+    <table><caption>10m幅で見た局所勾配 <span>割合・推定面積</span><span className="terrain-area-distribution-total">有効範囲 {formatTerrainSlopeArea(distribution.totalAreaM2)}（除外後）</span></caption>
       <thead><tr>{LABELS.map((label, index) => <th key={label} scope="col"><i style={{ background: COLORS[index] }} />{label}</th>)}</tr></thead>
-      <tbody><tr>{LABELS.map((label, index) => <td key={label}>{slopeShare(summary, index)}</td>)}</tr></tbody>
+      <tbody><tr>{LABELS.map((label, index) => <td key={label}><span>{slopeShare(summary, index)}</span><small>{formatTerrainSlopeArea(distribution.bins[index].areaM2)}</small></td>)}</tr></tbody>
     </table>
-    <p>割合は範囲内で勾配を計算できた格子点の分布です。色と数値は実際のDEMによる参考値で、施工可否の基準ではありません。</p>
+    {distribution.unknownAreaM2 > 0 && <p className="terrain-area-distribution-unknown">勾配未確認 {formatTerrainSlopeArea(distribution.unknownAreaM2)}</p>}
+    <p>割合は範囲内で勾配を計算できた格子点の分布です。面積は有効範囲と取得率からの概算。色と数値は実際のDEMによる参考値で、施工可否の基準ではありません。</p>
   </div>
 }
 
@@ -144,7 +149,7 @@ export function TerrainAreaPlan({ analysis, position, reportMode = false }) {
       <text x="756" y="443" textAnchor="end" className="terrain-area-svg-note">黄色線：地形の検討範囲{partial ? '　斜線：未取得・未計算' : ''}</text>
       <Legend summary={analysis.summary} />
     </svg>
-    <figcaption>等高線2m間隔・10mごとに太線。割合は勾配を計算できた範囲内の格子点が分母です。色分けは施工可否の基準ではありません。{position && !pointVisible ? '選択地点は図の範囲外です。' : ''}</figcaption>
+    <figcaption>等高線2m間隔・10mごとに太線。割合は勾配を計算できた範囲内の格子点が分母です。面積は有効範囲と勾配取得率からの概算。色分けは施工可否の基準ではありません。{position && !pointVisible ? '選択地点は図の範囲外です。' : ''}</figcaption>
   </figure>
 }
 
@@ -325,7 +330,7 @@ export function TerrainArea3D({ analysis, position, reportMode = false, azimuth 
     const drag = dragRef.current
     if (!drag || drag.id !== event.pointerId) return
     const dx = (event.clientX - drag.x) / drag.width, dy = (event.clientY - drag.y) / drag.height
-    queueView(drag.mode === 'elevate' ? elevateTerrainView(drag.view, dy) : dragTerrainView(drag.view, dx, dy))
+    queueView(drag.mode === 'orbit' ? orbitTerrainView(drag.view, dx, dy) : dragTerrainView(drag.view, dx, dy))
   }
   const pointerEnd = event => {
     if (dragRef.current?.id !== event.pointerId) return
@@ -337,7 +342,7 @@ export function TerrainArea3D({ analysis, position, reportMode = false, azimuth 
     if (!canRotate || !['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','+','=','-'].includes(event.key)) return
     event.preventDefault(); releaseDrag(); discardFrame()
     const current = latestView.current
-    const next = event.key === 'Home' ? initialView : ['+','=','-'].includes(event.key) ? zoomTerrainView(current, event.key === '-' ? 1/1.2 : 1.2) : viewMode === 'elevate' ? normalizeTerrainView({ ...current, pitch: current.pitch + (event.key === 'ArrowUp' ? 5 : event.key === 'ArrowDown' ? -5 : 0) }) : normalizeTerrainView({ ...current, azimuth: current.azimuth + (event.key === 'ArrowLeft' ? 10 : event.key === 'ArrowRight' ? -10 : 0), pitch: current.pitch + (event.key === 'ArrowDown' ? 5 : event.key === 'ArrowUp' ? -5 : 0) })
+    const next = event.key === 'Home' ? initialView : ['+','=','-'].includes(event.key) ? zoomTerrainView(current, event.key === '-' ? 1/1.2 : 1.2) : viewMode === 'orbit' ? orbitTerrainView(current, event.key === 'ArrowLeft' ? -10 / 180 : event.key === 'ArrowRight' ? 10 / 180 : 0, event.key === 'ArrowUp' ? -5 / 90 : event.key === 'ArrowDown' ? 5 / 90 : 0) : normalizeTerrainView({ ...current, azimuth: current.azimuth + (event.key === 'ArrowLeft' ? 10 : event.key === 'ArrowRight' ? -10 : 0), pitch: current.pitch + (event.key === 'ArrowDown' ? 5 : event.key === 'ArrowUp' ? -5 : 0) })
     latestView.current = next; setView(next)
   }
   const resetView = () => { releaseDrag(); discardFrame(); latestView.current = initialView; setView(initialView) }
@@ -373,7 +378,7 @@ export function TerrainArea3D({ analysis, position, reportMode = false, azimuth 
     </div>}
     <div className="terrain-area-model">
     {canRotate && <canvas ref={canvasRef} aria-hidden="true" className="terrain-area-surface" />}
-    <svg viewBox={`0 0 ${W} ${modelHeight}`} data-height-scale={verticalScale} role={canRotate ? 'group' : 'img'} tabIndex={canRotate ? 0 : undefined} aria-roledescription={canRotate ? '回転・視点の高さを変更できる地形図' : undefined} aria-labelledby={`${id}-title ${id}-desc`} aria-describedby={canRotate ? `${id}-controls` : undefined} onKeyDown={keyDown}>
+    <svg viewBox={`0 0 ${W} ${modelHeight}`} data-height-scale={verticalScale} data-view-azimuth={camera.azimuth} data-view-pitch={camera.pitch} role={canRotate ? 'group' : 'img'} tabIndex={canRotate ? 0 : undefined} aria-roledescription={canRotate ? '地形の周囲を回って見られる立体図' : undefined} aria-labelledby={`${id}-title ${id}-desc`} aria-describedby={canRotate ? `${id}-controls` : undefined} onKeyDown={keyDown}>
       <title id={`${id}-title`}>参考範囲の実DEM地形3D</title>
       <desc id={`${id}-desc`}>等高線図と同じ標高データ・参考範囲を用いた立体図。{verticalScale === 2 ? '横1：縦2の高さ強調表示。標高・勾配の数値と色は実DEMのままです。' : '高さ強調なし、縦横同尺度。'}黄色線は地表に沿う対象範囲。側面・底面は表示用で、地層・土量を示しません。樹木、建物、擁壁、造成後の形状は含みません。欠測や除外の部分を面で埋めません。</desc>
       {!canRotate && <rect width={W} height={H} fill="#fbfcfa" />}
@@ -395,12 +400,12 @@ export function TerrainArea3D({ analysis, position, reportMode = false, azimuth 
     </svg>
     </div>
     {canRotate && <div className="terrain-area-rotation-controls">
-      <div className="terrain-area-camera-modes" role="group" aria-label="3Dの操作"><button type="button" aria-pressed={viewMode === 'rotate'} onClick={() => changeViewMode('rotate')}>回転</button><button type="button" aria-pressed={viewMode === 'elevate'} onClick={() => changeViewMode('elevate')}>視点の高さ</button></div>
-      <p id={`${id}-controls`}>{viewMode === 'elevate' ? '方向を固定。上へドラッグで見下ろす。' : 'ドラッグで回転。'}ホイールで拡大・縮小。矢印キーも使えます。</p>
+      <div className="terrain-area-camera-modes" role="group" aria-label="3Dの操作"><button type="button" aria-pressed={viewMode === 'rotate'} onClick={() => changeViewMode('rotate')}>回転</button><button type="button" aria-pressed={viewMode === 'orbit'} onClick={() => changeViewMode('orbit')}>視点の移動</button></div>
+      <p id={`${id}-controls`}>{viewMode === 'orbit' ? '地形の中心を固定。左右で周囲を回り、上へドラッグで見下ろす。' : 'ドラッグで回転。'}ホイールで拡大・縮小。矢印キーも使えます。</p>
       <div className="terrain-area-camera-zoom" role="group" aria-label="3Dの拡大縮小"><button type="button" aria-label="3Dを縮小" disabled={camera.zoom <= .65} onClick={() => zoomView(1/1.2)}>−</button><span>{camera.zoom.toFixed(1)}×</span><button type="button" aria-label="3Dを拡大" disabled={camera.zoom >= 2.5} onClick={() => zoomView(1.2)}>＋</button></div>
       <button type="button" className="terrain-area-quiet-button" onClick={resetView}>最初の視点</button>
     </div>}
     {canRotate && <SlopeDistribution summary={analysis.summary} />}
-    <figcaption>{drawing.faceCount ? '地表面と黄色線は同じDEM。樹木・建物・造成後の形状は含みません。側面・底面は表示用で、地層・土量を示しません。' : '連続した地表面を描ける標高点が不足しています。'} {analysis.summary?.coveragePercent < 100 ? '未取得部分の面は表示していません。' : ''}</figcaption>
+    <figcaption>{drawing.faceCount ? '地表面と黄色線は同じDEM。樹木・建物・造成後の形状は含みません。側面・底面は表示用で、地層・土量を示しません。' : '連続した地表面を描ける標高点が不足しています。'} {!canRotate ? '面積は有効範囲と勾配取得率からの概算。' : ''} {analysis.summary?.coveragePercent < 100 ? '未取得部分の面は表示していません。' : ''}</figcaption>
   </figure>
 }
