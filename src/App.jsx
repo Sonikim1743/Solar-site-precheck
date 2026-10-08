@@ -3296,10 +3296,10 @@ export default function App() {
         <div className="topbar-actions">
           <nav className="workspace-nav" aria-label="画面切替">
             <button type="button" aria-current={activePage === 'solar' && !solarManualActive ? 'page' : undefined} onClick={() => switchPage('solar')}>候補地マップ</button>
-            <button type="button" aria-current={activePage === 'power' ? 'page' : undefined} onClick={() => switchPage('power')}>系統確認</button>
             <details className="workspace-tools"><summary>ツール</summary>
               <div className="workspace-tools-menu" onClick={event => { if (event.target.closest('button, a')) { event.currentTarget.parentElement.open = false; event.currentTarget.parentElement.querySelector('summary')?.focus() } }}>
                 <button type="button" onClick={() => openReviewSection('solar-generation')}>発電量計算</button>
+                <button type="button" aria-current={activePage === 'power' ? 'page' : undefined} onClick={() => switchPage('power')}>系統確認</button>
                 <button type="button" onClick={() => openReviewSection('simple-horizon')}>地平線・日影を計算</button>
                 <button type="button" onClick={() => openReviewSection('terrain-area')}>範囲の地形・3Dを見る</button>
                 <button type="button" onClick={() => openReviewSection('simple-snow')}>積雪データを見る</button>
@@ -3624,7 +3624,6 @@ export default function App() {
               <summary><strong>検討範囲の等高線・勾配・3D</strong><span>{terrainAreaOpen ? '閉じる' : '開く'}</span></summary>
               <TerrainAreaPanel geometry={parcelMetrics.geometry} metrics={parcelMetrics} analysis={currentTerrainArea} status={terrainAreaStatus} progress={terrainAreaProgress} error={terrainAreaError} position={position} onAnalyze={handleTerrainAreaAnalysis} onCancel={cancelTerrainAreaAnalysis} onClear={() => { cancelTerrainAreaWork(); setTerrainArea(null); setTerrainAreaStatus('idle'); setTerrainAreaError(''); setReportView('summary') }} onDrawBoundary={() => { setParcelMode('boundary'); openReviewSection('site-select') }} onOpenReport={openTerrainAreaReport} />
             </details>
-            <button type="button" className="power-page-link" disabled={!position} onClick={() => switchPage('power')}>この地点の系統を確認 →</button>
             {selectedParcel && (
               <div className="selected-parcel-card">
                 <div>

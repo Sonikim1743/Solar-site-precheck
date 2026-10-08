@@ -29,6 +29,14 @@
 .terrain-area-rotation-controls { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:6px; }
 .terrain-area-rotation-controls p { margin:0; color:#64786f; font-size:11px; line-height:1.5; }
 .terrain-area-rotation-controls button { flex-shrink:0; }
+.terrain-area-rotation-controls { flex-wrap:wrap; }
+.terrain-area-camera-modes,.terrain-area-camera-zoom { display:inline-flex; align-items:center; gap:4px; }
+.terrain-area-camera-modes button,.terrain-area-camera-zoom button { min-height:38px; padding:7px 10px; border:1px solid #ccdcd1; border-radius:6px; background:#fff; color:#476653; font:inherit; font-size:14px; font-weight:600; cursor:pointer; }
+.terrain-area-camera-modes button[aria-pressed="true"] { border-color:#17664f; background:#edf6ef; color:#17664f; }
+.terrain-area-camera-zoom button { width:38px; padding:7px 0; font-size:18px; }
+.terrain-area-camera-zoom button:disabled { opacity:.4; cursor:default; }
+.terrain-area-camera-zoom span { min-width:35px; text-align:center; font-size:13px; color:#476653; }
+.terrain-area-rotation-controls p { flex:1 1 180px; }
 .terrain-area-figure svg text { font-family:Meiryo,"Noto Sans JP",system-ui,sans-serif; fill:#3d5646; font-size:13px; }
 .terrain-area-svg-legend text { font-size:14px; }
 .terrain-area-figure .terrain-area-svg-note { font-size:11px; fill:#617162; }
@@ -75,6 +83,9 @@
 .terrain-area-panel .terrain-area-view-switch { gap:4px; padding:0; border:0; background:none; }
 .terrain-area-panel .terrain-area-view-switch button { min-height:38px; padding:7px 14px; border:1px solid #d4dfd5; border-radius:6px; background:#fff; font-size:14px; font-weight:600; }
 .terrain-area-panel .terrain-area-view-switch button.is-active { border-color:#17664f; background:#17664f; }
+.terrain-area-panel .terrain-area-view-switch .terrain-area-3d-button { display:inline-flex; align-items:center; justify-content:center; gap:7px; border-color:#17664f; background:#edf6ef; color:#17664f; }
+.terrain-area-panel .terrain-area-view-switch .terrain-area-3d-button.is-active { background:#17664f; color:#fff; }
+.terrain-area-3d-button svg { width:19px; height:19px; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linejoin:round; flex-shrink:0; }
 .terrain-area-panel .terrain-area-result-actions { gap:8px; margin:0; }
 .terrain-area-panel .terrain-area-quiet-button { min-height:38px; padding:7px 4px; font-size:14px; }
 .terrain-area-panel .terrain-area-empty { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:8px 12px; max-width:920px; margin:0 auto; padding:8px 0; border-radius:0; background:none; }
@@ -130,7 +141,7 @@
   .terrain-area-summary dt { font-size:10px; }
   .terrain-area-evidence dl>div { grid-template-columns:1fr; gap:1px; }
   .terrain-area-progress { align-items:flex-start; }
-  .terrain-area-panel .secondary-button,.terrain-area-panel .terrain-area-view-switch button,.terrain-area-panel .terrain-area-quiet-button { min-height:44px; }
+  .terrain-area-panel .secondary-button,.terrain-area-panel .terrain-area-view-switch button,.terrain-area-panel .terrain-area-quiet-button,.terrain-area-camera-modes button,.terrain-area-camera-zoom button { min-height:44px; }
   .terrain-area-panel .terrain-area-toolbar { gap:4px 8px; }
   .terrain-area-panel .terrain-area-empty { column-gap:10px; }
   .terrain-area-panel .terrain-area-summary { gap:8px; }
@@ -138,9 +149,14 @@
   .terrain-area-panel .secondary-button.terrain-area-primary-action { min-height:44px; }
   .terrain-area-panel .terrain-area-evidence>summary { min-height:44px; }
   .terrain-area-panel .terrain-area-evidence dl>div { grid-template-columns:1fr; gap:1px; }
+  .terrain-area-rotation-controls { display:grid; grid-template-columns:1fr auto; grid-template-areas:'modes zoom' 'hint reset'; gap:6px 8px; }
+  .terrain-area-camera-modes { grid-area:modes; }
+  .terrain-area-camera-zoom { grid-area:zoom; }
+  .terrain-area-rotation-controls p { grid-area:hint; min-width:0; }
+  .terrain-area-rotation-controls>.terrain-area-quiet-button { grid-area:reset; }
 }
 @media(pointer:coarse) {
-  .terrain-area-panel .secondary-button,.terrain-area-panel .terrain-area-view-switch button,.terrain-area-panel .terrain-area-quiet-button,.terrain-area-panel .terrain-area-evidence>summary { min-height:44px; }
+  .terrain-area-panel .secondary-button,.terrain-area-panel .terrain-area-view-switch button,.terrain-area-panel .terrain-area-quiet-button,.terrain-area-panel .terrain-area-evidence>summary,.terrain-area-camera-modes button,.terrain-area-camera-zoom button { min-height:44px; }
   .terrain-area-panel .secondary-button.terrain-area-primary-action { min-height:44px; }
 }
 @media print {

@@ -67,9 +67,9 @@
 .map-shell--parcel-drawing .leaflet-container, .map-shell--parcel-drawing .leaflet-interactive { cursor: crosshair; }
 .map-shell--parcel-drawing .leaflet-marker-pane .leaflet-marker-icon { pointer-events: none; }
 .parcel-draft-tooltip { padding: 1px 5px !important; border: 1px solid #d4e8dc !important; background: #fff !important; color: #184a37 !important; font-size: 10px !important; font-weight: 700; }
-.parcel-map-legend { display: flex; flex-wrap: wrap; gap: 9px 16px; margin: 9px 2px; font-size: 11px; color: #607369; }
-.parcel-map-legend span { display: inline-flex; align-items: center; gap: 5px; }
-.parcel-map-legend i { display: inline-block; width: 16px; height: 10px; border: 2px solid #c79c24; background: #f9e8b8; }
+.parcel-map-legend { display: flex; flex-direction: row; flex-wrap: nowrap; align-items: center; gap: clamp(8px, 2.5vw, 16px); min-width: 0; margin: 9px 2px; font-size: 11px; color: #607369; }
+.parcel-map-legend > span { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 5px; width: auto; white-space: nowrap; }
+.parcel-map-legend i { display: inline-block; flex: 0 0 16px; box-sizing: border-box; width: 16px; height: 10px; border: 2px solid #c79c24; background: #f9e8b8; }
 .parcel-map-legend i.parcel-map-legend__reference { border-color: #5897c5; border-style: dashed; background: #daeefe; }
 .parcel-map-legend i.parcel-map-legend__boundary { border-color: #599880; background: #d6eee4; }
 .parcel-map-legend i.parcel-map-legend__exclusion { border-color: #d56262; border-style: dashed; background: #f7d1d1; }

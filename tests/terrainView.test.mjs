@@ -1,18 +1,21 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createTerrainProjection, dragTerrainView, normalizeTerrainView } from '../src/utils/terrainView.js'
+import { createTerrainProjection, dragTerrainView, elevateTerrainView, normalizeTerrainView, terrainFaceVisible, zoomTerrainView } from '../src/utils/terrainView.js'
+import { buildTerrainSolid } from '../src/utils/terrainSolid.js'
 
 const settings = { bounds: { west: -50, south: -40, east: 50, north: 40 }, base: 300, maxElevation: 360 }
 const distance = (a, b) => Math.hypot(...a.map((v, i) => v - b[i]))
+const frame = { zoom: 1 }
+const close = (actual, expected, tolerance = 1e-10) => assert.ok(Math.abs(actual - expected) < tolerance, `${actual} != ${expected}`)
 
-test('terrain view wraps bearings and clamps only the camera pitch', () => {
-  assert.deepEqual(normalizeTerrainView({ azimuth: -725, pitch: -100 }), { azimuth: 355, pitch: 0 })
-  assert.deepEqual(normalizeTerrainView({ azimuth: 725, pitch: 200 }), { azimuth: 5, pitch: 75 })
-  assert.deepEqual(normalizeTerrainView({ azimuth: NaN, pitch: Infinity }), { azimuth: 35, pitch: 32 })
+test('terrain view wraps bearings and retains the original camera pitch limits', () => {
+  assert.deepEqual(normalizeTerrainView({ azimuth: -725, pitch: -100 }), { azimuth: 355, pitch: 0, ...frame })
+  assert.deepEqual(normalizeTerrainView({ azimuth: 725, pitch: 200 }), { azimuth: 5, pitch: 75, ...frame })
+  assert.deepEqual(normalizeTerrainView({ azimuth: NaN, pitch: Infinity }), { azimuth: 35, pitch: 32, ...frame })
 })
 
 test('drag changes direction and pitch without an unbounded vertical orbit', () => {
-  assert.deepEqual(dragTerrainView({ azimuth: 35, pitch: 32 }, .25, .25), { azimuth: 350, pitch: 54.5 })
+  assert.deepEqual(dragTerrainView({ azimuth: 35, pitch: 32 }, .25, .25), { azimuth: 350, pitch: 54.5, ...frame })
   assert.equal(dragTerrainView({ azimuth: 35, pitch: 32 }, 0, -10).pitch, 0)
   assert.equal(dragTerrainView({ azimuth: 35, pitch: 32 }, 0, 10).pitch, 75)
 })
@@ -66,4 +69,119 @@ test('zero pitch fits both flat and uneven terrain into a finite viewport at eve
       }
     }
   }
+})
+
+test('outward walls face the camera consistently at side and overhead views, while the bottom stays hidden', () => {
+  for (const pitch of [0, 32, 75]) {
+    assert.equal(terrainFaceVisible([0, 1, 0], { azimuth: 0, pitch }), true)
+    assert.equal(terrainFaceVisible([0, -1, 0], { azimuth: 0, pitch }), false)
+    assert.equal(terrainFaceVisible([1, 0, 0], { azimuth: 90, pitch }), true)
+    assert.equal(terrainFaceVisible([-1, 0, 0], { azimuth: 90, pitch }), false)
+    assert.equal(terrainFaceVisible([0, 1, 0], { azimuth: 180, pitch }), false)
+    assert.equal(terrainFaceVisible([0, -1, 0], { azimuth: 180, pitch }), true)
+    for (const azimuth of [0, 35, 90, 145, 180, 270, 359]) {
+      assert.equal(terrainFaceVisible([0, 0, -1], { azimuth, pitch }), false, 'the display bottom is never viewed from below')
+    }
+  }
+  assert.equal(terrainFaceVisible([1, 0, 0], { azimuth: 0, pitch: 0 }), false, 'edge-on walls do not leave an artificial stripe')
+  assert.equal(terrainFaceVisible([0, 0, 1], { azimuth: 0, pitch: 0 }), false)
+  assert.equal(terrainFaceVisible([0, 0, 1], { azimuth: 0, pitch: 75 }), true)
+})
+
+test('unknown surface normals stay visible and visibility uses the same normalized camera as projection', () => {
+  for (const normal of [null, undefined, [], [0, 0, 0], [NaN, 0, 0]]) {
+    assert.equal(terrainFaceVisible(normal, { azimuth: 180, pitch: 32 }), true)
+  }
+  assert.equal(terrainFaceVisible([0, 7, 0], { azimuth: -360, pitch: -20 }), true)
+  assert.equal(terrainFaceVisible([0, -7, 0], { azimuth: 360, pitch: 100 }), false)
+  assert.equal(terrainFaceVisible([0, 1, 0], { azimuth: NaN, pitch: Infinity }), terrainFaceVisible([0, 1, 0], { azimuth: 35, pitch: 32 }))
+})
+
+test('a steep far wall cannot cover a nearer slope even when centroid depth would paint the wall last', () => {
+  const topFaces = []
+  for (let y = 0; y < 50; y += 5) for (let x = 0; x < 50; x += 5) {
+    const ring = [[x, y], [x + 5, y], [x + 5, y + 5], [x, y + 5]].map(([x, y]) => [x, y, 100 + 5 * y])
+    const centroid = ring.reduce((sum, point) => sum.map((v, axis) => v + point[axis] / ring.length), [0, 0, 0])
+    topFaces.push({ rings: [ring], centroid, kind: 'surface' })
+  }
+  const view = { azimuth: 180, pitch: 32 }, base = 95
+  const projection = createTerrainProjection({ bounds: { west: 0, east: 50, south: 0, north: 50 }, base, maxElevation: 350, ...view })
+  const { walls } = buildTerrainSolid(topFaces, base)
+  const farWall = walls.find(face => face.centroid[0] === 2.5 && face.centroid[1] === 50)
+  const nearerSlope = topFaces.find(face => face.centroid[0] === 2.5 && face.centroid[1] === 7.5)
+  assert.ok(projection.transform(farWall.centroid)[2] > projection.transform(nearerSlope.centroid)[2], 'the previous painter ordering would draw this far wall after the slope')
+  const surfacePoint = [4.5, 9, 145], surfaceRay = projection.transform(surfacePoint)
+  const wallAtBase = projection.transform([4.5, 50, base])
+  const zUnit = projection.transform([4.5, 50, base + 1])[1] - wallAtBase[1]
+  const wallZ = base + (surfaceRay[1] - wallAtBase[1]) / zUnit
+  assert.ok(wallZ > base && wallZ < 350, 'the two projected faces genuinely overlap')
+  assert.ok(projection.transform([4.5, 50, wallZ])[2] < surfaceRay[2], 'at the overlap the wall is physically behind the slope')
+  assert.equal(terrainFaceVisible(farWall.normal, view), false)
+  assert.equal(terrainFaceVisible(null, view), true, 'the real DEM surface remains visible')
+})
+
+test('view normalization retains only direction, elevation angle and bounded zoom', () => {
+  assert.deepEqual(normalizeTerrainView(), { azimuth: 35, pitch: 32, ...frame })
+  assert.deepEqual(normalizeTerrainView(null), { azimuth: 35, pitch: 32, ...frame })
+  assert.deepEqual(normalizeTerrainView({ azimuth: 145, pitch: 0, zoom: 12 }), { azimuth: 145, pitch: 0, zoom: 2.5 })
+  assert.equal(normalizeTerrainView({ zoom: -1 }).zoom, .65)
+  assert.deepEqual(normalizeTerrainView({ zoom: Infinity }), { azimuth: 35, pitch: 32, ...frame })
+})
+
+test('upward dragging elevates the viewpoint while keeping object bearing, zoom and actual metres', () => {
+  const view = { azimuth: 145, pitch: 32, zoom: 1.5 }, raised = elevateTerrainView(view, -.25)
+  assert.deepEqual(raised, { azimuth: 145, pitch: 54.5, zoom: 1.5 })
+  assert.deepEqual(elevateTerrainView(view, .25), { ...view, pitch: 9.5 })
+  const before = createTerrainProjection({ ...settings, ...view }), after = createTerrainProjection({ ...settings, ...raised })
+  const origin = [10, 20, 320], points = [[20, 20, 320], [10, 30, 320], [10, 20, 330]], snapshot = structuredClone(points)
+  for (const point of points) {
+    close(after.transform(point)[0], before.transform(point)[0])
+    close(distance(after.transform(origin), after.transform(point)), 10)
+  }
+  assert.deepEqual(points, snapshot, 'elevations and terrain coordinates are not edited')
+  assert.notEqual(after.transform(origin)[1], before.transform(origin)[1], 'the camera changes elevation rather than translating the screen')
+  const corners = [settings.bounds.west, settings.bounds.east].flatMap(x => [settings.bounds.south, settings.bounds.north].flatMap(y => [settings.base, settings.maxElevation].map(z => after.project([x, y, z]))))
+  close((Math.min(...corners.map(p => p[0])) + Math.max(...corners.map(p => p[0]))) / 2, 400)
+  close((Math.min(...corners.map(p => p[1])) + Math.max(...corners.map(p => p[1]))) / 2, 225)
+  assert.equal(terrainFaceVisible([1, 0, 0], raised), terrainFaceVisible([1, 0, 0], view), 'the same side of the object faces the viewer')
+})
+
+test('normalized elevation drags behave equally at different viewport sizes and stay within 0 to 75 degrees', () => {
+  const view = { azimuth: 35, pitch: 32, zoom: 1.5 }
+  const results = [130, 520, 780].map(height => elevateTerrainView(view, (-height / 4) / height))
+  assert.deepEqual(results[0], { ...view, pitch: 54.5 })
+  assert.deepEqual(results[1], results[0]); assert.deepEqual(results[2], results[0])
+  assert.deepEqual(elevateTerrainView(view, -1e308), { ...view, pitch: 75 })
+  assert.deepEqual(elevateTerrainView(view, 1e308), { ...view, pitch: 0 })
+  for (const delta of [NaN, Infinity, undefined]) assert.deepEqual(elevateTerrainView(view, delta), view)
+})
+
+test('zoom scales every screen direction equally and preserves actual metres and bearing', () => {
+  for (const pitch of [0, 32, 75]) {
+    const view = { azimuth: 145, pitch, zoom: 1 }
+    const enlarged = zoomTerrainView(view, 2), before = createTerrainProjection({ ...settings, ...view }), after = createTerrainProjection({ ...settings, ...enlarged })
+    assert.deepEqual(enlarged, { ...view, zoom: 2 })
+    close(after.scale, before.scale * 2)
+    const origin = [10, 20, 320]
+    for (const end of [[20, 20, 320], [10, 30, 320], [10, 20, 330]]) {
+      assert.deepEqual(after.transform(end), before.transform(end))
+      close(distance(after.transform(origin), after.transform(end)), 10)
+      close(distance(after.project(origin), after.project(end)), distance(before.project(origin), before.project(end)) * 2)
+    }
+  }
+})
+
+test('zoom factors clamp safely and ignore invalid interactions without resetting the view', () => {
+  const view = { azimuth: 145, pitch: 75, zoom: 1.4 }
+  assert.deepEqual(zoomTerrainView(view, 1e308), { ...view, zoom: 2.5 })
+  assert.deepEqual(zoomTerrainView(view, .00001), { ...view, zoom: .65 })
+  for (const factor of [NaN, Infinity, -1, 0, undefined]) assert.deepEqual(zoomTerrainView(view, factor), view)
+})
+
+test('rotation preserves the current zoom and invalid drag input keeps the view', () => {
+  const view = { azimuth: 35, pitch: 32, zoom: 1.4 }
+  assert.deepEqual(dragTerrainView(view, .25, .25), { ...view, azimuth: 350, pitch: 54.5 })
+  assert.deepEqual(dragTerrainView(view, NaN, Infinity), view)
+  const normalized = normalizeTerrainView(view)
+  assert.deepEqual(view, normalized, 'helpers leave the input camera unchanged')
 })

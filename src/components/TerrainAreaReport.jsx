@@ -50,6 +50,7 @@ export default function TerrainAreaReport({ report }) {
       <div className="terrain-report-evidence-layout"><section><h3>使用資料と計算条件</h3><dl className="terrain-report-evidence">
         <div><dt>標高資料</dt><dd><a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noreferrer">国土地理院 標高タイル</a>{source.mixed ? '（資料混在）' : ''}<br />{layers.map(layer => `${layer.label} / 原資料${layer.nativeResolutionMeters}m級`).join('、')}</dd></div>
         <div><dt>計算方法</dt><dd>表示・集計格子 {grid.step}m / 勾配は東西・南北10m幅の中央差分 / 等高線2m、太線10m / 3D高さ強調なし（1:1）</dd></div>
+        <div><dt>立体の底面</dt><dd>側面・底面は高さを見やすくする表示用です。地下構造・地層・造成量は示しません。</dd></div>
         <div><dt>精度と欠測</dt><dd>補間と表示の間隔は測量精度ではありません。欠測や除外範囲は埋めず、異なる標高資料の境目には勾配差が出る可能性があります。</dd></div>
       </dl></section><section><h3>詳細検討へ渡す確認事項</h3><ul><li>境界・資料記載面積と図形面積の照合</li><li>接道、入口の段差、搬入経路、局所的な法面・擁壁</li><li>樹木・建物、地盤、排水、造成後の現況</li><li>勾配に合わせた配置・基礎・必要な造成の検討</li></ul><p>造成量、設置可能容量、施工可否は未判定です。現地測量・配置検討・詳細設計の前に使う参考図です。</p>{memoExcerpt && <p className="terrain-report-field-memo">現地メモ（抜粋）：{memoExcerpt}{report.fieldMemo.replace(/\s+/g, ' ').length > 180 && '…（180文字まで抜粋。全文はアプリの現地確認メモを参照）'}</p>}</section></div>
     </Sheet>

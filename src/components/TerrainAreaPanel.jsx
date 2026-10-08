@@ -23,7 +23,7 @@ export default function TerrainAreaPanel({ geometry, metrics, analysis, status =
   return <section className="terrain-area-panel" aria-labelledby={`${id}-heading`}>
     <h3 id={`${id}-heading`} className="terrain-area-panel-heading">範囲の地形</h3>
     {analysis ? <div className="terrain-area-toolbar">
-      <div className="terrain-area-view-switch" role="group" aria-label="地形の見方"><button type="button" aria-pressed={view === 'plan'} className={view === 'plan' ? 'is-active' : ''} onClick={() => setView('plan')}>等高線</button><button type="button" aria-pressed={view === '3d'} className={view === '3d' ? 'is-active' : ''} onClick={() => setView('3d')}>3D</button></div>
+      <div className="terrain-area-view-switch" role="group" aria-label="地形の見方"><button type="button" aria-pressed={view === 'plan'} className={view === 'plan' ? 'is-active' : ''} onClick={() => setView('plan')}>等高線</button><button type="button" aria-pressed={view === '3d'} className={`terrain-area-3d-button${view === '3d' ? ' is-active' : ''}`} onClick={() => setView('3d')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 22 7.5v9L12 22 2 16.5v-9Z M2 7.5 12 13l10-5.5 M12 13v9" /></svg>3Dで見る</button></div>
       <div className="terrain-area-result-actions"><button type="button" className="secondary-button" onClick={onOpenReport} disabled={!onOpenReport}>レポート</button><button type="button" className="terrain-area-quiet-button" onClick={onAnalyze} disabled={!onAnalyze || loading}>再取得</button></div>
     </div> : geometry && !loading ? <div className="terrain-area-toolbar"><p className="terrain-area-scope terrain-area-preview"><span>参考範囲</span><strong>約{number(metrics?.usableAreaM2, 0)} <small>m²</small></strong></p><button type="button" className="secondary-button terrain-area-primary-action" onClick={onAnalyze} disabled={!onAnalyze}>{message ? '再試行' : '地形を確認'}</button></div> : null}
     {!geometry && <div className="terrain-area-empty"><p>地図で範囲を描き、「地形を確認」を押してください。</p><button type="button" className="secondary-button" onClick={onDrawBoundary} disabled={!onDrawBoundary}>範囲を描く</button></div>}
@@ -38,6 +38,7 @@ export default function TerrainAreaPanel({ geometry, metrics, analysis, status =
         <div><dt>対象</dt><dd>地図上の有効な検討範囲。参考の筆と除外範囲は集計に含みません。</dd></div>
         <div><dt>標高資料</dt><dd>{analysis.source?.name || '国土地理院DEM'}{analysis.source?.mixed ? '（資料混在）' : ''}{sourceLayers.length > 0 && <ul>{sourceLayers.map((layer) => <li key={layer.id}>{layer.label || layer.id}{Number.isFinite(layer.nativeResolutionMeters) ? `・原資料${layer.nativeResolutionMeters}m級` : ''}</li>)}</ul>}</dd></div>
         <div><dt>計算</dt><dd>表示・集計格子 {analysis.grid?.step}m、局所勾配は10m幅の中央差分。上の勾配は中央値で、両端平均ではありません。表示間隔は測量精度ではありません。</dd></div>
+        <div><dt>3Dの底面</dt><dd>高さを見やすくする表示用です。地層・土量は示さず、除外・欠測部分は地表と同じ範囲で空けています。</dd></div>
         <div><dt>取得範囲</dt><dd>標高 約{number(summary?.coveragePercent)}% ／ 勾配 約{number(summary?.slopeCoveragePercent)}%</dd></div>
         <div><dt>取得</dt><dd>{dateText(analysis.fetchedAt)}</dd></div>
       </dl><p>黄色線は測量で確認した筆界ではありません。樹木・建物・擁壁や造成の細部は現地・図面で確認してください。</p><button type="button" className="terrain-area-quiet-button" onClick={onClear} disabled={!onClear}>地形の結果をクリア</button></details>
