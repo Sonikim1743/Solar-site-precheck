@@ -1,6 +1,6 @@
 # ソースコード共有・外部レビュー用ガイド
 
-このアプリを他のAIツール、社内レビュー、GitHub等で検証してもらう場合は、以下のファイルを共有してください。
+v1.28.1 / 2026-10-08。再現できるソースレビューには公開GitHubの検証対象コミットをcloneし、未変更のlockfileから依存関係を入れます。公開版との対応は [公開記録](docs/DEPLOYED_VERSION.md) を参照してください。ソース、ビルド済み配布物、個別案件の記録は別の資料です。
 
 ## 共有するファイル・フォルダ
 
@@ -9,7 +9,11 @@
 - `src/`
 - `public/`
 - `tests/`
-- `work/serve-dist.mjs`
+- `build/`
+- `shared/`
+- `functions/`
+- Gitで追跡されている `work/*.mjs`（ローカルサーバー・API・検証スクリプト）
+- `.github/workflows/`
 - `index.html`
 - `package.json`
 - `pnpm-lock.yaml`
@@ -17,6 +21,8 @@
 - `vite.config.js`
 - `README.md`
 - `CHANGELOG.md`
+- `AGENTS.md` と `docs/` の現行仕様・検証・引継ぎ文書
+- 配布を検証する場合は `release/latest` の対象版ZIPとメタデータ、`wrangler.pages.toml`
 
 補足資料として共有推奨:
 
@@ -40,8 +46,8 @@
 - `outputs/`
 - `.agents/`
 - `.codex/`
-- `work/serve-dist.mjs` 以外の `work/` 内ファイル
-- `*.zip`
+- `work/` 内の未追跡・個別調査用ファイル（追跡された実行・検証ソースは共有対象）
+- 一時作成ZIP（配布を検証する場合の `release/latest` は共有対象）
 - `eng.traineddata`
 
 ## 外部レビュー時に伝えるとよい観点
@@ -60,9 +66,11 @@
 依存関係を入れた後、以下で確認できます。
 
 ```bash
-pnpm install
+pnpm install --frozen-lockfile
 pnpm test
 pnpm build
+pnpm verify:csp
+pnpm verify:assets
 pnpm serve:dist
 ```
 
