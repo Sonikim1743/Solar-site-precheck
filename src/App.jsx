@@ -3403,7 +3403,7 @@ export default function App() {
 
         <div className="workflow">
           <section className="panel map-panel" id="site-select">
-            <div className="section-heading">
+            <div className="section-heading site-map-header">
 
               <div>
                 <div className="heading-with-help">
@@ -3431,9 +3431,7 @@ export default function App() {
                     </div>
                   </details>
                 </div>
-                <p>住所で検索、または地図から選択</p>
               </div>
-            </div>
 
             <div className="site-search-row">
               <form className="address-search" onSubmit={handleAddressSearch}>
@@ -3441,7 +3439,7 @@ export default function App() {
                 <input
                   value={address}
                   onChange={(event) => setAddress(event.target.value)}
-                  placeholder="住所・地名・緯度経度を入力（例：広島県庄原市東城町帝釈宇山 / 34.8617, 133.2433）"
+                  placeholder="住所・地名・緯度経度で検索"
                   aria-label="住所・地名・緯度経度"
                 />
                 <button type="submit" aria-label="候補地点を検索" disabled={searchStatus === 'loading'}>{searchStatus === 'loading' ? '検索中' : '検索'}</button>
@@ -3457,6 +3455,7 @@ export default function App() {
               </form>
 
 
+            </div>
             </div>
             {searchStatus === 'empty' && <p className="inline-message">該当する候補がありません。座標の場合は「34.8617, 133.2433」の形式も使えます。</p>}
             {searchStatus === 'error' && <p className="inline-message inline-message--error">住所検索に接続できませんでした。座標入力または地図クリックを使用してください。</p>}
@@ -3571,25 +3570,26 @@ export default function App() {
                 <div className="simple-point-actions">{position && <><button type="button" onClick={copySelectedCoordinates}>緯度経度コピー</button><a href={googleMapsUrl} target="_blank" rel="noreferrer">Google マップ ↗</a></>}{pointActionStatus && <span role="status">{pointActionStatus}</span>}</div>
               </div> : <div className="selected-point-mini">
                 <div className="selected-point-mini__location"><span>選択地点</span><strong>{position ? selectedPlaceLabel || '住所を確認中' : '住所検索または地図で地点を選択'}</strong></div>
-                <div className="selected-point-mini__coordinates"><span>緯度・経度</span><strong>{position ? `${toDegreeMinutes(position.lat, 'lat')} / ${toDegreeMinutes(position.lon, 'lon')}` : '—'}</strong></div>
+                <div className="selected-point-mini__coordinates"><span>座標</span><strong>{position ? `${position.lat.toFixed(6)}, ${position.lon.toFixed(6)}` : '—'}</strong></div>
                 <div className="selected-point-mini__elevation"><span>標高</span><strong>{elevation.status === 'success' ? `${elevation.value.toFixed(1)} m` : elevation.status === 'loading' ? '取得中…' : elevation.status === 'error' ? '未取得' : '—'}</strong></div>
-                {position && <button type="button" className="mini-copy-button" onClick={copySelectedCoordinates} title={selectedCoordinateText}>緯度経度コピー</button>}
+                {position && <button type="button" className="mini-copy-button" onClick={copySelectedCoordinates} aria-label="緯度経度をコピー" title={selectedCoordinateText}>コピー</button>}
                 {pointActionStatus && <em role="status">{pointActionStatus}</em>}
               </div>}
               {position && !Number.isFinite(elevation.value) && <button className="secondary-button" disabled={elevation.status === 'loading'} onClick={fetchMissingElevation}>{elevation.status === 'loading' ? '標高を取得中…' : 'この地点の標高を取得'}</button>}
               <div className="terrain-section-quick">
-                <div>
+                <div title={`選択地点から東西・南北へ各${terrainSectionRange}m、10m間隔の標高を確認します。`}>
                   <strong>
-                    {terrainSectionStatus === 'success' && (terrainSectionOpen ? `周辺${terrainSectionRange}m断面を表示中` : `周辺${terrainSectionRange}m断面を取得済み`)}
-                    {terrainSectionStatus === 'loading' && `周辺${terrainSectionRange}m断面を取得中…`}
+                    {terrainSectionStatus === 'success' && '地形断面'}
+                    {terrainSectionStatus === 'loading' && '断面を取得中…'}
                     {terrainSectionStatus === 'error' && '断面取得失敗'}
-                    {terrainSectionStatus === 'idle' && `周辺${terrainSectionRange}mの地形断面`}
+                    {terrainSectionStatus === 'idle' && '地形断面'}
                   </strong>
-                  <span>東西・南北へ各{terrainSectionRange}m、10m間隔で確認</span>
+                  <span>東西・南北</span>
                 </div>
                 <label className="terrain-range-select" title="地図上の確認範囲と断面の取得距離を変更します。">
-                  <span>範囲</span>
+                  <span>距離</span>
                   <select
+                    aria-label="地形断面の確認距離"
                     value={terrainSectionRange}
                     disabled={terrainSectionStatus === 'loading'}
                     onChange={(event) => {
