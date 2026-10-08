@@ -145,9 +145,20 @@
 .app .map-panel .terrain-area-disclosure > summary:hover { background:#eaf4ed; }
 .app .map-panel .terrain-area-disclosure > summary:focus-visible { outline:3px solid #3d9677; outline-offset:2px; }
 .app .map-panel .terrain-area-disclosure > .terrain-area-panel { margin-top:10px; padding:0; }
+.app .map-panel .map-draw-controls button,.app .map-panel .map-location-buttons > button { min-height:44px; padding:8px 13px; border:1px solid #c6d6cc; border-radius:7px; background:#fff; color:#2e483c; font-size:14px; font-weight:600; line-height:1.4; box-shadow:0 1px 4px #183c351c; }
+.app .map-panel .map-draw-controls button.is-active { background:#17664f; border-color:#17664f; color:#fff; }
+.app .map-panel .map-location-buttons > button:hover:not(:disabled) { background:#eef7f2; transform:none; }
+.app .map-panel .map-touch-toggle { min-height:44px; border-radius:7px; border-color:#c6d6cc; background:#fff; color:#2e483c; font-size:13px; font-weight:600; box-shadow:0 1px 4px #183c351c; }
+.app .map-panel .map-touch-toggle--active { background:#17664f; border-color:#17664f; color:#fff; }
+.app .map-panel .map-google-open { border:1px solid #c6d6cc; border-radius:7px; font-weight:600; box-shadow:0 1px 4px #183c351c; }
+.app .map-panel .map-google-open:hover { transform:none; }
+.app .map-panel .terrain-map-legend button { min-height:28px; padding:3px 8px; border-radius:5px; font-size:11px; font-weight:500; line-height:1.4; }
+.app .map-panel :is(.map-draw-controls button,.map-location-buttons > button,.map-touch-toggle,.map-google-open,.terrain-map-legend button):focus-visible { outline:3px solid #3d9677; outline-offset:2px; }
 @media (pointer:coarse) {
   .app .map-panel .selected-point-mini > .mini-copy-button,.app .map-panel .map-analysis-strip .terrain-range-select select,.app .map-panel .map-analysis-strip .terrain-section-button { min-height:36px; height:36px; }
+  .app .map-panel .terrain-map-legend button { min-height:36px; }
 }
+@media(max-width:640px) { .app .map-panel .terrain-map-legend button { min-height:36px; } .app .map-panel .map-google-open { min-height:36px; } }
 @media(max-width:640px) { .app .map-panel .terrain-area-disclosure > summary { width:100%; min-height:44px; padding:9px 12px; gap:4px 8px; } .app .map-panel .terrain-area-disclosure > summary strong { flex:1 1 220px; } }
 .map-panel .section-heading { margin-bottom:20px; }
 .cadastre-guide > summary { cursor:pointer; color:#63786e; font-size:12px; }
