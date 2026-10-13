@@ -1,0 +1,37 @@
+/* Map controls only. Keep the map instance, drawing state and data untouched. */
+.app .map-panel .map-shell .map-draw-controls{top:10px;left:48px;gap:6px;max-width:calc(100% - 142px)}
+.app .map-panel .map-shell .map-draw-controls button,
+.app .map-panel .map-shell .map-location-buttons>button,
+.app .map-panel .map-shell .map-touch-toggle,
+.app .map-panel .map-shell .map-base-toggle{box-sizing:border-box;min-height:36px;height:36px;padding:6px 9px;font-size:12px;line-height:1.4;border-radius:6px}
+.app .map-panel .map-shell .map-location-buttons{gap:6px;flex-wrap:wrap}
+.app .map-panel .map-shell .map-location-control{left:auto;right:10px;bottom:10px;gap:6px;max-width:calc(100% - 20px);justify-items:end}
+.app .map-panel .map-shell .map-location-control .map-google-open{position:static;pointer-events:auto;min-height:30px;height:30px;padding:4px 8px;font-size:11px;border-radius:6px;line-height:1.4;justify-self:end}
+.app .map-panel .map-shell .map-location-control small{max-width:290px}
+.app .map-panel .map-shell .map-touch-toggle{top:58px;padding-inline:10px}
+.app .map-panel .map-shell .map-hint{top:58px}
+.app .map-panel .map-shell .leaflet-control-zoom a{width:26px;height:26px;line-height:26px;font-size:20px}
+.app .map-panel .map-shell .map-display-controls{position:absolute;top:10px;right:10px;z-index:850;display:flex;flex-direction:column;align-items:flex-end;gap:6px;pointer-events:none}
+.app .map-panel .map-shell .map-base-toggle{pointer-events:auto;white-space:nowrap;border:1px solid #c6d6cc;background:#fff;color:#2e483c;font-family:inherit;font-weight:600;box-shadow:0 1px 4px #183c351c;cursor:pointer}
+.app .map-panel .map-shell .map-base-toggle:hover{background:#eef7f2}
+.app .map-panel .map-shell .map-display-options{position:relative;pointer-events:auto}
+.app .map-panel .map-shell .map-display-options>summary{box-sizing:border-box;width:28px;height:28px;display:flex;align-items:center;justify-content:center;list-style:none;border:1px solid #c6d6cc;border-radius:5px;background:#fff;color:#2e483c;font-size:20px;line-height:1;cursor:pointer;box-shadow:0 1px 4px #183c351c}
+.app .map-panel .map-shell .map-display-options>summary::-webkit-details-marker{display:none}
+.app .map-panel .map-shell .map-display-options>div{position:absolute;top:calc(100% + 20px);right:0;min-width:130px;padding:9px 11px;border:1px solid #c6d6cc;border-radius:6px;background:#fff;box-shadow:0 2px 8px #183c3526;color:#2e483c;font-size:12px}
+.app .map-panel .map-shell .map-display-options label{display:flex;align-items:center;gap:7px;white-space:nowrap;cursor:pointer}
+.app .map-panel .map-shell .map-display-options input{width:16px;height:16px;margin:0;accent-color:#17664f}
+.app .map-panel .map-shell :is(.map-base-toggle,.map-display-options>summary):focus-visible{outline:3px solid #3d9677;outline-offset:2px}
+.app .map-panel .parcel-drawing-toolbar .parcel-drawing-toolbar__buttons button{min-height:34px;padding:6px 9px;font-size:12px;border-radius:6px}
+.app .map-panel .map-shell>.map-region-label{top:10px;min-height:30px;padding:4px 8px}
+@media(max-width:760px){.app .map-panel .map-shell>.map-region-label{top:104px;left:48px;right:10px;max-width:calc(100% - 58px)}}
+@media(max-width:480px){
+  .app .map-panel .map-shell .map-draw-controls{left:46px;gap:4px;max-width:calc(100% - 136px)}
+  .app .map-panel .map-shell .map-draw-controls button{padding-inline:7px;font-size:11px}
+  .app .map-panel .map-shell .map-base-toggle{padding-inline:7px;font-size:11px}
+}
+@media(max-width:340px){
+  .app .map-panel .map-shell .map-display-controls{top:54px}
+  .app .map-panel .map-shell .map-touch-toggle{top:98px}
+  .app .map-panel .map-shell>.map-region-label{top:142px}
+}
+@media print{.map-display-controls{display:none!important}}

@@ -1,9 +1,13 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import polygonClipping from 'polygon-clipping'
-import { terrainPointToLocal } from '../utils/terrainArea.js'
+import { terrainPointToLocal, pointInTerrainBoundary } from '../utils/terrainArea.js'
 import { createTerrainProjection, dragTerrainView, normalizeTerrainView, orbitTerrainView, zoomTerrainView, terrainFaceVisible } from '../utils/terrainView.js'
 import { buildTerrainSolid } from '../utils/terrainSolid.js'
 import { terrainSlopeDistribution, formatTerrainSlopeArea } from '../utils/terrainSlopeDistribution.js'
+import { getTerrainCellSlope } from '../utils/terrainLayout.js'
+import { createTerrainOverlayVisibility, visibleTerrainLineParts } from '../utils/terrainOverlayVisibility.js'
+import { layoutTerrainLabels } from '../utils/terrainLabelLayout.js'
+import { hitTestTerrainRack } from '../utils/terrainRackHitTest.js'
 import './terrain-area.css'
 
 const COLORS = ['#cfe3cd', '#efe8ad', '#eabd8d', '#df9d9b']
@@ -86,7 +90,29 @@ function Scale({ project, bounds }) {
   </g>
 }
 
-export function TerrainAreaPlan({ analysis, position, reportMode = false }) {
+function ParcelLabels({ labels }) {
+  return <g className="terrain-area-parcel-labels">
+    {labels.filter(label => label.displaced).map((label, index) => <g key={`${label.id}-${index}`} className="terrain-area-parcel-leader">
+        <line x1={label.anchorScreen[0]} y1={label.anchorScreen[1]} x2={label.screen[0]} y2={label.screen[1] - 6} />
+        <circle cx={label.anchorScreen[0]} cy={label.anchorScreen[1]} r="2" />
+      </g>)}
+    {labels.map((label, index) => <text key={`${label.id}-${index}`} x={label.screen[0]} y={label.screen[1]} textAnchor="middle" data-parcel-number={label.number}>{label.number}</text>)}
+  </g>
+}
+
+function ParcelLabelNote({ labels, unplaced = [], hidden = [] }) {
+  if (!labels) return null
+  return <div className="terrain-area-parcel-note">
+    {labels.some(label => label.displaced) && <p>地番は重ならない位置へ表示。細い線の先が元の位置です。</p>}
+    {(unplaced.length > 0 || hidden.length > 0) && <details>
+      <summary>図上に収まらない地番・現在の視点で見えない地番（{unplaced.length + hidden.length}件）</summary>
+      {unplaced.length > 0 && <p>重なり・表示範囲：{unplaced.map(label => label.number).join('、')}</p>}
+      {hidden.length > 0 && <p>地形の裏側・画面外：{hidden.map(label => label.number).join('、')}。回転・縮小して確認できます。</p>}
+    </details>}
+  </div>
+}
+
+export function TerrainAreaPlan({ analysis, position, reportMode = false, layout, layoutCandidates, onToggleRack, fence, parcelOverlay, rackControls }) {
   const rawId = useId(), id = `terrain-plan-${rawId.replace(/:/g, '')}`
   const drawing = useMemo(() => {
     const grid = analysis?.grid
@@ -98,14 +124,20 @@ export function TerrainAreaPlan({ analysis, position, reportMode = false }) {
     const boundaryPath = ringsOf(grid).map((ring) => pathOf(ring, project, true)).join(' ')
     const fills = Array.from({ length: 5 }, () => [])
     let low = null, high = null
-    const cell = grid.step * scale
     for (let index = 0; index < grid.elevations.length; index++) {
       if (!grid.inside[index] || !finite(grid.elevations[index])) continue
       const [x, y] = project(coordinateAt(grid, index))
-      const category = colorIndex(grid.slopes[index])
-      fills[category + 1].push(`M${n(x - cell / 2)} ${n(y - cell / 2)}h${n(cell)}v${n(cell)}h-${n(cell)}Z`)
       if (!low || grid.elevations[index] < grid.elevations[low.index]) low = { index, x, y }
       if (!high || grid.elevations[index] > grid.elevations[high.index]) high = { index, x, y }
+    }
+    // Match the 3D surface and the layout mask: colours belong to the same
+    // four-sample cells, rather than half-cell squares around single nodes.
+    for (let row = 0; row < grid.height - 1; row++) for (let col = 0; col < grid.width - 1; col++) {
+      const first = row * grid.width + col
+      const indexes = [first, first + 1, first + grid.width + 1, first + grid.width]
+      if (!indexes.every(index => finite(grid.elevations[index]))) continue
+      const points = indexes.map(index => coordinateAt(grid, index))
+      fills[colorIndex(getTerrainCellSlope(grid, row, col)) + 1].push(pathOf(points, project, true))
     }
     const contours = (analysis.contours || []).map(({ level, paths }) => ({
       level, major: Math.abs(level % 10) < 1e-6,
@@ -114,6 +146,9 @@ export function TerrainAreaPlan({ analysis, position, reportMode = false }) {
     }))
     return { grid, bounds, project, boundaryPath, fills: fills.map((paths) => paths.join(' ')), contours, low, high }
   }, [analysis])
+  const parcelLabels = useMemo(() => !reportMode && parcelOverlay && drawing
+    ? layoutTerrainLabels(parcelOverlay.labels.map(label => ({ ...label, screen: drawing.project(label.point) })), { left: 45, top: 45, right: 735, bottom: 410 })
+    : null, [parcelOverlay, drawing, reportMode])
   if (!drawing) return <p className="terrain-area-empty">表示できる地形データがありません。</p>
   const { grid, project, boundaryPath, fills, contours, low, high, bounds } = drawing
   const localPoint = figurePoint(position, grid)
@@ -139,6 +174,17 @@ export function TerrainAreaPlan({ analysis, position, reportMode = false }) {
       </g>
       <path d={boundaryPath} fill="none" stroke="#755a0c" strokeWidth="5.5" fillRule="evenodd" />
       <path d={boundaryPath} fill="none" stroke="#ffe073" strokeWidth="3" fillRule="evenodd" />
+      {!reportMode && fence && <g className="terrain-area-fence">{fence.rails.map(rail => <path key={rail.id} data-terrain-fence="rail" d={pathOf(rail.points, project)} strokeDasharray="5 3" />)}</g>}
+      {!reportMode && layout && <g clipPath={`url(#${id}-clip)`} className="terrain-area-layout-plan" data-layout-racks={layout.rackCount}>
+        {layout.racks.map(rack => <g key={rack.id} role={onToggleRack ? 'button' : undefined} tabIndex={onToggleRack ? 0 : undefined} aria-label={onToggleRack ? `架台 ${rack.id} を除外` : undefined} className={onToggleRack ? 'terrain-area-plan-rack' : undefined} onClick={onToggleRack ? () => onToggleRack(rack.id) : undefined} onKeyDown={onToggleRack ? event => { if (['Enter',' '].includes(event.key)) { event.preventDefault(); onToggleRack(rack.id) } } : undefined}>
+          {rack.modules.map(module => <path key={module.id} d={pathOf(module.corners, project, true)} fill="#315e89" stroke="#e0edf6" strokeWidth=".55" />)}
+        </g>)}
+        {onToggleRack && layoutCandidates?.racks.filter(rack => !layout.racks.some(active => active.id === rack.id)).map(rack => <path key={`ghost-${rack.id}`} className="terrain-area-rack-ghost" d={pathOf(rack.corners, project, true)} role="button" tabIndex="0" aria-label={`架台 ${rack.id} を戻す`} onClick={() => onToggleRack(rack.id)} onKeyDown={event => { if (['Enter',' '].includes(event.key)) { event.preventDefault(); onToggleRack(rack.id) } }} />)}
+      </g>}
+      {!reportMode && parcelOverlay && <g clipPath={`url(#${id}-clip)`} className="terrain-area-parcel-labels">
+        {parcelOverlay.boundaries.map((boundary, index) => <path key={`${boundary.id}-${index}`} d={pathOf(boundary.points, project)} fill="none" stroke="#229da4" strokeWidth="1.5" />)}
+      </g>}
+      {parcelLabels && <ParcelLabels labels={parcelLabels.labels} />}
       {[low, high].filter(Boolean).map((point, index) => <g key={index} className="terrain-area-extreme">
         <circle cx={point.x} cy={point.y} r="4" fill={index ? '#9c5c30' : '#426b71'} stroke="#fff" strokeWidth="1.5" />
       </g>)}
@@ -149,6 +195,8 @@ export function TerrainAreaPlan({ analysis, position, reportMode = false }) {
       <text x="756" y="443" textAnchor="end" className="terrain-area-svg-note">黄色線：地形の検討範囲{partial ? '　斜線：未取得・未計算' : ''}</text>
       <Legend summary={analysis.summary} />
     </svg>
+    {!reportMode && rackControls}
+    {parcelLabels && <ParcelLabelNote {...parcelLabels} />}
     <figcaption>等高線2m間隔・10mごとに太線。割合は勾配を計算できた範囲内の格子点が分母です。面積は有効範囲と勾配取得率からの概算。色分けは施工可否の基準ではありません。{position && !pointVisible ? '選択地点は図の範囲外です。' : ''}</figcaption>
   </figure>
 }
@@ -198,7 +246,7 @@ function segmentCrossesCell(a, b, west, south, east, north) {
   return true
 }
 
-export function TerrainArea3D({ analysis, position, reportMode = false, azimuth = 35, interactive = false, heightScale = 1 }) {
+export function TerrainArea3D({ analysis, position, reportMode = false, azimuth = 35, interactive = false, heightScale = 1, layout, layoutCandidates, onToggleRack, fence, parcelOverlay, rackControls }) {
   const id = `terrain-3d-${useId().replace(/:/g, '')}`
   const canRotate = interactive && !reportMode
   const initialView = normalizeTerrainView({ azimuth, pitch: 32 })
@@ -243,8 +291,7 @@ export function TerrainArea3D({ analysis, position, reportMode = false, azimuth 
       const [west, south] = points[0], east = points[1][0], north = points[2][1]
       const boundaryCell = edges.some(([a, b]) => segmentCrossesCell(a, b, west, south, east, north))
       if (!boundaryCell && !indexes.every((index) => grid.inside[index])) continue
-      const slopes = indexes.map((index) => grid.slopes[index]).filter(finite)
-      const slope = slopes.length === 4 ? slopes.reduce((sum, value) => sum + value, 0) / slopes.length : null
+      const slope = getTerrainCellSlope(grid, row, col)
       const category = colorIndex(slope)
       const surface = boundaryCell ? polygonClipping.intersection(grid.boundary, [[...points.map(([x,y]) => [x,y]), [west,south]]]) : [[points.map(([x,y]) => [x,y])]]
       const lift = ([x,y]) => {
@@ -272,8 +319,10 @@ export function TerrainArea3D({ analysis, position, reportMode = false, azimuth 
   }, [analysis])
   const drawing = useMemo(() => {
     if (!mesh) return null
-    const projection = createTerrainProjection({ bounds: mesh.bounds, base: mesh.base, maxElevation: mesh.maximum, ...camera, heightScale: verticalScale })
-    const faces = [...mesh.floorFaces, ...mesh.walls, ...mesh.faces].map((face, index) => {
+    const modules = !reportMode && layout ? layout.racks.flatMap(rack => rack.modules.map(module => ({ rings: [module.corners], centroid: module.corners.reduce((sum, point) => sum.map((value, axis) => value + point[axis] / 4), [0,0,0]), normal: surfaceNormal(module.corners), kind: 'module', color: '#315e89' }))) : []
+    const maximum = [...(!reportMode && layoutCandidates ? layoutCandidates.racks.flatMap(rack => rack.corners) : modules.flatMap(face => face.rings[0])), ...(!reportMode && fence ? fence.posts.map(post => post.top) : [])].reduce((max, point) => Math.max(max, point[2]), mesh.maximum)
+    const projection = createTerrainProjection({ bounds: mesh.bounds, base: mesh.base, maxElevation: maximum, ...camera, heightScale: verticalScale })
+    const faces = [...mesh.floorFaces, ...mesh.walls, ...mesh.faces, ...modules].map((face, index) => {
       let color = face.color
       if (face.kind === 'floor') color = '#b2bcb4'
       if (face.kind === 'wall') {
@@ -287,7 +336,39 @@ export function TerrainArea3D({ analysis, position, reportMode = false, azimuth 
       return { ...face, color, index, visible: terrainFaceVisible(face.normal, camera, verticalScale), depth: projection.transform(face.centroid)[2] }
     }).sort((a,b) => a.depth - b.depth)
     return { ...mesh, ...projection, faces, faceCount: mesh.faces.length, outlinePaths: mesh.outlines.map(points => pathOf(points, projection.project)) }
-  }, [mesh, camera.azimuth, camera.pitch, camera.zoom, verticalScale])
+  }, [mesh, camera.azimuth, camera.pitch, camera.zoom, verticalScale, layout, layoutCandidates, fence, reportMode])
+  const projectedFence = useMemo(() => {
+    if (reportMode || !fence || !drawing) return null
+    const visible = createTerrainOverlayVisibility(drawing.faces.filter(face => face.kind !== 'module'), drawing)
+    return { posts: fence.posts.filter(post => visible([post.base[0],post.base[1],post.base[2]+.1])), rails: fence.rails.flatMap(rail => visibleTerrainLineParts(rail.points, visible)) }
+  }, [fence, drawing, reportMode])
+  const projectedRacks = useMemo(() => {
+    if (!canRotate || !onToggleRack || !layoutCandidates || !drawing) return []
+    const visible = createTerrainOverlayVisibility(drawing.faces.filter(face => face.kind !== 'module'), drawing, { requireSurface: false })
+    const active = new Set(layout?.racks.map(rack => rack.id))
+    return layoutCandidates.racks.map(rack => {
+      const center = rack.corners.reduce((sum, point) => sum.map((value, axis) => value + point[axis] / rack.corners.length), [0,0,0])
+      const ground = interpolateElevation(drawing.grid, center[0], center[1])
+      // The selectable object is the rigid panel plane, which may remain in
+      // view above terrain that hides the ground underneath. Module faces stay
+      // out of this occlusion mask so the roof does not cover its own control.
+      return { id: rack.id, active: active.has(rack.id), polygon: rack.corners.map(drawing.project), depth: drawing.transform(center)[2], visible: center.every(finite) && finite(ground) && pointInTerrainBoundary(center, drawing.grid.boundary) && visible(center) && terrainFaceVisible(surfaceNormal(rack.corners), camera, verticalScale) }
+    }).filter(rack => rack.visible).sort((a,b) => a.depth - b.depth)
+  }, [layoutCandidates, layout, drawing, canRotate, onToggleRack, camera.azimuth, camera.pitch, verticalScale])
+  const projectedParcels = useMemo(() => {
+    if (reportMode || !parcelOverlay || !drawing) return null
+    // Parcel numbers are annotations, so reference panels must not erase them.
+    // Terrain, walls and the current camera still determine visibility.
+    const visible = createTerrainOverlayVisibility(drawing.faces.filter(face => face.kind !== 'module'), drawing)
+    const lines = parcelOverlay.boundaries.flatMap(boundary => visibleTerrainLineParts(boundary.points.map(([x,y,z]) => [x,y,z+.06]), visible))
+    const labels = [], hidden = []
+    for (const label of parcelOverlay.labels) {
+      const point = [label.point[0], label.point[1], label.point[2]+.08]
+      if (!visible(point)) { hidden.push(label); continue }
+      labels.push({ ...label, screen: drawing.project(point) })
+    }
+    return { lines, ...layoutTerrainLabels(labels), hidden }
+  }, [parcelOverlay, drawing, reportMode])
 
   // Keep a single raster surface in the interactive view. Each clipped polygon
   // is filled separately, so overlap never cancels holes by compound evenodd.
@@ -307,7 +388,7 @@ export function TerrainArea3D({ analysis, position, reportMode = false, azimuth 
     }
     for (const face of drawing.faces) {
       if (!face.visible) continue
-      trace(face.rings); context.fillStyle = face.color; context.fill('evenodd'); context.strokeStyle = face.color; context.lineWidth = .35; context.lineJoin = 'round'; context.stroke()
+      trace(face.rings); context.fillStyle = face.color; context.fill('evenodd'); context.strokeStyle = face.kind === 'module' ? '#dce9f3' : face.color; context.lineWidth = face.kind === 'module' ? .55 : .35; context.lineJoin = 'round'; context.stroke()
     }
     context.restore()
   }, [drawing, canRotate, modelHeight])
@@ -322,21 +403,30 @@ export function TerrainArea3D({ analysis, position, reportMode = false, azimuth 
     const rect = modelRef.current?.getBoundingClientRect()
     if (!rect?.width || !rect.height) return
     discardFrame()
-    dragRef.current = { id: event.pointerId, element: event.currentTarget, x: event.clientX, y: event.clientY, view: latestView.current, mode: viewMode, width: rect.width, height: rect.height }
+    dragRef.current = { id: event.pointerId, element: event.currentTarget, x: event.clientX, y: event.clientY, view: latestView.current, mode: viewMode, width: rect.width, height: rect.height, left: rect.left, top: rect.top, moved: false }
     event.currentTarget.setPointerCapture(event.pointerId)
     event.currentTarget.ownerSVGElement?.focus({ preventScroll: true })
   }
   const pointerMove = event => {
     const drag = dragRef.current
     if (!drag || drag.id !== event.pointerId) return
+    if (Math.hypot(event.clientX - drag.x, event.clientY - drag.y) > 5) drag.moved = true
+    if (!drag.moved) return
     const dx = (event.clientX - drag.x) / drag.width, dy = (event.clientY - drag.y) / drag.height
     queueView(drag.mode === 'orbit' ? orbitTerrainView(drag.view, dx, dy) : dragTerrainView(drag.view, dx, dy))
   }
   const pointerEnd = event => {
     if (dragRef.current?.id !== event.pointerId) return
+    const drag = dragRef.current
     const next = pendingView.current
     releaseDrag(); discardFrame()
     if (next) { latestView.current = next; setView(next) }
+    if (event.type === 'pointerup' && !drag.moved && Math.hypot(event.clientX - drag.x, event.clientY - drag.y) <= 5 && onToggleRack) {
+      const screen = [event.clientX - drag.left, event.clientY - drag.top]
+      const cssRacks = projectedRacks.map(rack => ({ ...rack, polygon: rack.polygon.map(([x,y]) => [(x-25)/750*drag.width, (y-35)/395*drag.height]) }))
+      const rackId = hitTestTerrainRack(screen, cssRacks)
+      if (rackId) onToggleRack(rackId)
+    }
   }
   const keyDown = event => {
     if (!canRotate || !['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','+','=','-'].includes(event.key)) return
@@ -378,7 +468,7 @@ export function TerrainArea3D({ analysis, position, reportMode = false, azimuth 
     </div>}
     <div className="terrain-area-model">
     {canRotate && <canvas ref={canvasRef} aria-hidden="true" className="terrain-area-surface" />}
-    <svg viewBox={`0 0 ${W} ${modelHeight}`} data-height-scale={verticalScale} data-view-azimuth={camera.azimuth} data-view-pitch={camera.pitch} role={canRotate ? 'group' : 'img'} tabIndex={canRotate ? 0 : undefined} aria-roledescription={canRotate ? '地形の周囲を回って見られる立体図' : undefined} aria-labelledby={`${id}-title ${id}-desc`} aria-describedby={canRotate ? `${id}-controls` : undefined} onKeyDown={keyDown}>
+    <svg viewBox={`0 0 ${W} ${modelHeight}`} data-height-scale={verticalScale} data-view-azimuth={camera.azimuth} data-view-pitch={camera.pitch} data-layout-modules={!reportMode && layout ? layout.moduleCount : 0} role={canRotate ? 'group' : 'img'} tabIndex={canRotate ? 0 : undefined} aria-roledescription={canRotate ? '地形の周囲を回って見られる立体図' : undefined} aria-labelledby={`${id}-title ${id}-desc`} aria-describedby={canRotate ? `${id}-controls` : undefined} onKeyDown={keyDown}>
       <title id={`${id}-title`}>参考範囲の実DEM地形3D</title>
       <desc id={`${id}-desc`}>等高線図と同じ標高データ・参考範囲を用いた立体図。{verticalScale === 2 ? '横1：縦2の高さ強調表示。標高・勾配の数値と色は実DEMのままです。' : '高さ強調なし、縦横同尺度。'}黄色線は地表に沿う対象範囲。側面・底面は表示用で、地層・土量を示しません。樹木、建物、擁壁、造成後の形状は含みません。欠測や除外の部分を面で埋めません。</desc>
       {!canRotate && <rect width={W} height={H} fill="#fbfcfa" />}
@@ -392,6 +482,12 @@ export function TerrainArea3D({ analysis, position, reportMode = false, azimuth 
       </g>
       {!canRotate && <g>{faces.map(({ rings, color, index, kind, visible }) => <path key={index} data-terrain-face={kind} display={visible ? undefined : 'none'} d={rings.map(ring => pathOf(ring, project, true)).join(' ')} fill={color} fillRule="evenodd" stroke={color} strokeWidth="0.35" strokeLinejoin="round" />)}</g>}
       <g fill="none" strokeLinejoin="round" strokeLinecap="round">{outlinePaths.map((d, index) => <g key={index}><path d={d} stroke="#765b10" strokeWidth="4.5" /><path d={d} stroke="#ffe073" strokeWidth="2.4" /></g>)}</g>
+      {projectedFence && <g className="terrain-area-fence">{projectedFence.rails.map((points,index) => <path key={`rail-${index}`} data-terrain-fence="rail" d={pathOf(points,project)} />)}{projectedFence.posts.map(post => <path key={post.id} data-terrain-fence="post" d={pathOf([post.base,post.top],project)} />)}</g>}
+      {projectedRacks.length > 0 && <g className="terrain-area-rack-controls">{projectedRacks.map(rack => <path key={rack.id} data-terrain-rack={rack.id} data-rack-active={rack.active} d={pathOf(rack.polygon, point => point, true)} className={rack.active ? 'terrain-area-rack-control' : 'terrain-area-rack-ghost'} role="button" tabIndex="0" aria-label={`架台 ${rack.id} を${rack.active ? '除外' : '戻す'}`} onKeyDown={event => { if (['Enter',' '].includes(event.key)) { event.preventDefault(); onToggleRack(rack.id) } }} />)}</g>}
+      {projectedParcels && <g className="terrain-area-parcel-labels">
+        {projectedParcels.lines.map((points, index) => <path key={index} d={pathOf(points, project)} fill="none" stroke="#229da4" strokeWidth="1.5" />)}
+        <ParcelLabels labels={projectedParcels.labels} />
+      </g>}
       {point && point[0] > 25 && point[0] < 770 && point[1] > 32 && point[1] < 430 && <g transform={`translate(${point[0]} ${point[1]})`} className="terrain-area-selected-point"><circle r="5" fill="#197ca0" stroke="#fff" strokeWidth="2" /><text x="9" y="-8">選択地点</text></g>}
       <g className="terrain-area-3d-cardinals">{[['N', north], ['S', south], ['E', east], ['W', west]].map(([label, p]) => <text key={label} x={p[0]} y={p[1] + (label === 'N' ? -9 : 18)} textAnchor="middle">{label}</text>)}</g>
       </g>
@@ -399,12 +495,14 @@ export function TerrainArea3D({ analysis, position, reportMode = false, azimuth 
       {canRotate && <rect ref={modelRef} className="terrain-area-drag-target" x="25" y="35" width="750" height="395" fill="transparent" onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerEnd} onPointerCancel={pointerEnd} onLostPointerCapture={pointerEnd} />}
     </svg>
     </div>
+    {projectedParcels && <ParcelLabelNote {...projectedParcels} />}
     {canRotate && <div className="terrain-area-rotation-controls">
       <div className="terrain-area-camera-modes" role="group" aria-label="3Dの操作"><button type="button" aria-pressed={viewMode === 'rotate'} onClick={() => changeViewMode('rotate')}>回転</button><button type="button" aria-pressed={viewMode === 'orbit'} onClick={() => changeViewMode('orbit')}>視点の移動</button></div>
       <p id={`${id}-controls`}>{viewMode === 'orbit' ? '地形の中心を固定。左右で周囲を回り、上へドラッグで見下ろす。' : 'ドラッグで回転。'}ホイールで拡大・縮小。矢印キーも使えます。</p>
       <div className="terrain-area-camera-zoom" role="group" aria-label="3Dの拡大縮小"><button type="button" aria-label="3Dを縮小" disabled={camera.zoom <= .65} onClick={() => zoomView(1/1.2)}>−</button><span>{camera.zoom.toFixed(1)}×</span><button type="button" aria-label="3Dを拡大" disabled={camera.zoom >= 2.5} onClick={() => zoomView(1.2)}>＋</button></div>
       <button type="button" className="terrain-area-quiet-button" onClick={resetView}>最初の視点</button>
     </div>}
+    {canRotate && rackControls}
     {canRotate && <SlopeDistribution summary={analysis.summary} />}
     <figcaption>{drawing.faceCount ? '地表面と黄色線は同じDEM。樹木・建物・造成後の形状は含みません。側面・底面は表示用で、地層・土量を示しません。' : '連続した地表面を描ける標高点が不足しています。'} {!canRotate ? '面積は有効範囲と勾配取得率からの概算。' : ''} {analysis.summary?.coveragePercent < 100 ? '未取得部分の面は表示していません。' : ''}</figcaption>
   </figure>

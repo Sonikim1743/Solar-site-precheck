@@ -2,3 +2,8 @@
 .public-parcel-reference-pane canvas { pointer-events: none !important; }
 .public-parcel-overlay-status { margin: 0; color: #365d58; font-size: 12px; line-height: 1.5; }
 .public-parcel-overlay-status.is-error { color: #985328; }
+.app .map-panel .map-draw-controls .map-public-parcel-toggle { padding-inline: 9px; white-space: nowrap; }
+@media (max-width: 480px) {
+  .app .map-panel .map-draw-controls { gap: 5px; }
+  .app .map-panel .map-draw-controls button { padding-inline: 8px; font-size: 12px; }
+}

@@ -646,6 +646,8 @@ export default function App() {
   const [terrainAreaProgress, setTerrainAreaProgress] = useState(null)
   const [terrainAreaError, setTerrainAreaError] = useState('')
   const [terrainAreaOpen, setTerrainAreaOpen] = useState(false)
+  const [terrainPreview, setTerrainPreview] = useState({ options: {}, layout: null, enabled: false, labels: false })
+  const [publicParcelSnapshot, setPublicParcelSnapshot] = useState({ features: [], status: 'off' })
   const [reportView, setReportView] = useState('summary')
   const [recordDownload, setRecordDownload] = useState(null)
   const [terrainPdfDownload, setTerrainPdfDownload] = useState(null)
@@ -3469,6 +3471,7 @@ export default function App() {
                 setSelectedParcel(null); setFocusParcelId(null)
               }}
               parcelReview={parcelReview}
+              onPublicParcelsChange={setPublicParcelSnapshot}
               reviewAreaM2={parcelMetrics.geometry ? parcelMetrics.usableAreaM2 : null}
               parcelMode={parcelMode}
               onParcelModeChange={setParcelMode}
@@ -3629,7 +3632,7 @@ export default function App() {
             </div>
             <details id="terrain-area" className="terrain-area-disclosure" open={terrainAreaOpen} onToggle={event => setTerrainAreaOpen(event.currentTarget.open)}>
               <summary><strong>検討範囲の等高線・勾配・3D</strong><span>{terrainAreaOpen ? '閉じる' : '開く'}</span></summary>
-              <TerrainAreaPanel geometry={parcelMetrics.geometry} metrics={parcelMetrics} analysis={currentTerrainArea} status={terrainAreaStatus} progress={terrainAreaProgress} error={terrainAreaError} position={position} onAnalyze={handleTerrainAreaAnalysis} onCancel={cancelTerrainAreaAnalysis} onClear={() => { cancelTerrainAreaWork(); setTerrainArea(null); setTerrainAreaStatus('idle'); setTerrainAreaError(''); setReportView('summary') }} onDrawBoundary={() => { setParcelMode('boundary'); openReviewSection('site-select') }} onOpenReport={openTerrainAreaReport} />
+              <TerrainAreaPanel geometry={parcelMetrics.geometry} metrics={parcelMetrics} analysis={currentTerrainArea} status={terrainAreaStatus} progress={terrainAreaProgress} error={terrainAreaError} position={position} onAnalyze={handleTerrainAreaAnalysis} onCancel={cancelTerrainAreaAnalysis} onClear={() => { cancelTerrainAreaWork(); setTerrainArea(null); setTerrainAreaStatus('idle'); setTerrainAreaError(''); setReportView('summary') }} onDrawBoundary={() => { setParcelMode('boundary'); openReviewSection('site-select') }} onOpenReport={openTerrainAreaReport} parcels={parcelReview.parcels} publicParcels={publicParcelSnapshot.features} publicParcelsLimited={publicParcelSnapshot.truncated || publicParcelSnapshot.status === 'partial'} preview={terrainPreview} onPreviewChange={setTerrainPreview} />
             </details>
             {selectedParcel && (
               <div className="selected-parcel-card">
