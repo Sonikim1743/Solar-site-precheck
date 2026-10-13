@@ -110,7 +110,7 @@ for (const target of ['cloudflare', 'portable']) {
     buildId: `${version}-${buildDate}-${packageHash.slice(0, 12)}`, packageName,
     zipUrl: `https://raw.githubusercontent.com/Sonikim1743/Solar-site-precheck/main/release/latest/${packageName}`,
     sha256: packageHash, etag: packageHash.slice(0, 16), bundleName, minRequiredRuntime: '1.2',
-    notes: target === 'portable' ? '範囲地形・3D・推定面積、公開地番と度分コピーを更新。既存のruntime/node.exeを保持して更新してください。' : '範囲地形・3D・推定面積、公開地番と度分コピーを更新。dist・functions・sharedを含む展開先ルートから配布してください。',
+    notes: target === 'portable' ? '4段×4〜8列の参考配置、10/15/20°比較、架台選択・フェンス、地番と地図操作を更新。配置は画面内の参考です。既存runtime/node.exeを保持してください。' : '4段×4〜8列の参考配置、勾配比較、架台選択・フェンス、地番と地図操作を更新。配置は画面内の参考です。dist・functions・sharedを含む展開先ルートから配布してください。',
     sizeBytes: archive.length,
   }
   await writeFile(join(output, `${target}-metadata.json`), JSON.stringify(metadata, null, 2) + '\n')
