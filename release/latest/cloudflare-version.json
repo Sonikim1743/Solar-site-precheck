@@ -1,16 +1,16 @@
 {
   "app": "Solar Site Precheck",
-  "version": "1.28.1",
-  "buildDate": "2026-10-08",
-  "sourceCommit": "f05864141c2f7d0ca769574654b917d3e3eb7cb5",
+  "version": "1.28.2",
+  "buildDate": "2026-10-13",
+  "sourceCommit": "a7211cbaf4c7a862c4a1a6ef3e4dc9594e38f13e",
   "target": "cloudflare",
-  "buildId": "1.28.1-2026-10-08-5794e9b736e4",
-  "packageName": "SolarSitePrecheck_v1.28.1_2026-10-08_cloudflare.zip",
-  "zipUrl": "https://raw.githubusercontent.com/Sonikim1743/Solar-site-precheck/main/release/latest/SolarSitePrecheck_v1.28.1_2026-10-08_cloudflare.zip",
-  "sha256": "5794e9b736e4349caad3fc0ce6a11db03e5c08ee64b37b112005710f63ef2ff1",
-  "etag": "5794e9b736e4349c",
-  "bundleName": "index-DzqmE1sk.js",
+  "buildId": "1.28.2-2026-10-13-6155d240b480",
+  "packageName": "SolarSitePrecheck_v1.28.2_2026-10-13_cloudflare.zip",
+  "zipUrl": "https://raw.githubusercontent.com/Sonikim1743/Solar-site-precheck/main/release/latest/SolarSitePrecheck_v1.28.2_2026-10-13_cloudflare.zip",
+  "sha256": "6155d240b4804624d7311c43cd6f38b653bffabbddd2cdf8f55cf79884bc93a1",
+  "etag": "6155d240b4804624",
+  "bundleName": "index-uI2HMLn0.js",
   "minRequiredRuntime": "1.2",
-  "notes": "範囲地形・3D・推定面積、公開地番と度分コピーを更新。dist・functions・sharedを含む展開先ルートから配布してください。",
-  "sizeBytes": 14295372
+  "notes": "4段×4〜8列の参考配置、勾配比較、架台選択・フェンス、地番と地図操作を更新。配置は画面内の参考です。dist・functions・sharedを含む展開先ルートから配布してください。",
+  "sizeBytes": 14336660
 }

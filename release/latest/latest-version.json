@@ -1,16 +1,16 @@
 {
   "app": "Solar Site Precheck",
-  "version": "1.28.1",
-  "buildDate": "2026-10-08",
-  "sourceCommit": "f05864141c2f7d0ca769574654b917d3e3eb7cb5",
+  "version": "1.28.2",
+  "buildDate": "2026-10-13",
+  "sourceCommit": "a7211cbaf4c7a862c4a1a6ef3e4dc9594e38f13e",
   "target": "portable",
-  "buildId": "1.28.1-2026-10-08-36ad74c029c1",
-  "packageName": "SolarSitePrecheck_v1.28.1_release_light.zip",
-  "zipUrl": "https://raw.githubusercontent.com/Sonikim1743/Solar-site-precheck/main/release/latest/SolarSitePrecheck_v1.28.1_release_light.zip",
-  "sha256": "36ad74c029c1473c425c563bb9e776b748cc7a32ac2bed8a9ec2ddc29deedba0",
-  "etag": "36ad74c029c1473c",
-  "bundleName": "index-CZBb-LXf.js",
+  "buildId": "1.28.2-2026-10-13-e81d0e5dba9a",
+  "packageName": "SolarSitePrecheck_v1.28.2_release_light.zip",
+  "zipUrl": "https://raw.githubusercontent.com/Sonikim1743/Solar-site-precheck/main/release/latest/SolarSitePrecheck_v1.28.2_release_light.zip",
+  "sha256": "e81d0e5dba9ad75f3d8bdbf40e996667db007bc15d27d095012f1ca5d80edab4",
+  "etag": "e81d0e5dba9ad75f",
+  "bundleName": "index-10S0EM18.js",
   "minRequiredRuntime": "1.2",
-  "notes": "範囲地形・3D・推定面積、公開地番と度分コピーを更新。既存のruntime/node.exeを保持して更新してください。",
-  "sizeBytes": 15024624
+  "notes": "4段×4〜8列の参考配置、10/15/20°比較、架台選択・フェンス、地番と地図操作を更新。配置は画面内の参考です。既存runtime/node.exeを保持してください。",
+  "sizeBytes": 15065892
 }

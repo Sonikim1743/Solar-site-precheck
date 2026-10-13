@@ -5,7 +5,7 @@ import MapRegionLabel, { getMapRegionLabel } from './MapRegionLabel.jsx'
 import MapPlaceNamesOverlay from './MapPlaceNamesOverlay.jsx'
 import PublicParcelOverlay, { PublicParcelOverlayStatus } from './PublicParcelOverlay.jsx'
 import L from 'leaflet'
-import { Circle, CircleMarker, GeoJSON, LayersControl, MapContainer, Marker, Polygon, Polyline, Popup, Rectangle, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet'
+import { Circle, CircleMarker, GeoJSON, MapContainer, Marker, Polygon, Polyline, Popup, Rectangle, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet'
 import MapDistanceScale from './MapDistanceScale.jsx'
 import { parcelInfo } from '../services/cadastre.js'
 import { featureInteriorPoint, validatePolygonGeometry } from '../services/parcelGeometry.js'
@@ -14,6 +14,7 @@ import { capacityValueLabel, summarizeGridFlowDirection } from '../services/grid
 import { normalizeDisplayText } from '../utils/text.js'
 import { powerGridDisplayLine, powerGridDisplayLineLabel } from '../services/powerGrid.js'
 import '../parcel-review.css'
+import './map-controls.css'
 
 const INITIAL_MAP_CENTER = [36.2048, 138.2529]
 const INITIAL_MAP_ZOOM = 5
@@ -649,6 +650,7 @@ export default function MapPanel({
   onReviewGeometry,
   onParcelDrawingError,
   onParcelModeChange,
+  onPublicParcelsChange,
   terrainSection,
   terrainArea,
   powerGrid,
@@ -658,6 +660,9 @@ export default function MapPanel({
   const hasTerrainOverlay = !!terrainSection?.lines?.length
   const hasRegionLabel = Boolean(getMapRegionLabel(position, placeInfo))
   const [showTerrainArea, setShowTerrainArea] = useState(true)
+  const [showPublicParcels, setShowPublicParcels] = useState(false)
+  const [baseMap, setBaseMap] = useState('photo')
+  const [showPlaceNames, setShowPlaceNames] = useState(true)
   const [publicParcelStatus, setPublicParcelStatus] = useState({ state: 'off', message: '' })
   const [placeNameStatus, setPlaceNameStatus] = useState(null)
   useEffect(() => setShowTerrainArea(true), [terrainArea?.geometryKey, terrainArea?.fetchedAt])
@@ -749,8 +754,8 @@ export default function MapPanel({
 
   return (
     <>
-    <div ref={mapShellRef} className={`map-shell${isDrawing ? ' map-shell--parcel-drawing' : ''}`} onKeyDown={(event) => {
-      if (!isDrawing || event.target.closest?.('input, textarea, select, button, a')) return
+    <div ref={mapShellRef} data-basemap={baseMap} className={`map-shell${isDrawing ? ' map-shell--parcel-drawing' : ''}`} onKeyDown={(event) => {
+      if (!isDrawing || event.target.closest?.('input, textarea, select, button, a, summary')) return
       if (event.key === 'Escape') { event.preventDefault(); cancelDrawing() }
       if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); finishDrawing() }
     }}>
@@ -762,30 +767,14 @@ export default function MapPanel({
         scrollWheelZoom
         className="map"
       >
-        <LayersControl position="topright">
-          <LayersControl.BaseLayer checked name="航空写真">
-            <TileLayer
-              attribution='<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noreferrer">国土地理院 全国最新写真（シームレス）</a>'
-              url="https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg"
-              maxZoom={DRAWING_MAX_ZOOM}
-              maxNativeZoom={18}
-            />
-          </LayersControl.BaseLayer>
-          <LayersControl.BaseLayer name="標準地図">
-            <TileLayer
-              attribution='<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noreferrer">地理院タイル</a>'
-              url="https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png"
-              maxZoom={DRAWING_MAX_ZOOM}
-              maxNativeZoom={18}
-            />
-          </LayersControl.BaseLayer>
-          <LayersControl.Overlay checked name="地名（都道府県・市区町村）">
-            <MapPlaceNamesOverlay dimmed={isDrawing} onStatus={setPlaceNameStatus} />
-          </LayersControl.Overlay>
-          <LayersControl.Overlay name="地番（公開2024）">
-            <PublicParcelOverlay onStatus={setPublicParcelStatus} />
-          </LayersControl.Overlay>
-        </LayersControl>
+        <TileLayer
+          attribution='<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noreferrer">国土地理院 地理院タイル（航空写真・標準地図）</a>'
+          url={baseMap === 'photo' ? 'https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg' : 'https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png'}
+          maxZoom={DRAWING_MAX_ZOOM}
+          maxNativeZoom={18}
+        />
+        {showPlaceNames && <MapPlaceNamesOverlay dimmed={isDrawing} onStatus={setPlaceNameStatus} />}
+        {showPublicParcels && <PublicParcelOverlay onStatus={setPublicParcelStatus} onPublicParcelsChange={onPublicParcelsChange} contextKey={position ? `${position.lat},${position.lon}` : ''} />}
         <MapDistanceScale position="bottomleft" />
         <ClickHandler onSelect={onSelect} mode={parcelMode} locked={mapLocked} onAddVertex={addDraftVertex} onFinish={finishDrawing} />
         <MapController position={position} />
@@ -811,16 +800,16 @@ export default function MapPanel({
         <ReviewGeometryLayers review={parcelReview} vertices={draftVertices} onClose={finishDrawing} locked={mapLocked} dimmed={isDrawing} />
       </MapContainer>
       <MapRegionLabel position={position} placeInfo={placeInfo} />
-      <div className="map-draw-controls" role="group" aria-label="地図に範囲を描く">
+      <div className="map-display-controls" aria-label="地図の表示切替">
+        <button type="button" className="map-base-toggle" aria-label={`${baseMap === 'photo' ? '等高線地図' : '航空写真'}へ切り替える`} aria-pressed={baseMap === 'std'} title={baseMap === 'photo' ? '等高線のある国土地理院標準地図へ切り替え' : '航空写真へ切り替え'} onClick={() => setBaseMap(value => value === 'photo' ? 'std' : 'photo')}>{baseMap === 'photo' ? '等高線地図' : '航空写真'}</button>
+        <details className="map-display-options"><summary aria-label="地図の表示設定" title="地名の表示設定">⋯</summary><div><label title="重ねて表示する地名の設定。標準地図に含まれる文字は残ります。"><input type="checkbox" checked={showPlaceNames} onChange={event => setShowPlaceNames(event.target.checked)}/>地名を表示</label></div></details>
+      </div>
+      <div className="map-draw-controls" role="group" aria-label="地番表示・範囲の作図">
         <button type="button" className={parcelMode === 'boundary' ? 'is-active' : ''} aria-pressed={parcelMode === 'boundary'} onClick={() => onParcelModeChange?.(parcelMode === 'boundary' ? 'point' : 'boundary')} disabled={!onParcelModeChange}>範囲を描く</button>
         <button type="button" className={parcelMode === 'exclusion' ? 'is-active' : ''} aria-pressed={parcelMode === 'exclusion'} onClick={() => onParcelModeChange?.(parcelMode === 'exclusion' ? 'point' : 'exclusion')} disabled={!onParcelModeChange}>除外</button>
+        <button type="button" className={`map-public-parcel-toggle${showPublicParcels ? ' is-active' : ''}`} aria-pressed={showPublicParcels} aria-label={`公開地番を${showPublicParcels ? '非表示' : '表示'}`} title="公開地番（2024年）の参考表示。対象・検討範囲・除外は保持します。" onClick={() => setShowPublicParcels(value => !value)}>地番 {showPublicParcels ? 'ON' : 'OFF'}</button>
       </div>
       {isDrawing && <div className="map-hint">{PARCEL_MODE_HINTS[parcelMode]}</div>}
-      {googleMapsUrl && (
-        <a className="map-google-open" href={googleMapsUrl} target="_blank" rel="noreferrer">
-          Googleマップで開く
-        </a>
-      )}
       {isCompactMap && (
         <button
           type="button"
@@ -832,6 +821,7 @@ export default function MapPanel({
         </button>
       )}
       <div className="map-location-control">
+        {googleMapsUrl && <a className="map-google-open" href={googleMapsUrl} target="_blank" rel="noreferrer">Googleマップで開く</a>}
         <div className="map-location-buttons">
         <button type="button" onClick={onUseCurrentLocation} disabled={locationStatus?.status === 'loading'}>
           {locationStatus?.status === 'loading' ? '現在地を取得中…' : '◎ 現在地を取得'}

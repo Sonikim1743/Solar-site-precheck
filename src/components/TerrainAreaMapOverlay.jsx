@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import { GeoJSON, ImageOverlay, Pane, useMap } from 'react-leaflet'
 import { terrainMapLayers } from '../utils/terrainMap.js'
+import { getTerrainCellSlope } from '../utils/terrainLayout.js'
 import L from 'leaflet'
 
 const colors = ['#cfe3cd', '#efe8ad', '#eabd8d', '#df9d9b']
@@ -22,11 +23,12 @@ function terrainRaster(analysis) {
   context.clip('evenodd')
   context.fillStyle = '#b5bcb5'
   context.fillRect(0, 0, canvas.width, canvas.height)
-  for (let i = 0; i < grid.elevations.length; i++) {
-    if (!grid.inside[i] || !finite(grid.elevations[i]) || !finite(grid.slopes[i])) continue
-    const slope = grid.slopes[i]
+  for (let row = 0; row < grid.height - 1; row++) for (let col = 0; col < grid.width - 1; col++) {
+    const slope = getTerrainCellSlope(grid, row, col)
+    if (!finite(slope)) continue
     context.fillStyle = colors[slope < 10 ? 0 : slope < 20 ? 1 : slope < 30 ? 2 : 3]
-    context.fillRect(i % grid.width * factor, (grid.height - 1 - Math.floor(i / grid.width)) * factor, factor, factor)
+    const [x, y] = pixel([grid.xMin + col * grid.step, grid.yMin + row * grid.step])
+    context.fillRect(x, y - factor, factor, factor)
   }
   return canvas.toDataURL('image/png')
 }
