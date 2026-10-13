@@ -1,6 +1,6 @@
 # 配布パッケージ v1.28.2 / 2026-10-13
 
-リリース準備対象は1.28.2です。アプリ・ZIP・manifestの版と2026-10-13のビルド日を照合します。実際のGitHub・Cloudflare更新結果、ソースコミット、配布ID、ハッシュはソースリポジトリの [公開記録](https://github.com/Sonikim1743/Solar-site-precheck/blob/main/docs/DEPLOYED_VERSION.md) に記録します。本書を同梱したZIPの作成だけでは公開完了ではありません。
+公開・配布版は1.28.2です。アプリ・ZIP・manifestの版と2026-10-13のビルド日を照合し、GitHub mainと既存Cloudflare Pagesを更新しました。ソースコミット、配布ID、ハッシュと確認範囲は [公開記録](https://github.com/Sonikim1743/Solar-site-precheck/blob/main/docs/DEPLOYED_VERSION.md) に記録しています。配布後の確認文書と、ZIPを生成したソースコミットは区別します。
 
 ## 今回の使い方と変更
 

@@ -1,6 +1,6 @@
 # v1.28.2 更新手順 — 2026-10-13
 
-今回のリリース準備対象は **Version 1.28.2 / Build 2026-10-13** です。アプリ・ZIP・manifestを同じ版で照合し、公開・GitHubの実際の更新状態は [公開記録](https://github.com/Sonikim1743/Solar-site-precheck/blob/main/docs/DEPLOYED_VERSION.md) で確認してください。ZIPを生成しただけでは公開完了ではありません。
+今回の公開・配布版は **Version 1.28.2 / Build 2026-10-13** です。GitHub main・既存オンライン版を更新し、アプリ・ZIP・manifestを照合しました。ソース・配布ID・ハッシュと確認範囲は [公開記録](https://github.com/Sonikim1743/Solar-site-precheck/blob/main/docs/DEPLOYED_VERSION.md) を参照してください。各PCへのインストール更新は別の作業です。
 
 地図上で範囲・除外を描き、同じ範囲の等高線・勾配・3Dと背景地図付きレポートを確認します。「地番」は公開AMX 2024の参考表示で、初期状態はOFF。地名は初期状態で表示します。作図中のみ通常より細かく拡大できます。「範囲・地番の詳細」は上部「ツール」から開きます。地点は北緯・東経の度分で表示・コピーします。
 

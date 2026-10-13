@@ -4,7 +4,7 @@
 
 参考発電量は上部のツールメニューから比較できます。地形・発電量の結果は初期検討用であり、測量、設計、接続可否、採算判断を代替しません。
 
-- リリース準備版：**v1.28.2 / 2026-10-13** — 実際の公開状態は下記の確認記録を参照
+- 公開・配布版：**v1.28.2 / 2026-10-13** — GitHub main・オンライン版の確認記録は下記を参照
 - [オンライン版を開く](https://solar-site-precheck.pages.dev/)
 - [Windows更新ZIP](release/latest/SolarSitePrecheck_v1.28.2_release_light.zip) — 既存のNode.js実行環境を使う更新用
 - [公開・配布の確認記録](docs/DEPLOYED_VERSION.md) — ソース、配布物、実際のデプロイを区別

@@ -9,7 +9,7 @@ for deployment evidence, rather than assuming package.json is the live version.
 - Converse with the user in Korean. User-facing application copy and deliverable
   documents, reports and figures are Japanese (explicit preference, 2026-09-24). Keep the interface
   compact, place detailed explanations in contextual disclosures, and preserve inputs.
-- Current v1.28.1 direction: the main page prioritizes map, range/exclusion drawing,
+- Current v1.28.2 direction: the main page prioritizes map, range/exclusion drawing,
   terrain and reports. Generation opens in a separate screen from the upper menu
   (v1.27.2 user request); grid confirmation also stays in the upper Tools menu
   (v1.28 user request). Keep horizon, snow, report, reference and SolarPro manual

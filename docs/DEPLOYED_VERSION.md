@@ -1,4 +1,48 @@
-# 公開・配布版の状態 — v1.28.1 / 2026-10-08
+# 公開・配布版の状態 — v1.28.2 / 2026-10-13
+
+利用者のGitHub・オンライン版更新依頼に基づき、[PR #6](https://github.com/Sonikim1743/Solar-site-precheck/pull/6)をmainへ反映し、既存Cloudflare Pagesに公開しました。公開画面は **Version 1.28.2 / Build 2026-10-13**。実寸の参考配置、勾配条件比較、架台の選択・復元、配置を囲む仮フェンス、地番・地図切替と説明ウィンドウを更新しています。
+
+## 公開の根拠
+
+- 運用URL：https://solar-site-precheck.pages.dev/
+- 配布URL：https://8d946c82.solar-site-precheck.pages.dev/
+- Cloudflare Production ID：`8d946c82-89f9-4e6d-99a6-0ffa283c0295` / branch `main`
+- 両パッケージのソース：`a7211cbaf4c7a862c4a1a6ef3e4dc9594e38f13e`
+- 配布物コミット：`293f5465970e67cd440d2a122e204c2db1bb9a67`
+- PR #6のmainマージ：`0388ad9906c2a93c786ca6304ce7ddb7b9416eb9`
+- 公開JS：`index-uI2HMLn0.js` / portable JS：`index-10S0EM18.js`
+- [PR CI 38372495155](https://github.com/Sonikim1743/Solar-site-precheck/actions/runs/38372495155)：success
+- [main CI 38372751513](https://github.com/Sonikim1743/Solar-site-precheck/actions/runs/38372751513)：success
+
+後続の公開確認文書のコミットは、配布物のソースコミットとは別です。GitHub pushでは自動配布されないため、検証したCloudflareパッケージのルートからdist・Functions・sharedをそろえて配布しました。
+
+## 配布物と検証
+
+| 対象 | ファイル | サイズ（bytes） | SHA-256 |
+|---|---|---:|---|
+| Cloudflare | SolarSitePrecheck_v1.28.2_2026-10-13_cloudflare.zip | 14,336,660 | 6155d240b4804624d7311c43cd6f38b653bffabbddd2cdf8f55cf79884bc93a1 |
+| Windows更新 | SolarSitePrecheck_v1.28.2_release_light.zip | 15,065,892 | e81d0e5dba9ad75f3d8bdbf40e996667db007bc15d27d095012f1ca5d80edab4 |
+
+- パッケージ生成時の自動検査 **443/443**、両ターゲットのビルド、CSP、同梱PDF/OCR、Functionsのedge依存検査が通過。
+- 両ZIPのmanifest対象は各60ファイル。ZIPのSHA-256・サイズ・版・日付・target・ソース・bundleと、全同梱ファイルのハッシュを独立照合しました。個別案件・認証情報・私用CAD・.sptを含みません。
+- 運用URLの公開distファイル **47/47** が配布manifestのハッシュと一致。`_headers`はHTTP配布対象外として、実応答のCSPと基本ヘッダーを別に確認。HTMLの正規化は同一originの308で、`/index.html`→`/`、`/404.html`→`/404`の各1回を経て本文ハッシュを照合しました。
+- 初回の一部大容量取得はタイムアウトしたため、その対象だけを再取得して確認。最終の未照合ファイル・ハッシュ不一致は0件です。最終HTTP照合：2026-10-13 **21:13:16 JST**。先に一致した本文・ヘッダーの証拠日時は別に保持しています。
+- GitHub mainから二つのメタデータと二つのZIPを実取得し、ソース・版・日付・target・bundle・サイズ・ハッシュと各60ファイルのmanifestをローカル配布物に照合しました。
+- 公開API確認6項目：main HTML、操作PDFのContent-TypeとPDFシグネチャ、power-grid不正入力400 JSON、NEDO正常200、異常メッシュ400、inheritance-pdf GET 405。実PDFのPOST検証は今回実行していません。
+
+## 公開画面で確認した範囲
+
+Windowsの独立した配布URLで、業務案件ではない検証用地点・手描き範囲を使用しました。開始点の再クリックで範囲を閉じ、GSIの範囲DEMを取得し、3Dと参考配置のWorker計算を実行しました。急な任意地形の10°未満では0架台、20°未満では1架台・20枚となり、除外／復元・図下の減らす／増やすで数量とDC/ACが一致すること、配置に対するフェンス表示、説明ウィンドウの開閉、高さ2倍によって数量が変わらないことを確認しました。これは当該土地の事業性・設置可否の判断ではありません。
+
+密集地番、平面・3D選択、取消・範囲変更ガード、390px幅の確認は `TERRAIN_LAYOUT_QA_2026_10_13_JA.md` の合成検証を参照します。公開画面の全機能・OCR・PDF POST・Mac/Safari・実タッチを今回確認したとは扱いません。独立OSMの収録状況・電圧・接続先は現地・電力会社での確認が必要です。
+
+参考配置の条件・結果・個別除外・フェンスは画面内の検討用であり、JSON記録・PDFの保存対象ではありません。A3地形図面はDEMの固定視点・高さ1:1を維持します。複数タブの保存競合と異なる実行環境のgeometry key互換は既存の未解決事項です。会社PCの5290作業画面は初期化せず、全PCのインストール置換完了とも扱いません。
+
+以前の本番 `08da02c2-1263-4fba-94e0-ae6a20a85817` とv1.28.1のZIPを復旧用に保管しています。
+
+---
+
+# 以前の公開・配布版 — v1.28.1 / 2026-10-08
 
 利用者のGitHub・オンライン版更新依頼に基づき、[PR #4](https://github.com/Sonikim1743/Solar-site-precheck/pull/4) をmainへ反映し、既存Cloudflare Pagesへ公開しました。公開サイトは **Version 1.28.1 / Build 2026-10-08**。アプリ・両ZIP・manifestの版表記も1.28.1です。
 
