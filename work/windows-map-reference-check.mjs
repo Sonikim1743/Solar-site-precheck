@@ -45,7 +45,9 @@ const {chromium}=await import(pathToFileURL(process.env.SOLAR_PLAYWRIGHT_MODULE)
 const out=path.resolve(process.env.SOLAR_VERIFICATION_DIR||'../map-reference-verification'),base=process.env.SOLAR_BASE_URL||'http://127.0.0.1:5188'
 await fs.mkdir(out,{recursive:true})
 await fs.writeFile(path.join(out,'public-sample.json'),JSON.stringify(sample,null,2))
-const browser=await chromium.launch({executablePath:process.env.SOLAR_BROWSER_EXE,headless:true}),context=await browser.newContext({viewport:{width:1280,height:960},acceptDownloads:true,serviceWorkers:'block'}),page=await context.newPage(),errors=[],ranges=[]
+const {openBrowserSession}=await import('./windows-browser-session.mjs')
+const session=await openBrowserSession(chromium,out),{browser,context,page}=session,errors=[],ranges=[]
+try{
 page.setDefaultTimeout(30000)
 page.on('pageerror',e=>errors.push(e.message))
 page.on('response',r=>{if(r.url().includes('MojMap_amx_2024.pmtiles'))ranges.push({status:r.status(),range:r.request().headers().range,bytes:r.headers()['content-length']})})
@@ -75,7 +77,6 @@ const click=async candidate=>{
  await page.waitForFunction(()=>!document.querySelector('.regional-parcel-selection')?.textContent.includes('選択境界を取得中'))
  await page.waitForTimeout(500)
 }
-try{
  console.log('Map reference phase: opening isolated app')
  await page.goto(base+'/?design=simple')
  await page.waitForFunction(()=>[...document.querySelectorAll('img.leaflet-tile-loaded')].some(img=>img.src.includes('/14/')&&Math.abs(img.getBoundingClientRect().width-256)<1))
@@ -98,12 +99,13 @@ try{
  const expected=terrainGeometryKey(measureParcelReview({...review,boundary:null,exclusions:[]}).geometry)
  assert.equal(await page.locator('[data-selected-parcel-geometry-key]').getAttribute('data-selected-parcel-geometry-key'),expected)
  console.log('Map reference phase: 3D geometry matched')
+ if(process.env.SOLAR_EXPECT_NAVIGATION==='1'){const {checkTerrainNavigation}=await import('./windows-terrain-navigation-check.mjs');await checkTerrainNavigation(page,out)}
  await page.locator('.regional-parcel-selection').getByRole('button',{name:sample.candidates[0].number+' ×',exact:true}).click();assert.match(await selection.textContent(),/選択中 2区域 \/ 適用済み 3区域/)
  await page.getByRole('button',{name:'選択を中止',exact:true}).click();assert.match(await selection.textContent(),/選択中 3区域 \/ 適用済み 3区域/)
  await page.setViewportSize({width:390,height:844});await page.locator('.regional-parcel-selection').scrollIntoViewIfNeeded();await page.screenshot({path:path.join(out,'mobile-selection.png')});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1))
  if(expectAerial)await page.evaluate(()=>{
   window.__drawingEvidence=[]
-  const observer=new MutationObserver(()=>{const p=document.querySelector('.simple-export-source .terrain-drawing-export-source');if(p?.dataset.contextStatus!=='ready'||window.__drawingEvidence.length)return;window.__drawingEvidence.push({photoStatus:p.dataset.photoContextStatus,views:[...p.querySelectorAll('svg')].map(s=>({kind:s.dataset.drawingView,layer:s.dataset.contextLayer,viewport:s.dataset.viewport,images:[...s.querySelectorAll('image')].map(i=>({layer:i.dataset.contextLayer,mime:i.getAttribute('href').split(';')[0]})),labels:[...s.querySelectorAll('[data-contour-level]')].map(l=>({text:l.textContent,size:getComputedStyle(l).fontSize,weight:getComputedStyle(l).fontWeight,fill:getComputedStyle(l).fill}))}))})})
+  const observer=new MutationObserver(()=>{const p=document.querySelector('.simple-export-source .terrain-drawing-export-source');if(p?.dataset.contextStatus!=='ready'||window.__drawingEvidence.length)return;window.__drawingEvidence.push({photoStatus:p.dataset.photoContextStatus,views:[...p.querySelectorAll('svg')].map(s=>({kind:s.dataset.drawingView,layer:s.dataset.contextLayer,viewport:s.dataset.viewport,scaleM:s.dataset.scaleM,scalePx:s.dataset.scalePx,images:[...s.querySelectorAll('image')].map(i=>({layer:i.dataset.contextLayer,mime:i.getAttribute('href').split(';')[0]})),labels:[...s.querySelectorAll('[data-contour-level]')].map(l=>({text:l.textContent,size:getComputedStyle(l).fontSize,weight:getComputedStyle(l).fontWeight,fill:getComputedStyle(l).fill}))}))})})
   observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['data-context-status']});window.__drawingObserver=observer
  })
  if(process.env.SOLAR_TEST_PHOTO_FAILURE==='1'){
@@ -122,7 +124,7 @@ try{
  const before=await links.evaluateAll(ns=>ns.map(n=>n.href));await page.getByRole('button',{name:'同じ範囲を再解析',exact:true}).click();await page.getByRole('button',{name:'一括解析を中止',exact:true}).click();assert.deepEqual(await links.evaluateAll(ns=>ns.map(n=>n.href)),before)
  assert.deepEqual(errors,[]);assert.ok(ranges.every(r=>r.status===206),'PMTiles uses bounded Range requests')
  const drawingEvidence=expectAerial?await page.evaluate(()=>{window.__drawingObserver.disconnect();return window.__drawingEvidence}):[]
- if(expectAerial){const evidence=drawingEvidence[0];assert.ok(evidence);assert.equal(evidence.photoStatus,'ready');assert.equal(evidence.views[0].layer,'std');assert.equal(evidence.views[1].layer,'seamlessphoto');assert.equal(evidence.views[0].viewport,evidence.views[1].viewport);assert.ok(evidence.views[1].images.length>0&&evidence.views[1].images.every(i=>i.layer==='seamlessphoto'&&i.mime==='data:image/jpeg'));assert.ok(evidence.views[1].labels.length>0&&evidence.views[1].labels.every(l=>l.size==='18px'&&l.weight==='700'));await fs.writeFile(path.join(out,'aerial-evidence.json'),JSON.stringify({base,drawingEvidence,photoResponses},null,2))}
+ if(expectAerial){const evidence=drawingEvidence[0];assert.ok(evidence);assert.equal(evidence.photoStatus,'ready');assert.equal(evidence.views[0].layer,'std');assert.equal(evidence.views[1].layer,'seamlessphoto');const a=JSON.parse(evidence.views[0].viewport),b=JSON.parse(evidence.views[1].viewport);assert.ok(Math.abs((b[2]-b[0])/(a[2]-a[0])-1.25)<1e-8);assert.ok(Math.abs((b[3]-b[1])/(a[3]-a[1])-1.25)<1e-8);assert.ok(Math.abs(a[0]+a[2]-b[0]-b[2])<1e-7);assert.ok(Math.abs(Number(evidence.views[0].scalePx)-Number(evidence.views[1].scalePx))<1e-7);assert.ok(Math.abs(Number(evidence.views[1].scaleM)/Number(evidence.views[0].scaleM)-1.25)<1e-8);assert.ok(evidence.views[1].images.length>0&&evidence.views[1].images.every(i=>i.layer==='seamlessphoto'&&i.mime==='data:image/jpeg'));assert.ok(evidence.views[1].labels.length>0&&evidence.views[1].labels.every(l=>l.size==='18px'&&l.weight==='700'));await fs.writeFile(path.join(out,'aerial-evidence.json'),JSON.stringify({base,drawingEvidence,photoResponses},null,2))}
  await fs.writeFile(path.join(out,'check.json'),JSON.stringify({at:new Date().toISOString(),base,sample,expected,review,ranges,errors,checks:['actual map-vector click outside original prepared region','reference draft/cancel preserves applied selection','same map geometry to 3D and simple batch','390px without page overflow','two actual PDF downloads','cancel retains completed PDFs']},null,2))
  console.log('Actual Windows map-reference flow passed')
-}catch(e){await fs.writeFile(path.join(out,'failure.txt'),e.stack+'\n'+await page.locator('body').innerText({timeout:5000}).catch(()=>'(body unavailable)'));await page.screenshot({path:path.join(out,'failure.png'),fullPage:true,timeout:5000}).catch(()=>{});throw e}finally{await browser.close()}
+}catch(e){await fs.writeFile(path.join(out,'failure.txt'),e.stack+'\n'+await page.locator('body').innerText({timeout:5000}).catch(()=>'(body unavailable)'));await page.screenshot({path:path.join(out,'failure.png'),fullPage:true,timeout:5000}).catch(()=>{});throw e}finally{await session.close()}

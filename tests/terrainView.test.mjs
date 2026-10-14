@@ -8,16 +8,16 @@ const distance = (a, b) => Math.hypot(...a.map((v, i) => v - b[i]))
 const frame = { zoom: 1 }
 const close = (actual, expected, tolerance = 1e-10) => assert.ok(Math.abs(actual - expected) < tolerance, `${actual} != ${expected}`)
 
-test('terrain view wraps bearings and retains the original camera pitch limits', () => {
+test('terrain view wraps bearings and supports a true overhead camera', () => {
   assert.deepEqual(normalizeTerrainView({ azimuth: -725, pitch: -100 }), { azimuth: 355, pitch: 0, ...frame })
-  assert.deepEqual(normalizeTerrainView({ azimuth: 725, pitch: 200 }), { azimuth: 5, pitch: 75, ...frame })
+  assert.deepEqual(normalizeTerrainView({ azimuth: 725, pitch: 200 }), { azimuth: 5, pitch: 90, ...frame })
   assert.deepEqual(normalizeTerrainView({ azimuth: NaN, pitch: Infinity }), { azimuth: 35, pitch: 32, ...frame })
 })
 
 test('drag changes direction and pitch without an unbounded vertical orbit', () => {
   assert.deepEqual(dragTerrainView({ azimuth: 35, pitch: 32 }, .25, .25), { azimuth: 350, pitch: 54.5, ...frame })
   assert.equal(dragTerrainView({ azimuth: 35, pitch: 32 }, 0, -10).pitch, 0)
-  assert.equal(dragTerrainView({ azimuth: 35, pitch: 32 }, 0, 10).pitch, 75)
+  assert.equal(dragTerrainView({ azimuth: 35, pitch: 32 }, 0, 10).pitch, 90)
 })
 
 test('rotation preserves physical metres and uses one uniform display scale', () => {
@@ -146,12 +146,12 @@ test('upward dragging elevates the viewpoint while keeping object bearing, zoom 
   assert.equal(terrainFaceVisible([1, 0, 0], raised), terrainFaceVisible([1, 0, 0], view), 'the same side of the object faces the viewer')
 })
 
-test('normalized elevation drags behave equally at different viewport sizes and stay within 0 to 75 degrees', () => {
+test('normalized elevation drags behave equally at different viewport sizes and stay within 0 to 90 degrees', () => {
   const view = { azimuth: 35, pitch: 32, zoom: 1.5 }
   const results = [130, 520, 780].map(height => elevateTerrainView(view, (-height / 4) / height))
   assert.deepEqual(results[0], { ...view, pitch: 54.5 })
   assert.deepEqual(results[1], results[0]); assert.deepEqual(results[2], results[0])
-  assert.deepEqual(elevateTerrainView(view, -1e308), { ...view, pitch: 75 })
+  assert.deepEqual(elevateTerrainView(view, -1e308), { ...view, pitch: 90 })
   assert.deepEqual(elevateTerrainView(view, 1e308), { ...view, pitch: 0 })
   for (const delta of [NaN, Infinity, undefined]) assert.deepEqual(elevateTerrainView(view, delta), view)
 })
@@ -218,7 +218,7 @@ test('normalized orbit drags work across viewport sizes, wrap bearings, clamp el
   const results = [130, 520, 780].map(size => orbitTerrainView(view, (size / 4) / size, (-size / 4) / size))
   assert.deepEqual(results[0], { ...view, azimuth: 350, pitch: 54.5 })
   assert.deepEqual(results[1], results[0]); assert.deepEqual(results[2], results[0])
-  assert.deepEqual(orbitTerrainView(view, 4, -1e308), { ...view, pitch: 75 })
+  assert.deepEqual(orbitTerrainView(view, 4, -1e308), { ...view, pitch: 90 })
   assert.deepEqual(orbitTerrainView(view, -4, 1e308), { ...view, pitch: 0 })
   for (const delta of [NaN, Infinity, -Infinity, undefined]) assert.deepEqual(orbitTerrainView(view, delta, delta), view)
   assert.deepEqual(orbitTerrainView(view, .25, NaN), { ...view, azimuth: 350 })

@@ -9,6 +9,8 @@ import { getTerrainCellSlope } from '../utils/terrainLayout.js'
 import { createTerrainOverlayVisibility, visibleTerrainLineParts } from '../utils/terrainOverlayVisibility.js'
 import { layoutTerrainLabels } from '../utils/terrainLabelLayout.js'
 import { hitTestTerrainRack } from '../utils/terrainRackHitTest.js'
+import TerrainViewNavigation from './TerrainViewNavigation.jsx'
+import { interpolateTerrainNavigation, terrainNavigationTarget } from '../utils/terrainNavigation.js'
 import './terrain-area.css'
 
 const COLORS = TERRAIN_SLOPE_COLORS
@@ -262,7 +264,7 @@ export function TerrainArea3D({ analysis, position, reportMode = false, compactR
   const [displayHeightScale, setDisplayHeightScale] = useState(heightScale === 2 ? 2 : 1)
   const verticalScale = canRotate ? displayHeightScale : heightScale === 2 ? 2 : 1
   const modelHeight = canRotate ? 440 : H
-  const canvasRef = useRef(null), modelRef = useRef(null), dragRef = useRef(null), frameRef = useRef(null), pendingView = useRef(null)
+  const canvasRef = useRef(null), modelRef = useRef(null), dragRef = useRef(null), frameRef = useRef(null), pendingView = useRef(null), navigationFrame = useRef(null)
   const latestView = useRef(view)
   latestView.current = view
   const releaseDrag = () => {
@@ -272,7 +274,9 @@ export function TerrainArea3D({ analysis, position, reportMode = false, compactR
   }
   const discardFrame = () => {
     if (frameRef.current !== null) cancelAnimationFrame(frameRef.current)
+    if (navigationFrame.current !== null) cancelAnimationFrame(navigationFrame.current)
     frameRef.current = null
+    navigationFrame.current = null
     pendingView.current = null
   }
   useEffect(() => {
@@ -443,6 +447,19 @@ export function TerrainArea3D({ analysis, position, reportMode = false, compactR
     latestView.current = next; setView(next)
   }
   const resetView = () => { releaseDrag(); discardFrame(); latestView.current = initialView; setView(initialView) }
+  const selectDirection = direction => {
+    releaseDrag(); discardFrame()
+    const from = latestView.current, to = terrainNavigationTarget(direction, from, initialView)
+    const apply = next => { latestView.current = next; setView(next) }
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { apply(to); return }
+    const started = performance.now()
+    const animate = time => {
+      const progress = Math.min(1, (time - started) / 280)
+      apply(interpolateTerrainNavigation(from, to, progress))
+      navigationFrame.current = progress < 1 ? requestAnimationFrame(animate) : null
+    }
+    navigationFrame.current = requestAnimationFrame(animate)
+  }
   const changeViewMode = mode => { releaseDrag(); discardFrame(); setViewMode(mode) }
   const changeHeightScale = scale => { releaseDrag(); discardFrame(); setDisplayHeightScale(scale) }
   const zoomView = factor => { releaseDrag(); discardFrame(); const next = zoomTerrainView(latestView.current, factor); latestView.current = next; setView(next) }
@@ -469,9 +486,11 @@ export function TerrainArea3D({ analysis, position, reportMode = false, compactR
   const axisX = bounds.west, axisY = bounds.south
   const north = project([(bounds.west + bounds.east) / 2, bounds.north, base]), south = project([(bounds.west + bounds.east) / 2, bounds.south, base]), east = project([bounds.east, (bounds.south + bounds.north) / 2, base]), west = project([bounds.west, (bounds.south + bounds.north) / 2, base])
   return <figure className={`terrain-area-figure${reportMode ? ' terrain-area-figure--report' : ''}${canRotate ? ' terrain-area-figure--interactive' : ''}`}>
-    <div className="terrain-area-model">
+    <div className={`terrain-area-model${canRotate ? ' terrain-area-model--navigation' : ''}`}>
+    {canRotate && <TerrainViewNavigation view={camera} onSelect={selectDirection} />}
+    <div className="terrain-area-stage">
     {canRotate && <canvas ref={canvasRef} aria-hidden="true" className="terrain-area-surface" />}
-    <svg viewBox={`0 0 ${W} ${modelHeight}`} data-height-scale={verticalScale} data-view-azimuth={camera.azimuth} data-view-pitch={camera.pitch} data-layout-modules={(!reportMode || reportLayout) && layout ? layout.moduleCount : 0} role={canRotate ? 'group' : 'img'} tabIndex={canRotate ? 0 : undefined} aria-roledescription={canRotate ? '地形の周囲を回って見られる立体図' : undefined} aria-labelledby={`${id}-title ${id}-desc`} aria-describedby={canRotate ? `${id}-controls` : undefined} onKeyDown={keyDown}>
+    <svg viewBox={`0 0 ${W} ${modelHeight}`} data-height-scale={verticalScale} data-view-azimuth={camera.azimuth} data-view-pitch={camera.pitch} data-view-zoom={camera.zoom} data-layout-modules={(!reportMode || reportLayout) && layout ? layout.moduleCount : 0} role={canRotate ? 'group' : 'img'} tabIndex={canRotate ? 0 : undefined} aria-roledescription={canRotate ? '地形の周囲を回って見られる立体図' : undefined} aria-labelledby={`${id}-title ${id}-desc`} aria-describedby={canRotate ? `${id}-controls` : undefined} onKeyDown={keyDown}>
       <title id={`${id}-title`}>参考範囲の実DEM地形3D</title>
       <desc id={`${id}-desc`}>等高線図と同じ標高データ・参考範囲を用いた立体図。{verticalScale === 2 ? '横1：縦2の高さ強調表示。標高・勾配の数値と色は実DEMのままです。' : '高さ強調なし、縦横同尺度。'}黄色線は地表に沿う対象範囲。側面・底面は表示用で、地層・土量を示しません。樹木、建物、擁壁、造成後の形状は含みません。欠測や除外の部分を面で埋めません。</desc>
       {!canRotate && <rect width={W} height={H} fill="#fbfcfa" />}
@@ -497,6 +516,7 @@ export function TerrainArea3D({ analysis, position, reportMode = false, compactR
       {!canRotate && <><text x="44" y="443" className="terrain-area-svg-note">{compactReport ? `${noteRef}（最終ページ）` : '地表面と黄色線は同じ標高データ。樹木・建物・造成後の形状は含みません。'}</text><Legend analysis={analysis} /></>}
       {canRotate && <rect ref={modelRef} className="terrain-area-drag-target" x="25" y="35" width="750" height="395" fill="transparent" onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerEnd} onPointerCancel={pointerEnd} onLostPointerCapture={pointerEnd} />}
     </svg>
+    </div>
     </div>
     {projectedParcels && <ParcelLabelNote {...projectedParcels} />}
     {canRotate && <div className="terrain-area-rotation-controls terrain-area-compact-toolbar" role="region" aria-label="3D表示操作（横スクロール可能）" tabIndex="0">    {canRotate && <div className="terrain-area-height-controls" role="group" aria-label="3Dの高さ表示">

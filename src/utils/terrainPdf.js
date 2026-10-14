@@ -6,6 +6,7 @@ import { isMapParcel } from './mapParcelSelection.js'
 import { terrainGeometryKey } from './terrainArea.js'
 import { measureParcelReview } from './parcelReview.js'
 import { terrainSlopeDistribution, formatTerrainSlopeArea, TERRAIN_SLOPE_COLORS } from './terrainSlopeDistribution.js'
+import { terrainDrawingViewport, terrainDrawingScaleBar, TERRAIN_DRAWING_PHOTO_EXTENT } from './terrainDrawingViewport.js'
 
 const PAGE_MM = [420, 297]
 const DPI = 240
@@ -277,14 +278,14 @@ function pageDrawing(ctx, model, images) {
   ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, ...PAGE_MM)
   ctx.strokeStyle = '#222'; ctx.lineWidth = .3; ctx.strokeRect(6, 5, 408, 286)
   const sheet = model.layoutSheets[0], layout = sheet.layouts[0], o = layout.options, d = model.drawingDistribution
-  // Equal physical viewport area, north-up orientation, scale and context.
+  // Equal printed image areas; each north-up view has its own exact scale.
   // No site-name header: the two maps occupy the main A3 page area.
   for(let i=0;i<2;i++){
     const x=i?214:8
     drawText(ctx,i?'地形・勾配・地番':'参考モジュール配置',x+3,7,192,{size:3.5,weight:700,maxLines:1})
     ctx.drawImage(images[i],x,12,198,198*model.snapshots[i].ratio)
   }
-  drawText(ctx,`DEM標高 ${model.values[1][1]} · 北上・両図同一縮尺`,11,196,193,{size:3,maxLines:1})
+  drawText(ctx,`DEM標高 ${model.values[1][1]} · 北上・縮尺は各図の目盛`,11,196,193,{size:3,maxLines:1})
   drawText(ctx,`分母：穴・除外後 ${numeric(d.totalAreaM2,0)} m² / 勾配確認 ${numeric(d.coveragePercent)}%`,11,202,193,{size:2.95,maxLines:1})
   const legend=[...d.bins.map((b,i)=>({label:b.max===90?'30°以上':`${b.min}–${b.max}°未満`,percent:b.percent,color:TERRAIN_SLOPE_COLORS[i]})),{label:'未確認 / NoData',percent:d.unknownPercent,color:'#eef0ed'}]
   legend.forEach((b,i)=>{
@@ -446,7 +447,9 @@ export async function exportTerrainAreaPdf({ report, element, drawingOnly = fals
       const pair = element.querySelector('.terrain-drawing-export-source')
       if(!pair)fail('単独配置図の2つの図面が表示されていません。')
       const plans = [...pair.querySelectorAll('svg')]
-      if(plans.length!==2 || plans[0].dataset.viewport!==plans[1].dataset.viewport || plans.some(p=>p.dataset.geometryKey!==report.terrainArea.geometryKey) || plans[1].querySelector('[data-layout-racks]')) fail('2つの図の範囲・縮尺・配置が一致しません。')
+      if(plans.length!==2 || plans.some(p=>p.dataset.geometryKey!==report.terrainArea.geometryKey) || plans[1].querySelector('[data-layout-racks]')) fail('2つの図の対象範囲・配置を確認できません。')
+      const expectedViews=[terrainDrawingViewport(report.terrainArea.grid),terrainDrawingViewport(report.terrainArea.grid,10,TERRAIN_DRAWING_PHOTO_EXTENT)]
+      if(plans.some((p,i)=>{const v=expectedViews[i],bar=terrainDrawingScaleBar(v,expectedViews[0]),m=Number(p.dataset.scaleM),px=Number(p.dataset.scalePx);return p.dataset.viewport!==JSON.stringify([v.west,v.south,v.east,v.north])||!Number.isFinite(m)||!Number.isFinite(px)||m<=0||px<=0||Math.abs(m-bar.meters)>1e-7||Math.abs(px-bar.pixelLength)>1e-7})) fail('各図の表示範囲と縮尺目盛が一致しません。')
       const photos=[...plans[1].querySelectorAll('image')]
       if(pair.dataset.photoContextStatus!=='ready'||plans[1].dataset.contextLayer!=='seamlessphoto'||!photos.length||photos.some(image=>image.getAttribute('data-context-layer')!=='seamlessphoto'||!/^data:image\/jpeg;base64,/.test(image.getAttribute('href')||'')))fail('右図の周辺航空写真が準備できていません。再試行してください。')
       model.snapshots = plans.map(plan=>snapshotSvg(plan, 198, checkDeadline, true))

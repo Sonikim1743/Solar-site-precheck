@@ -8,7 +8,7 @@ export function normalizeTerrainView(view = {}) {
   const azimuth = finite(view?.azimuth) ? view.azimuth : TERRAIN_INITIAL_VIEW.azimuth
   return {
     azimuth: ((azimuth % 360) + 360) % 360,
-    pitch: clamp(finite(view?.pitch) ? view.pitch : TERRAIN_INITIAL_VIEW.pitch, 0, 75),
+    pitch: clamp(finite(view?.pitch) ? view.pitch : TERRAIN_INITIAL_VIEW.pitch, 0, 90),
     zoom: clamp(finite(view?.zoom) ? view.zoom : TERRAIN_INITIAL_VIEW.zoom, .65, 2.5),
   }
 }
@@ -24,7 +24,7 @@ export function dragTerrainView(view, deltaX, deltaY) {
 // the observer sees; upward dragging raises the observer to look down farther.
 export function orbitTerrainView(view, deltaX, deltaY) {
   const camera = normalizeTerrainView(view)
-  return normalizeTerrainView({ ...camera, azimuth: camera.azimuth - (finite(deltaX) ? deltaX : 0) * 180, pitch: clamp(camera.pitch - (finite(deltaY) ? deltaY : 0) * 90, 0, 75) })
+  return normalizeTerrainView({ ...camera, azimuth: camera.azimuth - (finite(deltaX) ? deltaX : 0) * 180, pitch: clamp(camera.pitch - (finite(deltaY) ? deltaY : 0) * 90, 0, 90) })
 }
 
 // Compatibility for an elevation-only interaction at the same object centre.

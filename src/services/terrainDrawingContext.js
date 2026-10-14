@@ -1,5 +1,5 @@
 import proj4 from 'proj4'
-import { terrainDrawingViewport } from '../utils/terrainDrawingViewport.js'
+import { terrainDrawingViewport, TERRAIN_DRAWING_PHOTO_EXTENT } from '../utils/terrainDrawingViewport.js'
 
 const cache=new WeakMap()
 const toTile=([lon,lat],z)=>[(lon+180)/360*2**z,(1-Math.asinh(Math.tan(lat*Math.PI/180))/Math.PI)/2*2**z]
@@ -13,7 +13,7 @@ export function loadTerrainDrawingContext(analysis,kind='map') {
   const cached=cache.get(analysis)||new Map()
   if(cached.has(kind))return cached.get(kind)
   const task=(async()=>{
-    const g=analysis.grid,v=terrainDrawingViewport(g),projection=proj4('EPSG:4326',`+proj=aeqd +lat_0=${g.origin.lat} +lon_0=${g.origin.lon} +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs`)
+    const g=analysis.grid,v=terrainDrawingViewport(g,10,kind==='photo'?TERRAIN_DRAWING_PHOTO_EXTENT:1),projection=proj4('EPSG:4326',`+proj=aeqd +lat_0=${g.origin.lat} +lon_0=${g.origin.lon} +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs`)
     const corners=[[v.west,v.south],[v.east,v.south],[v.east,v.north],[v.west,v.north]].map(p=>projection.inverse(p))
     if(!corners.flat().every(Number.isFinite))throw Error('周辺地図の投影座標が不正です。')
     let z=18,b
@@ -29,7 +29,7 @@ export function loadTerrainDrawingContext(analysis,kind='map') {
       })())
       if(!requests.length)throw Error('周辺地図の照会範囲を確認できません。')
       const results=await Promise.allSettled(requests),tiles=results.filter(r=>r.status==='fulfilled').map(r=>r.value)
-      return {tiles,status:tiles.length===requests.length?'ready':tiles.length?'partial':'unavailable'}
+      return {tiles,status:tiles.length===requests.length?'ready':tiles.length?'partial':'unavailable',viewport:[v.west,v.south,v.east,v.north]}
     }finally{clearTimeout(timer);controller.abort()}
   })().catch(()=>({tiles:[],status:'unavailable'})).then(result=>{if(result.status!=='ready'&&cached.get(kind)===task)cached.delete(kind);return result})
   cached.set(kind,task);cache.set(analysis,cached);return task

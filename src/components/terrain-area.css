@@ -309,3 +309,32 @@
 @media(max-width:420px) { .terrain-layout-totals dd { font-size:18px; white-space:normal; } }
 .terrain-area-fence--report path { stroke:#111; stroke-width:1.7; stroke-dasharray:8 3 1 3; }
 .terrain-area-figure svg .terrain-report-map-title { font-weight:700; }
+
+.terrain-area-stage { position:relative; min-width:0; }
+.terrain-area-stage>svg { position:relative; }
+.terrain-area-model--navigation { display:grid; grid-template-columns:minmax(0,1fr) 212px; gap:8px; }
+.terrain-area-model--navigation .terrain-area-stage { grid-column:1; grid-row:1; }
+.terrain-view-navigation { grid-column:2; grid-row:1; align-self:start; display:grid; grid-template-columns:44px 160px; gap:8px; margin-top:22px; }
+.terrain-navigation-tools { display:flex; flex-direction:column; gap:8px; padding-top:28px; }
+.terrain-navigation-tools button { box-sizing:border-box; width:44px; height:44px; padding:6px; border:1px solid #c8d6cd; border-radius:7px; background:#fff; cursor:pointer; }
+.terrain-navigation-tools .terrain-navigation-compass { padding:0; border:0; border-radius:50%; }
+.terrain-navigation-home svg { fill:#345846; }
+.terrain-navigation-compass circle { fill:#fff; stroke:#84968b; stroke-width:2; }
+.terrain-navigation-compass .terrain-compass-north { fill:#c23b3b; }
+.terrain-navigation-compass .terrain-compass-south { fill:#66786f; }
+.terrain-area-figure .terrain-navigation-cube { width:160px; height:160px; overflow:visible; }
+.terrain-navigation-cube [role="button"] { cursor:pointer; }
+.terrain-navigation-cube polygon { fill:#fff; stroke:#84998b; stroke-width:1.5; stroke-linejoin:round; }
+.terrain-navigation-cube [role="button"]:hover polygon { fill:#eaf3ed; }
+.terrain-area-figure .terrain-navigation-cube text { fill:#284736; font-size:18px; font-weight:650; pointer-events:none; }
+.terrain-navigation-cube [role="button"]:focus-visible { outline:none; }
+.terrain-navigation-cube [role="button"]:focus-visible polygon { stroke:#17664f; stroke-width:4; }
+.terrain-navigation-tools button:focus-visible,.terrain-navigation-menu button:focus-visible { outline:3px solid #17664f; outline-offset:2px; }
+.terrain-navigation-menu { grid-column:1/-1; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px; padding:6px; border:1px solid #c8d6cd; border-radius:8px; background:#fff; }
+.terrain-navigation-menu button { min-height:44px; border:1px solid #c8d6cd; border-radius:5px; background:#fff; color:#284736; font:inherit; font-size:13px; cursor:pointer; }
+@media(max-width:640px) {
+  .terrain-area-model--navigation { grid-template-columns:minmax(0,1fr); gap:0; }
+  .terrain-view-navigation { grid-column:1; grid-row:1; justify-self:end; margin:0 8px 0 0; }
+  .terrain-area-model--navigation .terrain-area-stage { grid-column:1; grid-row:2; }
+}
+@media print { .terrain-view-navigation { display:none; } .terrain-area-model--navigation { display:block; } }

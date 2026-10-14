@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { terrainPointToLocal, pointInTerrainBoundary } from '../utils/terrainArea.js'
-import { terrainDrawingViewport } from '../utils/terrainDrawingViewport.js'
+import { terrainDrawingViewport, terrainDrawingScaleBar, TERRAIN_DRAWING_PHOTO_EXTENT } from '../utils/terrainDrawingViewport.js'
 import { loadTerrainDrawingContext } from '../services/terrainDrawingContext.js'
 import { geometryPolygons, featureInteriorPoint } from '../services/parcelGeometry.js'
 import { layoutTerrainLabels, terrainLabelBounds } from '../utils/terrainLabelLayout.js'
@@ -21,8 +21,8 @@ export default function TerrainDrawingPair({analysis,layout,fence,parcels}) {
     return()=>{active=false;job++;node?.removeEventListener('terrain-drawing-context-retry',load)}
   },[analysis])
   const contextStatus=contexts.some(c=>c.status==='loading')?'loading':contexts.every(c=>c.status==='ready')?'ready':'unavailable'
-  const model=useMemo(()=>{
-    const v=terrainDrawingViewport(g),boundary=g.boundary.flat().map(r=>path(r,v.project)).join(' '),fills=[[],[],[],[]]
+  const models=useMemo(()=>[1,TERRAIN_DRAWING_PHOTO_EXTENT].map(factor=>{
+    const v=terrainDrawingViewport(g,10,factor),boundary=g.boundary.flat().map(r=>path(r,v.project)).join(' '),fills=[[],[],[],[]]
     for(let row=0;row<g.height-1;row++)for(let col=0;col<g.width-1;col++){
       const i=slopeIndex(getTerrainCellSlope(g,row,col));if(i<0)continue
       const x=g.xMin+col*g.step,y=g.yMin+row*g.step
@@ -55,10 +55,10 @@ export default function TerrainDrawingPair({analysis,layout,fence,parcels}) {
     // Retain the real 2m contours, and label those when no major label fits.
     if(!contourLabels.length)for(const c of analysis.contours||[]){if(contourLabels.length>=12)break;if(c.level%10!==0)placeContour(c)}
     return {v,boundary,fills:fills.map(ps=>ps.join(' ')),parcelPaths,labels:placed,contourLabels,unplaced:[...labelLayout.unplaced,...outsideLabels],missing:parcels.filter(p=>p.role==='target'&&!p.info?.number).length,noParcelMetadata:!parcels.some(p=>p.role==='target')}
-  },[g,parcels,analysis.contours])
-  const {v,boundary,fills}=model
+  }),[g,parcels,analysis.contours])
+  const model=models[1]
   return <div ref={source} className="terrain-drawing-export-source" aria-hidden="true" data-context-status={contextStatus} data-map-context-status={contexts[0].status} data-photo-context-status={contexts[1].status} data-context-tiles={contexts.reduce((n,c)=>n+c.tiles.length,0)} data-no-parcel-metadata={model.noParcelMetadata} data-unplaced-parcels={model.unplaced.map(p=>p.number).join('、')} data-missing-parcels={model.missing}>
-    {[true,false].map((modules,index)=><svg key={index} viewBox="0 0 800 740" data-drawing-view={modules?'layout':'terrain'} data-context-layer={modules?'std':'seamlessphoto'} data-geometry-key={analysis.geometryKey} data-viewport={JSON.stringify([v.west,v.south,v.east,v.north])} data-margin-m="10" role="img">
+    {[true,false].map((modules,index)=>{const model=models[index],{v,boundary,fills}=model,bar=terrainDrawingScaleBar(v,models[0].v);return <svg key={index} viewBox="0 0 800 740" data-drawing-view={modules?'layout':'terrain'} data-context-layer={modules?'std':'seamlessphoto'} data-geometry-key={analysis.geometryKey} data-viewport={JSON.stringify([v.west,v.south,v.east,v.north])} data-context-factor={modules?1:TERRAIN_DRAWING_PHOTO_EXTENT} data-scale-m={bar.meters} data-scale-px={bar.pixelLength} data-margin-m="10" role="img">
       <title>{modules?'参考モジュール配置':'地形・勾配・地番'}</title>
       <defs><clipPath id={`${id}-${index}-boundary`}><path d={boundary} fillRule="evenodd" clipRule="evenodd"/></clipPath><clipPath id={`${id}-${index}-map`}><rect x="35" y="25" width="730" height="660"/></clipPath><pattern id={`${id}-${index}-missing`} width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#eef0ed"/><path d="M0 8 L8 0" stroke="#aeb5af"/></pattern></defs>
       <rect width="800" height="740" fill="#fff"/>
@@ -78,8 +78,8 @@ export default function TerrainDrawingPair({analysis,layout,fence,parcels}) {
         {!modules&&<g clipPath={`url(#${id}-${index}-boundary)`}>{model.contourLabels.map(l=><text key={l.level} x={l.screen[0]} y={l.screen[1]} textAnchor="middle" data-contour-level={l.level} style={{fontSize:18,fontWeight:700,fill:'#183b29',stroke:'#fff',strokeWidth:3.5,paintOrder:'stroke'}}>{l.level} m</text>)}</g>}
       </g>
       <g transform="translate(749 48)" fill="#22392e"><text y="-10" textAnchor="middle" fontSize="18">N</text><path d="M0 -5 L-6 13 L0 8 L6 13 Z"/></g>
-      <g transform="translate(40 710)" fill="#22392e" stroke="#22392e" strokeWidth="1.3"><path d={`M0 -5 V5 M0 0 H${Math.min(50,Math.max(1,Math.floor((v.east-v.west)/5)))*v.scale}`} /><text y="22" stroke="none" fontSize="16">{Math.min(50,Math.max(1,Math.floor((v.east-v.west)/5)))} m</text></g>
+      <g transform="translate(40 710)" fill="#22392e" stroke="#22392e" strokeWidth="1.3"><path d={`M0 -5 V5 M0 0 H${bar.pixelLength}`} /><text y="22" stroke="none" fontSize="16">{bar.meters.toLocaleString('ja-JP',{maximumFractionDigits:2})} m</text></g>
       <text x="755" y="718" textAnchor="end" fontSize="15" fill="#41574c">等高線2m・太線10m / 黄色線：計算範囲 / 外側：{modules?'周辺地図':'航空写真'}</text>
-    </svg>)}
+    </svg>})}
   </div>
 }

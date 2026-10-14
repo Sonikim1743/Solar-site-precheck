@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {terrainSlopeDistribution} from '../src/utils/terrainSlopeDistribution.js'
-import {terrainDrawingViewport} from '../src/utils/terrainDrawingViewport.js'
+import {terrainDrawingViewport,terrainDrawingScaleBar,TERRAIN_DRAWING_PHOTO_EXTENT} from '../src/utils/terrainDrawingViewport.js'
 import {buildTerrainLayout} from '../src/utils/terrainLayout.js'
 const ring=(a,b,c,d)=>[[a,b],[c,b],[c,d],[a,d],[a,b]]
 const close=(a,b)=>assert.ok(Math.abs(a-b)<1e-7,`${a} != ${b}`)
@@ -28,6 +28,18 @@ test('drawing adds minimum ten metre context without changing geometry or the st
  close(terrainSlopeDistribution(a).totalAreaM2,146);assert.equal(JSON.stringify(a),before)
  const tall={...a.grid,boundary:[[ring(0,0,20,200)]]};const t=terrainDrawingViewport(tall)
  assert.ok(t.west<=-10&&t.east>=30&&t.south<=-10&&t.north>=210)
+})
+
+test('only the aerial view expands 1.25 times around the same centre with independently accurate bars',()=>{
+ for(const boundary of [[[ring(0,0,15,10),ring(2,2,4,4)]],[[ring(0,0,20,200)]],[[ring(-30,-20,-5,20)],[ring(10,15,40,30)]]]){
+  const g={boundary},before=JSON.stringify(g),left=terrainDrawingViewport(g),right=terrainDrawingViewport(g,10,TERRAIN_DRAWING_PHOTO_EXTENT)
+  close(right.east-right.west,(left.east-left.west)*1.25);close(right.north-right.south,(left.north-left.south)*1.25)
+  close(right.west+right.east,left.west+left.east);close(right.south+right.north,left.south+left.north)
+  const a=terrainDrawingScaleBar(left),b=terrainDrawingScaleBar(right,left)
+  close(a.pixelLength,b.pixelLength);close(b.meters,a.meters*1.25)
+  close(right.project([b.meters,0])[0]-right.project([0,0])[0],b.pixelLength)
+  close(right.scale,left.scale*.8);assert.equal(JSON.stringify(g),before)
+ }
 })
 test('plan rotation, vertical module tilt and terrain cutoff remain independent physical quantities',()=>{
  const g={width:17,height:17,step:5,xMin:0,yMin:0,boundary:[[ring(0,0,80,80)]],elevations:Array(289).fill(100),slopes:Array(289).fill(17)}

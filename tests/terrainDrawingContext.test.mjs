@@ -18,7 +18,7 @@ test('surrounding map uses finite local projection coordinates, bounded GSI tile
  }finally{globalThis.fetch=previousFetch;if(previousReader===undefined)delete globalThis.FileReader;else globalThis.FileReader=previousReader}
 })
 
-test('standard map and real aerial JPEG use separate bounded caches with exactly the same projected viewport',async()=>{
+test('standard map and real aerial JPEG use separate bounded caches with a wider centred photo viewport',async()=>{
  const previousFetch=globalThis.fetch,previousReader=globalThis.FileReader,requests=[]
  globalThis.FileReader=class {readAsDataURL(blob){this.result=`data:${blob.type};base64,AA==`;queueMicrotask(()=>this.onload())}}
  globalThis.fetch=async url=>{requests.push(url);return new Response(new Uint8Array([0]),{headers:{'content-type':url.includes('/seamlessphoto/')?'image/jpeg':'image/png'}})}
@@ -27,7 +27,10 @@ test('standard map and real aerial JPEG use separate bounded caches with exactly
   assert.notEqual(map,photo);assert.equal(p.status,'ready');assert.equal(loadTerrainDrawingContext(a,'photo'),photo)
   assert.ok(p.tiles.length>0&&p.tiles.length<=16);assert.ok(p.tiles.every(t=>t.layer==='seamlessphoto'&&t.href.startsWith('data:image/jpeg;base64,')))
   assert.ok(m.tiles.every(t=>t.layer==='std'&&t.href.startsWith('data:image/png;base64,')))
-  assert.deepEqual(m.tiles.map(t=>t.points),p.tiles.map(t=>t.points));assert.equal(requests.filter(u=>u.includes('/seamlessphoto/')&&u.endsWith('.jpg')).length,p.tiles.length)
+  assert.ok(Math.abs((p.viewport[2]-p.viewport[0])/(m.viewport[2]-m.viewport[0])-1.25)<1e-10)
+  assert.ok(Math.abs((p.viewport[3]-p.viewport[1])/(m.viewport[3]-m.viewport[1])-1.25)<1e-10)
+  assert.ok(Math.abs(p.viewport[0]+p.viewport[2]-m.viewport[0]-m.viewport[2])<1e-7)
+  assert.equal(requests.filter(u=>u.includes('/seamlessphoto/')&&u.endsWith('.jpg')).length,p.tiles.length)
  }finally{globalThis.fetch=previousFetch;if(previousReader===undefined)delete globalThis.FileReader;else globalThis.FileReader=previousReader}
 })
 
