@@ -21,6 +21,7 @@ export default function TerrainLayoutPreview({ analysis, preview, onChange, parc
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const workerRef = useRef(null)
+  const retryRef = useRef(null)
   const [conditionsOpen, setConditionsOpen] = useState(false)
   const conditionsRef = useRef(null)
   const conditionsId = `layout-conditions-${useId().replace(/:/g, '')}`
@@ -35,6 +36,7 @@ export default function TerrainLayoutPreview({ analysis, preview, onChange, parc
   const layout = selectedTerrainLayout(pool, preview)
   const enabled = Boolean(layout && preview?.enabled)
   useEffect(() => {
+    retryRef.current = null
     setBusy(false); setError('')
     onChangeRef.current(previous => previous?.layout && (previous.layout.analysisReference !== analysis || previous.layout.analysisKey !== key)
       ? { ...previous, layout: null, comparison: null, activeRackCount: null, disabledRackIds: [], enabled: false, calculating: false } : previous?.calculating ? { ...previous, calculating: false } : previous)
@@ -42,12 +44,14 @@ export default function TerrainLayoutPreview({ analysis, preview, onChange, parc
   }, [analysis, key])
 
   const changeOptions = patch => {
+    retryRef.current = null
     workerRef.current?.terminate(); workerRef.current = null
     setBusy(false); setError('')
     onChangeRef.current(previous => ({ ...previous, options: { ...options, ...patch }, calculating: false }))
   }
   const calculate = (patch = {}, optimized = false, compareSlopes = false) => {
     const runOptions = normalizeTerrainLayoutOptions({ ...options, ...patch })
+    retryRef.current = { options: runOptions, optimized, compareSlopes }
     workerRef.current?.terminate()
     workerRef.current = null
     setBusy(true); setError('')
@@ -122,7 +126,7 @@ export default function TerrainLayoutPreview({ analysis, preview, onChange, parc
     {draftChanged && <p className="terrain-layout-footnote" role="status">条件は未適用です。図・数量・PDFは前回の適用結果を保持しています。</p>}
     {preview?.comparison?.analysisReference === analysis && <div className="terrain-layout-comparison"><p>地形の局所勾配のみ変更。パネル傾斜・方位・開始位置・間隔・範囲は同一。個別除外なしの自動案です。</p><table><thead><tr><th>地形勾配</th><th>架台</th><th>枚数</th><th>DC kW</th><th>表示</th></tr></thead><tbody>{preview.comparison.layouts.map(result => <tr key={result.options.slopeLimitDeg}><th>{result.options.slopeLimitDeg}°未満</th><td>{result.rackCount}</td><td>{result.moduleCount}</td><td>{number(result.dcKw)}</td><td><button type="button" disabled={busy} onClick={() => { onChangeRef.current(previous => ({ ...previous, options: result.options, appliedOptions: result.options, layout: { ...result, analysisKey: key, analysisReference: analysis }, disabledRackIds: [], activeRackCount: null, enabled: true })); onShow3D?.() }}>この案を見る</button></td></tr>)}</tbody></table><p>差（20° − 15°）：{preview.comparison.layouts[1].rackCount - preview.comparison.layouts[0].rackCount}架台 / {preview.comparison.layouts[1].moduleCount - preview.comparison.layouts[0].moduleCount}枚 / {number(preview.comparison.layouts[1].dcKw - preview.comparison.layouts[0].dcKw)} kW。案の切替・再計算成功時は個別除外を初期化します。</p></div>}
     {busy && <div className="terrain-layout-status" role="status"><span>{options.slopeLimitDeg}°未満の地形と除外範囲を確認して配置中…</span><button type="button" onClick={cancel}>中止</button></div>}
-    {error && <TerrainLayoutErrorNotice error={error} onRetry={() => calculate()} onRefresh={() => window.location.reload()} onReacquire={onReacquire} onBoundary={onBoundary} onConditions={() => { setConditionsOpen(true); requestAnimationFrame(() => conditionsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })) }} />}
+    {error && <TerrainLayoutErrorNotice error={error} onRetry={() => { const attempt = retryRef.current; calculate(attempt?.options, attempt?.optimized, attempt?.compareSlopes) }} onRefresh={() => window.location.reload()} onReacquire={onReacquire} onBoundary={onBoundary} onConditions={() => { setConditionsOpen(true); requestAnimationFrame(() => conditionsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })) }} />}
     {layout && <>
       <dl className="terrain-layout-totals" aria-label="参考配置の予測規模">
         <div><dt>モジュール</dt><dd>{number(layout.moduleCount, 0)} <small>枚</small></dd></div>

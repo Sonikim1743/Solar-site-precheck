@@ -8,7 +8,7 @@ import { terrainGeometryKey } from '../src/utils/terrainArea.js'
 import { REGIONAL_PARCEL_SOURCE } from '../src/services/regionalParcels.js'
 if(!process.env.SOLAR_PLAYWRIGHT_MODULE || !process.env.SOLAR_BROWSER_EXE)throw Error('Set SOLAR_PLAYWRIGHT_MODULE and SOLAR_BROWSER_EXE to an existing isolated browser test runtime; no installation is performed')
 const {chromium}=await import(pathToFileURL(path.resolve(process.env.SOLAR_PLAYWRIGHT_MODULE)).href)
-const out=path.resolve('../windows-verification'),base='http://127.0.0.1:5187'
+const out=path.resolve(process.env.SOLAR_VERIFICATION_DIR || '../windows-verification'),base=process.env.SOLAR_BASE_URL || 'http://127.0.0.1:5187'
 await fs.mkdir(out,{recursive:true})
 const index=JSON.parse(await fs.readFile('public/parcels/2024-takahashi/index.json','utf8')),features=[]
 for(const cell of index.cells)features.push(...JSON.parse(await fs.readFile('public/parcels/2024-takahashi/'+cell.url,'utf8')).features)
@@ -17,7 +17,7 @@ assert.ok(selected.every(Boolean))
 let review=createEmptyParcelReview()
 for(const f of selected)review=setReviewParcel(review,f,'target',{fileName:REGIONAL_PARCEL_SOURCE,importedAt:new Date().toISOString()})
 const geometry=measureParcelReview(review).geometry,expected=terrainGeometryKey(geometry)
-const browser=await chromium.launch({executablePath:process.env.SOLAR_BROWSER_EXE,headless:true})
+const browser=await chromium.launch({executablePath:process.env.SOLAR_BROWSER_EXE,headless:process.env.SOLAR_HEADLESS !== '0'})
 const context=await browser.newContext({viewport:{width:1280,height:960},acceptDownloads:true,serviceWorkers:'block'})
 const page=await context.newPage(),errors=[],transfers=[],downloads=[]
 page.on('pageerror',e=>errors.push(e.message))
@@ -32,14 +32,30 @@ try {
   for(let i=0;i<4;i++){const before=await page.locator('.leaflet-control-scale-line').textContent();await page.locator('.leaflet-control-zoom-in').click();await page.waitForFunction(before=>document.querySelector('.leaflet-control-scale-line')?.textContent!==before,before);await page.waitForFunction(()=>!document.querySelector('.leaflet-container').classList.contains('leaflet-zoom-anim'))}
   const parcelPaths=selected.map(f=>page.locator(`[data-regional-parcel-id="${f.id}"]`))
   for(const locator of parcelPaths){await locator.waitFor({timeout:30000});await locator.focus();await locator.press('Enter')}
+  const selection=page.locator('.regional-parcel-selection strong')
+  assert.match(await selection.textContent(),/選択中 2筆 \/ 確定済み 0筆/)
+  await page.getByRole('button',{name:'選択を中止',exact:true}).click()
+  assert.match(await selection.textContent(),/選択中 0筆 \/ 確定済み 0筆/)
+  assert.equal(await page.locator('[data-selected-parcel-geometry-key]').count(),0)
+  for(const locator of parcelPaths){await locator.focus();await locator.press('Enter')}
   await page.getByRole('button',{name:'選択完了 → 3D',exact:true}).click()
   await page.locator('[data-selected-parcel-geometry-key]').waitFor({timeout:60000})
+  assert.equal(await page.locator('[data-selected-parcel-geometry-key]').getAttribute('data-selected-parcel-geometry-key'),expected)
+  await parcelPaths[0].focus();await parcelPaths[0].press('Enter')
+  assert.match(await selection.textContent(),/選択中 1筆 \/ 確定済み 2筆/)
+  assert.equal(await page.locator('[data-selected-parcel-geometry-key]').getAttribute('data-selected-parcel-geometry-key'),expected)
+  await page.getByRole('button',{name:'選択を中止',exact:true}).click()
+  assert.match(await selection.textContent(),/選択中 2筆 \/ 確定済み 2筆/)
   assert.equal(await page.locator('[data-selected-parcel-geometry-key]').getAttribute('data-selected-parcel-geometry-key'),expected)
   await page.locator('.selected-parcel-3d').screenshot({path:path.join(out,'selected-parcel-3d.png')})
   await page.setViewportSize({width:390,height:844})
   await page.locator('.regional-parcel-selection').scrollIntoViewIfNeeded()
   await page.screenshot({path:path.join(out,'mobile-selection.png')})
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1))
+  const resetBox=await page.getByRole('button',{name:'初期化',exact:true}).boundingBox()
+  const gsiBox=await page.locator('.leaflet-control-attribution a[href="https://maps.gsi.go.jp/development/ichiran.html"]').boundingBox()
+  assert.ok(resetBox && gsiBox)
+  assert.ok(resetBox.x+resetBox.width<=gsiBox.x || gsiBox.x+gsiBox.width<=resetBox.x || resetBox.y+resetBox.height<=gsiBox.y || gsiBox.y+gsiBox.height<=resetBox.y,'GSI attribution and reset do not overlap')
   const before=transfers.length
   await page.getByRole('button',{name:'地番選択',exact:true}).click()
   await page.getByRole('button',{name:'地番選択',exact:true}).click()
@@ -63,7 +79,7 @@ try {
   await page.getByRole('button',{name:'詳細',exact:true}).click()
   await page.getByRole('button',{name:'シンプル',exact:true}).click()
   assert.deepEqual(await links.evaluateAll(nodes=>nodes.map(n=>n.href)),prior)
-  await fs.writeFile(path.join(out,'check.json'),JSON.stringify({expected,selectedNumbers:['3243','道-184'],geometryType:geometry.type,areaM2:measureParcelReview(review).usableAreaM2,transfers,errors,checks:['original union to interactive 3D','390px no page overflow','validated parcel cache revisit','same geometry simple flow to two actual PDF downloads','retry cancel preserves completed PDFs','simple detail round trip preserves results']},null,2))
+  await fs.writeFile(path.join(out,'check.json'),JSON.stringify({verifiedAt:new Date().toISOString(),base,headless:process.env.SOLAR_HEADLESS !== '0',expected,selectedNumbers:['3243','道-184'],geometryType:geometry.type,areaM2:measureParcelReview(review).usableAreaM2,transfers,errors,checks:['multi-parcel draft cancel leaves original confirmed state','draft edits and cancel preserve confirmed original union and 3D','original union to interactive 3D','390px no page overflow and no GSI/reset overlap','validated parcel cache revisit','same geometry simple flow to two actual PDF downloads','retry cancel preserves completed PDFs','simple detail round trip preserves results']},null,2))
   assert.deepEqual(errors,[])
   console.log('Windows public-original end-to-end passed')
 } catch(e) {

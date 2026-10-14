@@ -5,13 +5,14 @@ import {pathToFileURL} from 'node:url'
 import {terrainReviewSynthetic} from '../tests/fixtures/terrainReviewSynthetic.mjs'
 import {terrainAreaSnapshot} from '../src/utils/terrainArea.js'
 const {chromium}=await import(pathToFileURL(process.env.SOLAR_PLAYWRIGHT_MODULE).href)
-const out=path.resolve('../windows-verification'),s=terrainReviewSynthetic()
-const browser=await chromium.launch({headless:true,executablePath:process.env.SOLAR_BROWSER_EXE})
+const out=path.resolve(process.env.SOLAR_VERIFICATION_DIR || '../windows-verification'),s=terrainReviewSynthetic()
+await fs.mkdir(out,{recursive:true})
+const browser=await chromium.launch({headless:process.env.SOLAR_HEADLESS !== '0',executablePath:process.env.SOLAR_BROWSER_EXE})
 const context=await browser.newContext({viewport:{width:1280,height:960},acceptDownloads:true,serviceWorkers:'block'}),page=await context.newPage(),errors=[]
 page.on('pageerror',e=>errors.push(e.message))
 await context.addInitScript(draft=>localStorage.setItem('solar-site-precheck-draft-v1',JSON.stringify(draft)),{position:s.position,siteName:s.siteName,siteNameTouched:true,parcelReview:s.parcelReview,terrainArea:terrainAreaSnapshot(s.terrainArea)})
 try {
-  await page.goto('http://127.0.0.1:5187/')
+  await page.goto(process.env.SOLAR_BASE_URL || 'http://127.0.0.1:5187/')
   await page.locator('#terrain-area > summary').click()
   const slope=page.getByLabel('参考配置の勾配条件')
   await slope.selectOption('20')
@@ -35,6 +36,28 @@ try {
   await page.locator('.terrain-layout-comparison').waitFor({timeout:30000})
   assert.deepEqual(await counts(),after,'comparison preserves manual applied result')
   const comparison=await page.locator('.terrain-layout-comparison tbody tr').allTextContents()
+  // Hold a real Worker's response, cancel, then deliver it late in this isolated
+  // browser. The UI must reject it without replacing the applied quantities.
+  await page.evaluate(()=>{
+    window.__solarNativeWorker=window.Worker
+    window.Worker=class extends window.__solarNativeWorker {
+      set onmessage(listener){super.onmessage=event=>{window.__solarLateResponse=()=>listener(event)}}
+    }
+  })
+  await page.getByRole('button',{name:'地形勾配15° / 20°を比較',exact:true}).click()
+  await page.waitForFunction(()=>Boolean(window.__solarLateResponse),{},{timeout:30000})
+  await page.locator('.terrain-layout-status').getByRole('button',{name:'中止',exact:true}).click()
+  await page.evaluate(()=>{window.__solarLateResponse();window.Worker=window.__solarNativeWorker;delete window.__solarLateResponse})
+  assert.deepEqual(await counts(),after,'cancel and late Worker response preserve applied quantities')
+  await page.evaluate(()=>{window.Worker=class {constructor(){throw Error('isolated browser startup failure')}}})
+  await page.getByRole('button',{name:'地形勾配15° / 20°を比較',exact:true}).click()
+  await page.locator('.terrain-layout-error').waitFor()
+  assert.deepEqual(await counts(),after,'Worker startup failure preserves applied quantities')
+  await page.evaluate(()=>{window.Worker=window.__solarNativeWorker;delete window.__solarNativeWorker})
+  await page.getByRole('button',{name:'再試行',exact:true}).click()
+  await page.locator('.terrain-layout-error').waitFor({state:'hidden'})
+  await page.locator('.terrain-layout-status').waitFor({state:'hidden',timeout:30000})
+  assert.deepEqual(await counts(),after,'successful comparison retry preserves exclusions')
   await page.locator('.terrain-area-result-actions').getByRole('button',{name:'レポート',exact:true}).click()
   await page.locator('#terrain-area-report').waitFor()
   assert.equal(await page.locator('#terrain-area-report .terrain-report-sheet').count(),4)
@@ -47,7 +70,7 @@ try {
   }
   await page.setViewportSize({width:320,height:780})
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1))
-  await fs.writeFile(path.join(out,'layout-check.json'),JSON.stringify({initial,after,reportNumbers,comparison,errors,checks:['actual Worker nonzero placement','draft preserves applied result','one rack exclusion recalculates capacity','height 1:2 leaves capacity unchanged','15/20 terrain-only comparison preserves exclusion','fence in both outputs','actual 1-page drawing and 4-page report downloads','320px no page overflow']},null,2))
+  await fs.writeFile(path.join(out,'layout-check.json'),JSON.stringify({verifiedAt:new Date().toISOString(),headless:process.env.SOLAR_HEADLESS !== '0',initial,after,reportNumbers,comparison,errors,checks:['actual Worker nonzero placement','draft preserves applied result','one rack exclusion recalculates capacity','height 1:2 leaves capacity unchanged','15/20 terrain-only comparison preserves exclusion','cancel and real late Worker response preserve quantities','Worker startup failure and retry preserve applied quantities','fence in both outputs','actual 1-page drawing and 4-page report downloads','320px no page overflow']},null,2))
   assert.deepEqual(errors,[])
   console.log('Windows layout and two PDF outputs passed')
 } catch(e){await fs.writeFile(path.join(out,'layout-failure.txt'),e.stack+'\n'+await page.locator('body').innerText());await page.screenshot({path:path.join(out,'layout-failure.png'),fullPage:true});throw e}finally{await browser.close()}

@@ -2,7 +2,9 @@
 
 対象：Solar-site-precheck。基準mainは `d75a0ebf5edbc1c3cb8d6a0b7ef2012afbb85777`。
 会社PCの既存配布フォルダーは更新していない。新しい作業フォルダーと
-`codex/windows-terrain-restore` で作業する。mainの変更・本番配布は対象外。
+`codex/windows-terrain-restore` で作業する。初回復元ではmainの変更・本番配布を行わなかった。
+その後、利用者が会社PCでの実行・使用確認後のmain更新を承認した。
+手動のproduction配布は引き続き対象外。
 
 ## 復元の意味
 
@@ -59,7 +61,7 @@ repositoryには保存しない。
 依存の復旧は既存キャッシュだけで始めた。最初のキャッシュには一部の
 固定依存がなく、別の既存pnpmキャッシュを確認した。新規ダウンロードが
 必要な検証依存には、依頼にある「新承認なしのインストール禁止」が適用される。
-新しいテスト・build・CSP・assetsと実ブラウザーの結果は検証完了後に追記する。
+テスト・build・CSP・assetsと実ブラウザーの結果を以下に記録する。
 
 初回Windows検証：追加依存なしの核心テスト464件、build、CSP、assetsと
 既存release metadataは成功。地域コンパイラーの2件と環境間識別・旧記録の
@@ -97,3 +99,40 @@ jsdomの追加インストールは行わなかった。過去履歴から再構
 buildは成功（既存の大きなJSチャンクの警告あり）。CSPとassetsの成功は
 今回のローカルbuildに対する確認。release metadataの検査は既存公開v1.28.2
 ZIPの整合性であり、今回の変更を配布ZIPへ梱包・公開した証拠ではない。
+
+## main更新前の会社PCでの再確認
+
+2026-10-14、利用者の追加承認に基づき、現在のmainと実行設定を再確認した。
+開始時の `origin/main` は引き続き `d75a0eb`、初回復元の `fd119c6` は
+[GitHub CI](https://github.com/Sonikim1743/Solar-site-precheck/actions/runs/38487774052) が成功。
+既存の会社実行版と利用者の未コミット作業は今回も置換していない。
+
+Windows Edgeで、公開原本2筆の未確定選択の中止、確定後の選択変更・中止、
+元の合併形状と3Dの同一性、シンプル解析から実PDF2本の取得、再解析中止と
+シンプル/詳細往復時のPDF保持を再確認した。390px幅でGSI帰属リンクと
+初期化ボタンの重なりも確認した。
+
+比較失敗後の「再試行」が通常の再配置を実行して個別除外を初期化する不具合を
+実ブラウザーで再現した。失敗時の計算条件・比較種別を保存し、同じ処理を
+再試行するよう修正した。実Workerの応答を一時保留して中止後に遅延配送する
+隔離検証、Worker起動失敗と比較再試行でも81架台・2,396枚・DC 1,725.12kWが
+保持された。15°/20°比較、仮フェンス、図面1ページとレポート4ページ、320px幅を
+再確認した。最終の基本テスト470件・build・CSP・assetsと既存release metadataが成功。
+
+画面自動化ヘルパーはWindowsランタイムの欠落エラーで起動できなかった。
+新規インストールや認証は行わず、既存Playwrightとインストール済みEdgeを使った。
+表示付き検証では予定外の選択・地図状態を観察して停止し、最終の再現可能な
+検証は独立したheadless Edgeで実施した。手動利用の実機タッチ検証とは区別する。
+実結果は作業フォルダーの `windows-main-verification/check.json` と
+`layout-check.json`、生成PDFと画面に保存する。公開repositoryにこれらの
+実行時記録や私用ブラウザーデータを追加しない。
+
+使用するローカルアプリは `http://127.0.0.1:5187/`。この復元フォルダーのdistを
+既存の1プロセスから提供し、追加の同じアプリサーバーは起動しなかった。
+上の保存済み実行版とは別のアドレスであり、利用者の既存作業を初期化しない。
+
+`.github/workflows/ci.yml` はpush/PR時のテスト・build・CSP・assets・release検査のみ。
+配布コマンドはない。`MAC_OPENCLAW_START_KO.md` と `DEPLOYED_VERSION.md` は
+既存Cloudflare PagesをGit Providerなしの手動配布として記録している。
+main更新前の運用サイトは `index-uI2HMLn0.js` を提供していた。今回のmain更新を
+新しいproduction公開の証拠にしない。リモートmainの最終SHAとCI結果は完了報告に記す。
