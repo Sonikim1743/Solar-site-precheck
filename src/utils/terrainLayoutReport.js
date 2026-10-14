@@ -13,7 +13,7 @@ export function terrainReportLayouts(analysis, preview) {
   return { current, comparison, fence, comparisonFences, totalPages: 3 + Number(Boolean(comparison)) + Number(Boolean(preview?.simpleReview)) }
 }
 export function terrainLayoutReportRows(layout) {
-  return [ ['配置可能な地形勾配', `${layout.options.slopeLimitDeg}°未満`], ['使用架台 / 個別除外', `${layout.rackCount} / ${layout.disabledRacks?.length || 0} 架台`], ['モジュール', `${n(layout.moduleCount, 0)} 枚`], ['DC容量', `${n(layout.dcKw, 2)} kW`], ['AC参考容量', `約 ${n(layout.acRangeKw?.[0], 0)}〜${n(layout.acRangeKw?.[1], 0)} kW`] ]
+  return [ ['地形の傾斜', `${layout.options.slopeLimitDeg}°未満`], ['使用架台 / 個別除外', `${layout.rackCount} / ${layout.disabledRacks?.length || 0} 架台`], ['モジュール', `${n(layout.moduleCount, 0)} 枚`], ['DC容量', `${n(layout.dcKw, 2)} kW`], ['AC参考容量', `約 ${n(layout.acRangeKw?.[0], 0)}〜${n(layout.acRangeKw?.[1], 0)} kW`] ]
 }
 export function terrainLayoutReportConditions(layout) {
   const o = layout.options
