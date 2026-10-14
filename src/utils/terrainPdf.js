@@ -313,7 +313,7 @@ function pageDrawing(ctx, model, images) {
     [['アレイ間左右間隔', `${numeric(o.rackGapM)}m`], ['アレイ間前後間隔', `${numeric(o.rowGapM)}m`]],
     [['境界からの離隔距離', `${numeric(o.setbackM)}m`], ['モジュール間隔', `${numeric(o.moduleGapM*1000,0)}mm`]],
     [['モジュール高さ', `${numeric(o.minClearanceM)}m`], ['架台構成 / 開始位置', `4段 × ${o.minColumns === o.maxColumns ? o.minColumns : `${o.minColumns}〜${o.maxColumns}`}列 / ${numeric(o.scanOffsetUM,2)}, ${numeric(o.scanOffsetVM,2)}m`]],
-    [['AC参考容量', `約 ${numeric(layout.acRangeKw?.[0],0)}〜${numeric(layout.acRangeKw?.[1],0)} kW`], ['配置方式 / 取得日', `${layout.stats?.autoSearch?.mode==='south-fixed'?'真南固定・探索内最多':'方位探索 / 適用案'} / ${model.fetchedAt.split(' ')[0]}`]],
+    [['AC参考容量', `約 ${numeric(layout.acRangeKw?.[0],0)}〜${numeric(layout.acRangeKw?.[1],0)} kW`], ['配置方式 / 取得日', `${layout.stats?.autoSearch?.mode==='south-fixed'?'真南固定・探索内最多':layout.stats?.autoSearch?'方位探索 / 適用案':'入力方位固定 / 適用案'} / ${model.fetchedAt.split(' ')[0]}`]],
   ]
   tableRows.forEach((pairs, row) => pairs.forEach(([label, value], column) => {
     const x = 8 + column * 202, y = 236 + row * 6.3

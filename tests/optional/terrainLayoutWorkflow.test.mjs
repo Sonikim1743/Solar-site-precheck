@@ -4,7 +4,7 @@ import {JSDOM} from 'jsdom'
 import {createServer} from 'vite'
 import react from '@vitejs/plugin-react'
 import {terrainReviewSynthetic} from '../fixtures/terrainReviewSynthetic.mjs'
-import {buildTerrainLayout} from '../../src/utils/terrainLayout.js'
+import {buildTerrainLayout,buildSouthTerrainLayout} from '../../src/utils/terrainLayout.js'
 import {buildTerrainSlopeComparison,terrainLayoutAnalysisKey} from '../../src/utils/terrainLayoutComparison.js'
 import {terrainReportTitle} from '../../src/utils/terrainReportTitle.js'
 import {terrainReportLayouts} from '../../src/utils/terrainLayoutReport.js'
@@ -30,6 +30,43 @@ async function click(label){const button=[...document.querySelectorAll('button')
 async function selectSlope(value){const select=document.querySelector('select[aria-label="参考配置の勾配条件"]');await React.act(async()=>{select.value=String(value);select.dispatchEvent(new window.Event('change',{bubbles:true}))})}
 async function clean(){await React.act(async()=>root.unmount())}
 
+async function selectBearing(value){const select=[...document.querySelectorAll('label')].find(x=>x.textContent.startsWith('モジュール正面の方位')).querySelector('select');await React.act(async()=>{select.value=String(value);select.dispatchEvent(new window.Event('change',{bubbles:true}))})}
+
+test('180→90→180 drafts, calculation and late replies preserve exact applied bearings',async()=>{
+ await setup();await click('▸ 配置条件');let stale
+ for(const bearing of [180,90,180]){
+  await selectBearing(bearing);await click('この条件で再計算');const worker=workers.at(-1)
+  assert.equal(worker.message.options.azimuthDeg,bearing);assert.equal(worker.message.optimized,false)
+  if(stale)await React.act(async()=>stale.onmessage({data:{result:buildTerrainLayout(analysis,stale.message.options)}}))
+  await React.act(async()=>worker.onmessage({data:{result:buildTerrainLayout(analysis,worker.message.options)}}))
+  assert.equal(state.options.azimuthDeg,bearing);assert.equal(state.appliedOptions.azimuthDeg,bearing);assert.equal(state.layout.options.azimuthDeg,bearing);stale=worker
+ }
+ const applied=state.layout;await selectBearing(90);await click('この条件で再計算');await click('中止');assert.equal(state.layout,applied);assert.equal(state.layout.options.azimuthDeg,180)
+ await clean()
+})
+
+test('explicit optimized fractional angle is selectable and synchronized; wrong manual worker bearing is rejected',async()=>{
+ await setup();await click('方位も最適化して適用（±30°）');const worker=workers.at(-1),o=worker.message.options
+ const result=buildTerrainLayout(analysis,{...o,azimuthDeg:172.5});result.stats.autoSearch={mode:'optimized',baseAzimuthDeg:o.azimuthDeg,selectedAzimuthDeg:172.5}
+ await React.act(async()=>worker.onmessage({data:{result}}))
+ assert.equal(state.options.azimuthDeg,172.5);assert.equal(state.appliedOptions.azimuthDeg,172.5);assert.equal(state.layout.options.azimuthDeg,172.5)
+ await click('▸ 配置条件');const select=[...document.querySelectorAll('label')].find(x=>x.textContent.startsWith('モジュール正面の方位')).querySelector('select');assert.equal(select.value,'172.5')
+ const applied=state.layout;await selectBearing(180);await click('この条件で再計算');await React.act(async()=>workers.at(-1).onmessage({data:{result}}));assert.equal(state.layout,applied);assert.ok(document.querySelector('[role="alert"]'))
+ await clean()
+})
+
+test('bearing-only draft edits block old slope and south comparison application',async()=>{
+ await setup();await click('地形勾配15° / 20°を比較');let worker=workers.at(-1)
+ await React.act(async()=>worker.onmessage({data:{comparison:buildTerrainSlopeComparison(analysis,worker.message.options)}}))
+ await click('▸ 配置条件');await selectBearing(90)
+ assert.ok([...document.querySelectorAll('button')].filter(b=>b.textContent==='この案を見る').every(b=>b.disabled))
+ await click('真南固定・最大配置を比較');worker=workers.at(-1);const south=buildSouthTerrainLayout(analysis,worker.message.options)
+ await React.act(async()=>worker.onmessage({data:{result:south}}))
+ const apply=[...document.querySelectorAll('button')].find(b=>b.textContent==='真南固定案を適用');assert.equal(apply.disabled,false)
+ await selectBearing(180);assert.equal(apply.disabled,true)
+ await clean()
+})
+
 test('single-character spacing draft preserves the applied rack pool, exclusions, quantities and report snapshot',async()=>{
  const prior=await setup();await click('▸ 配置条件')
  const input=[...document.querySelectorAll('label')].find(x=>x.textContent.startsWith('架台左右')).querySelector('input')
@@ -44,7 +81,7 @@ test('slope change then cancel, late success, startup failure and worker error a
  await click('中止');assert.equal(state.layout,prior.layout);assert.deepEqual(state.disabledRackIds,prior.disabledRackIds)
  await React.act(async()=>cancelled.onmessage({data:{result:buildTerrainLayout(analysis,cancelled.message.options)}}))
  assert.equal(state.layout,prior.layout)
- await click('最適配置を比較');await React.act(async()=>workers.at(-1).onerror({message:'synthetic'}))
+ await click('方位も最適化して適用（±30°）');await React.act(async()=>workers.at(-1).onerror({message:'synthetic'}))
  assert.equal(state.layout,prior.layout);assert.deepEqual(state.disabledRackIds,prior.disabledRackIds);assert.equal(state.fence,true)
  globalThis.Worker=class {constructor(){throw Error('synthetic startup')}};await click('再試行');assert.equal(state.layout,prior.layout);assert.equal(state.calculating,false);globalThis.Worker=WorkerStub
  await clean()
@@ -72,17 +109,18 @@ test('report uses applied geometry and excluded quantities, emits four sheets, a
  const {renderToStaticMarkup}=await import('react-dom/server')
  const html=renderToStaticMarkup(React.createElement(Report,{report})),document=new JSDOM(html).window.document
  assert.equal(document.querySelectorAll('.terrain-report-sheet').length,4)
- assert.equal(document.querySelectorAll('.terrain-area-figure svg').length,6)
+ assert.equal(document.querySelectorAll('.terrain-area-figure svg').length,5)
  const drawing=document.querySelector('.terrain-layout-report')
  assert.equal(drawing.querySelectorAll('button,input,select,canvas').length,0)
- assert.ok(drawing.textContent.includes('71 / 1 架台'))
- assert.ok(drawing.textContent.includes('2,236 枚'))
- assert.ok(drawing.textContent.includes('1,609.92 kW'))
- assert.ok(document.querySelector('.terrain-report-footnotes').textContent.includes('パネル傾斜 10°'))
+ const activeModules=pool.moduleCount-pool.racks[0].moduleCount
+ assert.ok(drawing.textContent.includes(`${pool.rackCount-1} / 1 架台`))
+ assert.ok(drawing.textContent.includes(`${activeModules.toLocaleString('ja-JP')} 枚`))
+ assert.ok(drawing.textContent.includes(`${(activeModules*.72).toLocaleString('ja-JP',{maximumFractionDigits:2})} kW`))
+ assert.ok(document.querySelector('.terrain-report-footnotes').textContent.includes(`パネル傾斜 ${pool.options.tiltDeg}°`))
  assert.ok(!drawing.textContent.includes('55°'))
- assert.equal(Number(drawing.querySelectorAll('svg')[1].getAttribute('data-layout-modules')),2236)
- assert.equal(document.querySelector('.terrain-drawing-export-source').querySelectorAll('.terrain-area-layout-plan path').length,2236)
- assert.ok(document.querySelector('.terrain-drawing-export-source g[stroke-dasharray="5 3"] path'))
+ assert.equal(Number(drawing.querySelectorAll('svg')[1].getAttribute('data-layout-modules')),activeModules)
+ assert.equal(document.querySelector('.terrain-drawing-export-source').querySelectorAll('[data-layout-racks] path').length,activeModules)
+ assert.ok(document.querySelector('.terrain-drawing-export-source path[stroke-dasharray="5 3"]'))
 })
 
 
@@ -96,12 +134,12 @@ test('report consolidates the terrain/configuration evidence in final notes and 
  assert.ok(sheets[1].textContent.includes('実DEM地形 · 配置前'))
  assert.ok(sheets[1].textContent.includes('参考配置3D · 適用済み'))
  assert.equal(sheets[1].querySelectorAll('svg').length,2)
- assert.equal(sheets[1].querySelectorAll('[data-layout-modules="2236"]').length,1)
+ assert.equal(sheets[1].querySelectorAll(`[data-layout-modules="${pool.moduleCount-pool.racks[0].moduleCount}"]`).length,1)
  assert.ok(!sheets[1].textContent.includes('原資料'))
  assert.ok(!sheets[2].textContent.includes('DC÷1.5'))
  assert.ok(sheets[3].textContent.includes('原資料'))
  assert.ok(sheets[3].textContent.includes('DC÷1.5'))
- assert.ok(sheets[3].textContent.includes('パネル傾斜 10°'))
+ assert.ok(sheets[3].textContent.includes(`パネル傾斜 ${pool.options.tiltDeg}°`))
  assert.ok(sheets[3].textContent.includes('仮フェンス'))
  assert.ok(doc.querySelector('.terrain-drawing-export-source [data-terrain-fence]'))
  const projected=terrainReportLayouts(analysis,report.terrainPreview)

@@ -35,7 +35,12 @@ export function terrainLayoutErrorGuidance(kind, message = '') {
   // A new value lets UI state change without corrupting later error guidance.
   return { ...guidance }
 }
-export function terrainLayoutResultMatchesOptions(result, requested) {
+export function terrainLayoutResultMatchesOptions(result, requested, allowBearingSearch = false) {
   const keys = ['rows','minColumns','maxColumns','slopeLimitDeg','moduleWidthM','moduleHeightM','modulePowerW','moduleGapM','tiltDeg','rackGapM','rowGapM','setbackM']
-  return Boolean(result?.options && requested && keys.every(key => Number.isFinite(requested[key]) && result.options[key] === requested[key]))
+  if(!result?.options || !requested || !keys.every(key => Number.isFinite(requested[key]) && result.options[key] === requested[key]))return false
+  const bearing=result.options.azimuthDeg,expected=requested.azimuthDeg
+  if(!Number.isFinite(bearing)||!Number.isFinite(expected))return false
+  if(!allowBearingSearch)return bearing===expected
+  const search=result.stats?.autoSearch
+  return search?.mode==='optimized' && search.baseAzimuthDeg===expected && search.selectedAzimuthDeg===bearing && Math.abs(((bearing-expected+540)%360)-180)<=30
 }

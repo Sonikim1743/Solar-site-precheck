@@ -54,7 +54,10 @@ test('raw exception content is never echoed or interpreted and returned UI objec
 })
 test('an older worker cannot label below-ten results as a new slope scenario or use incorrect physical dimensions', () => {
   const requested=normalizeTerrainLayoutOptions({slopeLimitDeg:15}), valid={options:{...requested,azimuthDeg:172.5}}
-  assert.equal(terrainLayoutResultMatchesOptions(valid,requested),true,'selected bearing may differ from base bearing')
+  assert.equal(terrainLayoutResultMatchesOptions(valid,requested),false,'fixed bearing rejects a different orientation')
+  valid.stats={autoSearch:{mode:'optimized',baseAzimuthDeg:180,selectedAzimuthDeg:172.5}}
+  assert.equal(terrainLayoutResultMatchesOptions(valid,requested,true),true)
+  assert.equal(terrainLayoutResultMatchesOptions({...valid,options:{...requested,azimuthDeg:90}},requested,true),false)
   assert.equal(terrainLayoutResultMatchesOptions({options:{...requested,slopeLimitDeg:10}},requested),false)
   const old={...requested};delete old.slopeLimitDeg
   assert.equal(terrainLayoutResultMatchesOptions({options:old},requested),false)
