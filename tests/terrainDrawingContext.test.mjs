@@ -12,6 +12,7 @@ test('surrounding map uses finite local projection coordinates, bounded GSI tile
   assert.equal(loadTerrainDrawingContext(a),p)
   for(const tile of r.tiles){assert.ok(tile.points.flat().every(Number.isFinite));assert.equal(tile.points.length,3);assert.ok(Math.hypot(tile.points[1][0]-tile.points[0][0],tile.points[1][1]-tile.points[0][1])>10)}
   assert.ok(requests.every(u=>/^https:\/\/cyberjapandata.gsi.go.jp\/xyz\/std\/\d+\/\d+\/\d+\.png$/.test(u)))
+  assert.ok(requests.every(u=>Number(u.split('/')[5])<=18))
   const invalid=await loadTerrainDrawingContext({grid:{origin:{lat:NaN,lon:135},boundary:[[ring]]}})
   assert.equal(invalid.status,'unavailable');assert.equal(invalid.tiles.length,0)
  }finally{globalThis.fetch=previousFetch;if(previousReader===undefined)delete globalThis.FileReader;else globalThis.FileReader=previousReader}

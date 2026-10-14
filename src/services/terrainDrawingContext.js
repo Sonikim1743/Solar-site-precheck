@@ -14,7 +14,7 @@ export function loadTerrainDrawingContext(analysis) {
     const g=analysis.grid,v=terrainDrawingViewport(g),projection=proj4('EPSG:4326',`+proj=aeqd +lat_0=${g.origin.lat} +lon_0=${g.origin.lon} +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs`)
     const corners=[[v.west,v.south],[v.east,v.south],[v.east,v.north],[v.west,v.north]].map(p=>projection.inverse(p))
     if(!corners.flat().every(Number.isFinite))throw Error('周辺地図の投影座標が不正です。')
-    let z=17,b
+    let z=18,b
     do{const t=corners.map(p=>toTile(p,z));b={x0:Math.floor(Math.min(...t.map(p=>p[0]))),x1:Math.floor(Math.max(...t.map(p=>p[0]))),y0:Math.floor(Math.min(...t.map(p=>p[1]))),y1:Math.floor(Math.max(...t.map(p=>p[1])))};if((b.x1-b.x0+1)*(b.y1-b.y0+1)<=16)break;z--}while(z>10)
     const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),8000),requests=[]
     try{

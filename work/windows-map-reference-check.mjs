@@ -64,6 +64,7 @@ const click=async candidate=>{
  await page.waitForFunction(()=>!document.querySelector('.regional-parcel-selection')?.textContent.includes('選択境界を取得中'))
 }
 try{
+ console.log('Map reference phase: opening isolated app')
  await page.goto(base+'/?design=simple')
  await page.waitForFunction(()=>[...document.querySelectorAll('img.leaflet-tile-loaded')].some(img=>img.src.includes('/14/')&&Math.abs(img.getBoundingClientRect().width-256)<1))
  await page.waitForTimeout(700)
@@ -71,21 +72,25 @@ try{
  for(let i=0;i<2;i++){await page.locator('.leaflet-control-zoom-in').click();await page.waitForTimeout(600);await page.waitForFunction(()=>!document.querySelector('.leaflet-container').classList.contains('leaflet-zoom-anim'))}
  await page.waitForFunction(()=>document.querySelectorAll('.public-parcel-reference-pane canvas').length>0)
  await page.waitForFunction(()=>document.querySelector('.public-parcel-overlay-status')?.textContent.includes('公開地番／参考境界'))
+ console.log('Map reference phase: selecting three areas')
  for(let i=0;i<sample.candidates.length;i++){await click(sample.candidates[i]);await page.waitForFunction(n=>document.querySelector('.regional-parcel-selection strong')?.textContent.includes(`選択中 ${n}区域`),i+1)}
  assert.match(await selection.textContent(),/適用済み 0区域/)
  await page.getByRole('button',{name:'選択を中止',exact:true}).click();assert.match(await selection.textContent(),/選択中 0区域/)
  for(let i=0;i<sample.candidates.length;i++){await click(sample.candidates[i]);await page.waitForFunction(n=>document.querySelector('.regional-parcel-selection strong')?.textContent.includes(`選択中 ${n}区域`),i+1)}
  await page.getByRole('button',{name:'選択完了 → 3D',exact:true}).click()
+ console.log('Map reference phase: applied selection, waiting for 3D')
  await page.locator('[data-selected-parcel-geometry-key]').waitFor({timeout:60000})
  const draft=JSON.parse(await page.evaluate(()=>localStorage.getItem('solar-site-precheck-draft-v1'))),review=draft.parcelReview
  assert.equal(review.parcels.filter(p=>p.role==='target').length,3);assert.deepEqual(review.parcels.map(p=>p.info.number).sort(),sample.candidates.map(c=>c.number).sort())
  assert.match(review.parcels[0].source.fileName,/地図表示境界の参考領域/)
  const expected=terrainGeometryKey(measureParcelReview({...review,boundary:null,exclusions:[]}).geometry)
  assert.equal(await page.locator('[data-selected-parcel-geometry-key]').getAttribute('data-selected-parcel-geometry-key'),expected)
+ console.log('Map reference phase: 3D geometry matched')
  await page.locator('.regional-parcel-selection').getByRole('button',{name:sample.candidates[0].number+' ×',exact:true}).click();assert.match(await selection.textContent(),/選択中 2区域 \/ 適用済み 3区域/)
  await page.getByRole('button',{name:'選択を中止',exact:true}).click();assert.match(await selection.textContent(),/選択中 3区域 \/ 適用済み 3区域/)
  await page.setViewportSize({width:390,height:844});await page.locator('.regional-parcel-selection').scrollIntoViewIfNeeded();await page.screenshot({path:path.join(out,'mobile-selection.png')});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1))
  await page.getByRole('button',{name:'基本値でまとめて解析',exact:true}).click();await page.locator('.simple-batch-complete').waitFor({timeout:180000})
+ console.log('Map reference phase: simple batch completed')
  assert.equal(await page.locator('.simple-batch-complete').getAttribute('data-simple-result-key'),expected)
  const links=page.locator('.simple-batch-downloads a[download]');assert.equal(await links.count(),2)
  for(let i=0;i<2;i++){const [d]=await Promise.all([page.waitForEvent('download'),links.nth(i).click()]);await d.saveAs(path.join(out,i?'map-reference-report.pdf':'map-reference-drawing.pdf'))}
@@ -94,4 +99,4 @@ try{
  assert.deepEqual(errors,[]);assert.ok(ranges.every(r=>r.status===206),'PMTiles uses bounded Range requests')
  await fs.writeFile(path.join(out,'check.json'),JSON.stringify({at:new Date().toISOString(),base,sample,expected,review,ranges,errors,checks:['actual map-vector click outside original prepared region','reference draft/cancel preserves applied selection','same map geometry to 3D and simple batch','390px without page overflow','two actual PDF downloads','cancel retains completed PDFs']},null,2))
  console.log('Actual Windows map-reference flow passed')
-}catch(e){await fs.writeFile(path.join(out,'failure.txt'),e.stack+'\n'+await page.locator('body').innerText());await page.screenshot({path:path.join(out,'failure.png'),fullPage:true});throw e}finally{await browser.close()}
+}catch(e){await fs.writeFile(path.join(out,'failure.txt'),e.stack+'\n'+await page.locator('body').innerText({timeout:5000}).catch(()=>'(body unavailable)'));await page.screenshot({path:path.join(out,'failure.png'),fullPage:true,timeout:5000}).catch(()=>{});throw e}finally{await browser.close()}

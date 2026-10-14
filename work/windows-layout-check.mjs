@@ -75,6 +75,9 @@ try {
   assert.equal(await drawings.count(),2)
   assert.equal(await drawings.nth(0).getAttribute('data-viewport'),await drawings.nth(1).getAttribute('data-viewport'))
   assert.equal(await drawings.nth(0).getAttribute('data-margin-m'),'10');assert.equal(await drawings.nth(1).locator('[data-layout-racks]').count(),0)
+  const contourLabels=await drawings.nth(1).locator('[data-contour-level]').allTextContents()
+  assert.ok(contourLabels.length>0);assert.ok(contourLabels.every(s=>/^\d+(?:\.\d+)? m$/.test(s)))
+  for(const selector of ['[data-parcel-boundaries]','[data-parcel-labels]'])assert.match(await drawings.nth(1).locator(selector).getAttribute('clip-path'),/-boundary\)/)
   const reportNumbers=await page.locator('.terrain-layout-report-values--primary dd').allTextContents()
   assert.ok(reportNumbers[2].includes(after[0].replace(/\s*枚.*/,'')))
   for(const [name,file] of [['配置図PDF · 1枚','synthetic-drawing.pdf'],['地形PDFを保存','synthetic-report.pdf']]) {

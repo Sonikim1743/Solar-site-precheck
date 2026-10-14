@@ -42,7 +42,7 @@ function fits(box, viewport, occupied) {
 // Caller order is priority order (e.g. file parcels before public references).
 // Never move source XYZ or invent a cadastral number. Unplaced entries are kept
 // for the caller's compact list instead of disappearing behind collision skips.
-export function layoutTerrainLabels(labels, viewport = DEFAULT_VIEWPORT) {
+export function layoutTerrainLabels(labels, viewport = DEFAULT_VIEWPORT, accepts = null) {
   const result = { labels: [], unplaced: [] }, occupied = []
   if (!Array.isArray(labels)) return result
   const validViewport = viewport && ['left', 'top', 'right', 'bottom'].every(key => finite(viewport[key])) && viewport.right > viewport.left && viewport.bottom > viewport.top
@@ -63,7 +63,7 @@ export function layoutTerrainLabels(labels, viewport = DEFAULT_VIEWPORT) {
     for (const [dx, dy] of OFFSETS) {
       const screen = [label.screen[0] + dx, label.screen[1] + dy]
       const box = terrainLabelBounds(label.number, screen)
-      if (!fits(box, viewport, occupied)) continue
+      if (!fits(box, viewport, occupied) || (accepts && !accepts(box, label))) continue
       occupied.push(box)
       result.labels.push({ ...label, screen, anchorScreen: [...label.screen], displaced: dx !== 0 || dy !== 0 })
       placed = true
