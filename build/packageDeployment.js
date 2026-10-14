@@ -110,7 +110,7 @@ for (const target of ['cloudflare', 'portable']) {
     buildId: `${version}-${buildDate}-${packageHash.slice(0, 12)}`, packageName,
     zipUrl: `https://raw.githubusercontent.com/Sonikim1743/Solar-site-precheck/main/release/latest/${packageName}`,
     sha256: packageHash, etag: packageHash.slice(0, 16), bundleName, minRequiredRuntime: '1.2',
-    notes: target === 'portable' ? '4段×4〜8列の参考配置、10/15/20°比較、架台選択・フェンス、地番と地図操作を更新。配置は画面内の参考です。既存runtime/node.exeを保持してください。' : '4段×4〜8列の参考配置、勾配比較、架台選択・フェンス、地番と地図操作を更新。配置は画面内の参考です。dist・functions・sharedを含む展開先ルートから配布してください。',
+    notes: target === 'portable' ? '地図参考領域から3D・一括解析・PDFへ接続。A3横1枚2図、標高ラベル、面積加重勾配、正南比較、15°・前後空き3.3mを追加。原本全筆は未確認。既存runtime/node.exeを保持してください。' : '地図参考領域から3D・一括解析・PDFへ接続。A3横1枚2図、標高ラベル、面積加重勾配、正南比較、15°・前後空き3.3mを追加。原本全筆は未確認。dist・functions・sharedの展開先ルートから配布してください。',
     sizeBytes: archive.length,
   }
   await writeFile(join(output, `${target}-metadata.json`), JSON.stringify(metadata, null, 2) + '\n')
@@ -118,8 +118,11 @@ for (const target of ['cloudflare', 'portable']) {
 }
 // Do not update tracked release/latest until both targets are successfully verified.
 const portable = packages.find((item) => item.target === 'portable')
+const cloudflare = packages.find((item) => item.target === 'cloudflare')
 await copy(portable.path, join('release/latest', portable.packageName))
 await copy(join(output, 'portable-metadata.json'), 'release/latest/latest-version.json')
+await copy(cloudflare.path, join('release/latest', cloudflare.packageName))
+await copy(join(output, 'cloudflare-metadata.json'), 'release/latest/cloudflare-version.json')
 run('work/verify-release-metadata.mjs')
 await writeFile(join(output, 'packages.json'), JSON.stringify(packages, null, 2) + '\n')
 console.log(JSON.stringify({ output, packages }, null, 2))

@@ -14,8 +14,6 @@ const ATTRIBUTION = '<a href="https://source.coop/smartmaps/amx-2024-04" target=
 export { ParcelNumberSymbolizer }
 
 function createPublicParcelLayer(props, context) {
-  const selectionId = p => p.properties?.__mvtId != null ? `2024:${p.properties.__mvtId}` : p.id
-  let selectedIds = new Set((props.referenceSelections || []).map(selectionId))
   // The official Leaflet renderer expects the same Leaflet singleton globally.
   globalThis.L = L
   const pane = context.map.getPane(PANE_NAME) || context.map.createPane(PANE_NAME)
@@ -35,7 +33,6 @@ function createPublicParcelLayer(props, context) {
     paintRules: [
       { dataSource: 'parcels', dataLayer: 'fude', filter: (_, feature) => isPublicParcelFeature(feature), symbolizer: new PolygonSymbolizer({ fill: 'rgba(0,0,0,0)', stroke: 'rgba(22,58,56,.65)', width: 2.3 }) },
       { dataSource: 'parcels', dataLayer: 'fude', filter: (_, feature) => isPublicParcelFeature(feature), symbolizer: new PolygonSymbolizer({ fill: 'rgba(0,0,0,0)', stroke: '#d6ffff', width: 1.15 }) },
-      { dataSource: 'parcels', dataLayer: 'fude', filter: (_, feature) => selectedIds.has(`2024:${feature.id}`), symbolizer: new PolygonSymbolizer({ fill: 'rgba(255,220,98,.35)', stroke: '#ffdc62', width: 3 }) },
     ],
     labelRules: [{ dataSource: 'parcels', dataLayer: 'fude', minzoom: 15, filter: (_, feature) => Boolean(publicParcelNumber(feature)), symbolizer: new ParcelNumberSymbolizer() }],
   })
@@ -107,8 +104,8 @@ function createPublicParcelLayer(props, context) {
   layer.setCallbacks = nextProps => {
     callback = nextProps.onStatus
     parcelsCallback = nextProps.onPublicParcelsChange
-    const nextIds = new Set((nextProps.referenceSelections || []).map(selectionId))
-    if (nextIds.size !== selectedIds.size || [...nextIds].some(id => !selectedIds.has(id))) { selectedIds = nextIds; layer.rerenderTiles() }
+    // Selection is drawn by MapPanel's exact GeoJSON preview. Repainting these
+    // cached tiles re-enters the renderer's label index and can stall dense maps.
     if (contextKey !== (nextProps.contextKey || '')) {
       contextKey = nextProps.contextKey || ''
       invalidateSnapshot()

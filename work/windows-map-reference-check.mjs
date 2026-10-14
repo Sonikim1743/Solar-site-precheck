@@ -22,6 +22,10 @@ for(const [lat,lon] of [[34.796,133.616],[34.426,132.7204],[34.865604,133.368782
   try{
    const rings=f.loadGeometry().map(r=>r.map(p=>({x:p.x*256/f.extent,y:p.y*256/f.extent}))),anchor=publicParcelLabelAnchor(rings)
    if(rings.reduce((n,r)=>n+r.length,0)>500)continue
+   // Use independent public plots for the flow check. Invalid touching unions
+   // are rejected before apply, without repairing or replacing source shapes.
+   const ps=rings.flat(),box={left:Math.min(...ps.map(p=>p.x)),right:Math.max(...ps.map(p=>p.x)),top:Math.min(...ps.map(p=>p.y)),bottom:Math.max(...ps.map(p=>p.y))}
+   if(box.left<4||box.top<4||box.right>252||box.bottom>252||candidates.some(c=>!(box.right+4<c.box.left||box.left-4>c.box.right||box.bottom+4<c.box.top||box.top-4>c.box.bottom)))continue
    if(!anchor)continue
    const distance=(a,b)=>{const dx=b.x-a.x,dy=b.y-a.y,t=Math.max(0,Math.min(1,((anchor.x-a.x)*dx+(anchor.y-a.y)*dy)/(dx*dx+dy*dy||1)));return Math.hypot(anchor.x-a.x-t*dx,anchor.y-a.y-t*dy)}
    if(Math.min(...rings.flatMap(r=>r.slice(1).map((p,j)=>distance(r[j],p))))<2)continue
@@ -30,7 +34,7 @@ for(const [lat,lon] of [[34.796,133.616],[34.426,132.7204],[34.865604,133.368782
    // from source edges, rather than a wide scanline extremely near a corner.
    const world=256*2**z,px=x*256+anchor.x,py=y*256+anchor.y,p={lon:px/world*360-180,lat:Math.atan(Math.sinh(Math.PI*(1-2*py/world)))*180/Math.PI}
    if(candidates.length){const first=candidates[0].point,fx=(first.lon+180)/360*world,fy=(1-Math.asinh(Math.tan(first.lat*Math.PI/180))/Math.PI)/2*world;if(Math.hypot(px-fx,py-fy)>100)continue}
-   candidates.push({number:String(f.properties['地番']),point:p,id:f.id,crs:f.properties['座標系']});if(candidates.length===3)break
+   candidates.push({number:String(f.properties['地番']),point:p,id:f.id,crs:f.properties['座標系'],box});if(candidates.length===3)break
   }catch{}
  }
  if(candidates.length>2){sample={position:{lat,lon},candidates:candidates.slice(0,3)};break}
@@ -42,6 +46,7 @@ const out=path.resolve(process.env.SOLAR_VERIFICATION_DIR||'../map-reference-ver
 await fs.mkdir(out,{recursive:true})
 await fs.writeFile(path.join(out,'public-sample.json'),JSON.stringify(sample,null,2))
 const browser=await chromium.launch({executablePath:process.env.SOLAR_BROWSER_EXE,headless:true}),context=await browser.newContext({viewport:{width:1280,height:960},acceptDownloads:true,serviceWorkers:'block'}),page=await context.newPage(),errors=[],ranges=[]
+page.setDefaultTimeout(30000)
 page.on('pageerror',e=>errors.push(e.message))
 page.on('response',r=>{if(r.url().includes('MojMap_amx_2024.pmtiles'))ranges.push({status:r.status(),range:r.request().headers().range,bytes:r.headers()['content-length']})})
 const center=sample.candidates[0].point
@@ -50,6 +55,7 @@ const position={lat:center.lat+.0003,lon:center.lon-.0004}
 await context.addInitScript(p=>localStorage.setItem('solar-site-precheck-draft-v1',JSON.stringify({position:p,siteName:'公開地図の参考領域検証（実候補地ではありません）',siteNameTouched:true})),position)
 const selection=page.locator('.regional-parcel-selection strong')
 const click=async candidate=>{
+ await page.locator('.leaflet-container').first().scrollIntoViewIfNeeded()
  const hit=await page.locator('img.leaflet-tile-loaded').evaluateAll((imgs,p)=>{
   for(const img of [...imgs].sort((a,b)=>Number(b.src.match(/\/xyz\/[^/]+\/(\d+)\//)?.[1]||0)-Number(a.src.match(/\/xyz\/[^/]+\/(\d+)\//)?.[1]||0))){const m=img.src.match(/\/xyz\/(?:seamlessphoto|std)\/(\d+)\/(\d+)\/(\d+)\./);if(!m||Number(m[1])<16)continue
    const z=Number(m[1]),w=256*2**z,x=(p.lon+180)/360*w-Number(m[2])*256,y=(1-Math.asinh(Math.tan(p.lat*Math.PI/180))/Math.PI)/2*w-Number(m[3])*256,b=img.getBoundingClientRect()
@@ -57,11 +63,15 @@ const click=async candidate=>{
   }
  },candidate.point)
  assert.ok(hit,'clicked public feature must be inside a displayed basemap tile');assert.ok(hit.z>=16)
- await page.mouse.click(hit.x,hit.y)
+ const viewport=page.viewportSize();console.log('Click',candidate.number,hit)
+ assert.ok(hit.x>=0&&hit.y>=0&&hit.x<viewport.width&&hit.y<viewport.height,'map click must be in the browser viewport')
+ let clickTimer
+ try{await Promise.race([page.mouse.click(hit.x,hit.y),new Promise((_,reject)=>{clickTimer=setTimeout(()=>reject(Error('Map mouse event exceeded 30 seconds')),30000)})])}finally{clearTimeout(clickTimer)}
  await page.waitForTimeout(100)
  const overlap=page.getByRole('group',{name:'重なる地図境界の候補'})
  if(await overlap.count())await overlap.getByRole('button').filter({hasText:candidate.number+' /'}).first().click()
  await page.waitForFunction(()=>!document.querySelector('.regional-parcel-selection')?.textContent.includes('選択境界を取得中'))
+ await page.waitForTimeout(500)
 }
 try{
  console.log('Map reference phase: opening isolated app')
@@ -73,7 +83,7 @@ try{
  await page.waitForFunction(()=>document.querySelectorAll('.public-parcel-reference-pane canvas').length>0)
  await page.waitForFunction(()=>document.querySelector('.public-parcel-overlay-status')?.textContent.includes('公開地番／参考境界'))
  console.log('Map reference phase: selecting three areas')
- for(let i=0;i<sample.candidates.length;i++){await click(sample.candidates[i]);await page.waitForFunction(n=>document.querySelector('.regional-parcel-selection strong')?.textContent.includes(`選択中 ${n}区域`),i+1)}
+ for(let i=0;i<sample.candidates.length;i++){await click(sample.candidates[i]);console.log('Selected',sample.candidates[i].number,await selection.textContent());await page.waitForFunction(n=>document.querySelector('.regional-parcel-selection strong')?.textContent.includes(`選択中 ${n}区域`),i+1)}
  assert.match(await selection.textContent(),/適用済み 0区域/)
  await page.getByRole('button',{name:'選択を中止',exact:true}).click();assert.match(await selection.textContent(),/選択中 0区域/)
  for(let i=0;i<sample.candidates.length;i++){await click(sample.candidates[i]);await page.waitForFunction(n=>document.querySelector('.regional-parcel-selection strong')?.textContent.includes(`選択中 ${n}区域`),i+1)}

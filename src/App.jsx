@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import MapPanel from './components/MapPanel.jsx'
 import ParcelReviewPanel from './components/ParcelReviewPanel.jsx'
 import { createEmptyParcelReview, normalizeParcelReview, setReviewParcel, removeReviewParcel, measureParcelReview, getParcelKey } from './utils/parcelReview.js'
-import { featureInteriorPoint, pointInGeometry } from './services/parcelGeometry.js'
+import { featureInteriorPoint, pointInGeometry, validatePolygonGeometry } from './services/parcelGeometry.js'
 import './parcel-review.css'
 import GridCapacityExplorer from './components/GridCapacityExplorer.jsx'
 import './simple-prototype.css'
@@ -1199,6 +1199,7 @@ export default function App() {
     try {
       let next={...parcelReview,parcels:parcelReview.parcels.filter(p=>!(p.role==='target'&&p.source.fileName===MAP_PARCEL_SOURCE))}
       for(const feature of features)next=setReviewParcel(next,feature,'target',{fileName:MAP_PARCEL_SOURCE,importedAt:new Date().toISOString()})
+      if(features.length){const geometry=measureParcelReview(selectedParcelUnionReview(next)).geometry;if(!geometry)throw Error('選択区域の合併形状を確認できません。');validatePolygonGeometry(geometry)}
       if(!updateParcelReview(next))return false
       if(features.length)setRegional3DRequest(n=>n+1)
       return true
