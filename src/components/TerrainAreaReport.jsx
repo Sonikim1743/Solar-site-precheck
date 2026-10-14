@@ -38,15 +38,15 @@ export default function TerrainAreaReport({ report, id = 'terrain-area-report' }
       <div className="terrain-report-plan-layout"><div className="terrain-report-main-figure"><TerrainAreaPlan analysis={analysis} position={report.position} reportTitle={terrainReportTitle(report)} reportMode compactReport noteRef="注1" /></div><aside className="terrain-report-findings">
         <h3>範囲内の参考値</h3><dl className="terrain-report-values">
           <div><dt>図形面積</dt><dd>{number(summary.polygonAreaM2, 0)} m²</dd></div>
-          <div><dt>標高 最低–最高</dt><dd>{number(summary.minElevation)}–{number(summary.maxElevation)} m</dd></div>
-          <div><dt>高低差</dt><dd>{number(summary.heightRange)} m</dd></div>
+          <div><dt>敷地標高 最低点–最高点</dt><dd>{Number.isFinite(summary.minElevation)&&Number.isFinite(summary.maxElevation)?`${number(summary.minElevation)}–${number(summary.maxElevation)} m`:'確認不可'}</dd></div>
+          <div><dt>高低差</dt><dd>{Number.isFinite(summary.minElevation)&&Number.isFinite(summary.maxElevation)?`${number(summary.maxElevation-summary.minElevation)} m`:'確認不可'}</dd></div>
           <div><dt>局所勾配 中央値</dt><dd>{number(summary.medianSlope)}°</dd></div>
           <div><dt>局所勾配 上位10%の境目</dt><dd>{number(summary.p90Slope)}°</dd></div>
         </dl>
         <p className="terrain-report-observation">{interpretation}</p>
-        <h3>勾配の分布</h3><table className="terrain-report-bins"><thead><tr><th>セル勾配（範囲面積比）</th><th>割合 / 推定面積</th></tr></thead><tbody>{distribution.bins.map(bin => <tr key={bin.min}><th>{bin.max === 90 ? `${bin.min}°以上` : `${bin.min}–${bin.max}°未満`}</th><td>{Number.isFinite(bin.percent) ? `${number(bin.percent)}%` : '未計算'} / {formatTerrainSlopeArea(bin.areaM2)}</td></tr>)}<tr><th>未確認 / NoData</th><td>{number(distribution.unknownPercent)}% / {formatTerrainSlopeArea(distribution.unknownAreaM2)}</td></tr></tbody></table>
+        <h3>勾配の分布</h3><table className="terrain-report-bins"><thead><tr><th>セル勾配（範囲面積比）</th><th>割合 / 推定面積</th></tr></thead><tbody>{distribution.bins.map(bin => <tr key={bin.min}><th>{bin.max === null ? `${bin.min}°以上` : `${bin.min}–${bin.max}°未満`}</th><td>{Number.isFinite(bin.percent) ? `${number(bin.percent)}%` : '未計算'} / {formatTerrainSlopeArea(bin.areaM2)}</td></tr>)}<tr><th>未確認 / NoData</th><td>{number(distribution.unknownPercent)}% / {formatTerrainSlopeArea(distribution.unknownAreaM2)}</td></tr></tbody></table>
         <p className="terrain-report-distribution-summary">有効範囲（除外後）：{formatTerrainSlopeArea(distribution.totalAreaM2)}{(distribution.unknownAreaM2 === null || distribution.unknownAreaM2 > 0) && ` / 未計算：${formatTerrainSlopeArea(distribution.unknownAreaM2)}`}</p>
-        <p className="terrain-report-distribution-note">勾配確認 {number(distribution.coveragePercent)}% · 四区分＋未確認＝100%。セル交差面積・欠測：注1</p>
+        <p className="terrain-report-distribution-note">勾配確認 {number(distribution.coveragePercent)}% · 五区分＋未確認＝100%。セル交差面積・欠測：注1</p>
         {Number.isFinite(summary.medianSlope) && <p>20°以上の参考割合：約{number(steepPercent)}%。注1</p>}
         {partial && <p className="terrain-report-warning">取得できた範囲：標高 {number(summary.coveragePercent)}% / 勾配 {number(distribution.coveragePercent)}%。欠測を除いた参考値であり、範囲全体の確定値ではありません。</p>}
       </aside></div>

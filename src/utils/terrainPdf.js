@@ -1,3 +1,4 @@
+import { terrainElevationLabel } from './terrainElevationLabel.js'
 import { simpleReviewReportRows } from './simpleReviewReport.js'
 import { terrainReportTitle } from './terrainReportTitle.js'
 import { terrainReportNotes } from './terrainReportNotes.js'
@@ -7,6 +8,7 @@ import { terrainGeometryKey } from './terrainArea.js'
 import { measureParcelReview } from './parcelReview.js'
 import { terrainSlopeDistribution, formatTerrainSlopeArea, TERRAIN_SLOPE_COLORS } from './terrainSlopeDistribution.js'
 import { terrainDrawingViewport, terrainDrawingScaleBar, TERRAIN_DRAWING_PHOTO_EXTENT } from './terrainDrawingViewport.js'
+import { terrainAzimuthLabel } from './terrainAzimuthLabel.js'
 
 const PAGE_MM = [420, 297]
 const DPI = 240
@@ -282,18 +284,19 @@ function pageDrawing(ctx, model, images) {
   // No site-name header: the two maps occupy the main A3 page area.
   for(let i=0;i<2;i++){
     const x=i?214:8
-    drawText(ctx,i?'地形・勾配・地番':'参考モジュール配置',x+3,7,192,{size:3.5,weight:700,maxLines:1})
+    drawText(ctx,i?'地形・勾配・地番（矢印：地形上の想定排水方向）':'参考モジュール配置',x+3,7,192,{size:3.5,weight:700,maxLines:1})
     ctx.drawImage(images[i],x,12,198,198*model.snapshots[i].ratio)
   }
-  drawText(ctx,`DEM標高 ${model.values[1][1]} · 北上・縮尺は各図の目盛`,11,196,193,{size:3,maxLines:1})
-  drawText(ctx,`分母：穴・除外後 ${numeric(d.totalAreaM2,0)} m² / 勾配確認 ${numeric(d.coveragePercent)}%`,11,202,193,{size:2.95,maxLines:1})
-  const legend=[...d.bins.map((b,i)=>({label:b.max===90?'30°以上':`${b.min}–${b.max}°未満`,percent:b.percent,color:TERRAIN_SLOPE_COLORS[i]})),{label:'未確認 / NoData',percent:d.unknownPercent,color:'#eef0ed'}]
+  drawText(ctx,`${model.elevationLabel} · 北上`,11,196,193,{size:3,maxLines:1})
+  drawText(ctx,`検討対象面積 ${numeric(d.totalAreaM2,0)} m²`,11,202,193,{size:3,maxLines:1})
+  const legend=[...d.bins.map((b,i)=>({label:b.max===null?'20°以上':`${b.min}–${b.max}°未満`,percent:b.percent,color:TERRAIN_SLOPE_COLORS[i]})),{label:'未確認 / NoData',percent:d.unknownPercent,color:'#eef0ed'}]
   legend.forEach((b,i)=>{
-    const x=217+i*38
+    const x=217+i*32
     ctx.fillStyle=b.color;ctx.fillRect(x,197,5,3.2);ctx.strokeStyle='#7b887c';ctx.lineWidth=.15;ctx.strokeRect(x,197,5,3.2)
-    drawText(ctx,b.label,x+6,196.5,32,{size:2.85,maxLines:1})
-    drawText(ctx,`${numeric(b.percent)}%`,x+6,202,32,{size:3.7,weight:700,maxLines:1})
+    drawText(ctx,b.label,x+6,196.5,26,{size:2.65,maxLines:1})
+    drawText(ctx,`${numeric(b.percent)}%`,x+6,202,26,{size:3.4,weight:700,maxLines:1})
   })
+  drawText(ctx,'矢印長＝局所勾配（5°区分） / 流量・流速ではありません',217,207,192,{size:2.5,maxLines:1})
   rule(ctx,6,211,408);rule(ctx,6,235,408)
   const metric=(label,value,unit,x)=>{
     drawText(ctx,label,x,214,126,{size:3.5,color:MUTED,maxLines:1})
@@ -305,8 +308,8 @@ function pageDrawing(ctx, model, images) {
   metric('モジュール枚数',numeric(layout.moduleCount,0),'枚',148)
   metric('DC容量',numeric(layout.dcKw,2),'kW',285)
   const tableRows = [
-    [['モジュール型式', 'JKM720N-66HL5-BDV'], ['出力 / 外形', '720W / 2.384 × 1.303m']],
-    [['モジュール傾斜', `${numeric(o.tiltDeg)}°（水平から）`], ['配置方位 / 地形除外', `${numeric(o.azimuthDeg)}° / ${o.slopeLimitDeg}°未満`]],
+    [['モジュール型式', 'JKM720N-66HL5-BDV'], ['モジュール出力・外形寸法', '720W / 2.384 × 1.303m']],
+    [['モジュール傾斜', `${numeric(o.tiltDeg)}°（水平から）`], ['配置方位 / 配置可能な地形勾配', `${terrainAzimuthLabel(o.azimuthDeg)} / ${o.slopeLimitDeg}°未満`]],
     [['アレイ間左右間隔', `${numeric(o.rackGapM)}m`], ['アレイ間前後間隔', `${numeric(o.rowGapM)}m`]],
     [['境界からの離隔距離', `${numeric(o.setbackM)}m`], ['モジュール間隔', `${numeric(o.moduleGapM*1000,0)}mm`]],
     [['モジュール高さ', `${numeric(o.minClearanceM)}m`], ['架台構成 / 開始位置', `4段 × ${o.minColumns === o.maxColumns ? o.minColumns : `${o.minColumns}〜${o.maxColumns}`}列 / ${numeric(o.scanOffsetUM,2)}, ${numeric(o.scanOffsetVM,2)}m`]],
@@ -321,9 +324,9 @@ function pageDrawing(ctx, model, images) {
     drawText(ctx, value, x+69, y+1.4, 129, { size: 3.3, maxLines: 1 })
   }))
   drawText(ctx,`出典：国土地理院 DEM・標準地図・航空写真${model.mapReference?' / AMX公開地図2024 https://source.coop/smartmaps/amx-2024-04':' / 範囲・地番資料は報告書の出典参照'} 。${sheet.fenceOn?'一点鎖線＝仮フェンス（1.2m）。':''}`,11,276,397,{size:2.65,maxLines:1})
-  drawText(ctx,`${model.mapReference?'地図表示境界の参考領域・原本全筆未確認。':'地図上の参考図形・測量筆界未確認。'}セル${model.gridStep}m・4点平均の勾配を交差面積で集計。四区分＋未確認＝100%。境界外約10m以上は表示のみ。`,11,281,397,{size:2.65,maxLines:1})
+  drawText(ctx,`${model.mapReference?'地図表示境界の参考領域・原本全筆未確認。':'地図上の参考図形・測量筆界未確認。'}セル${model.gridStep}m・4点平均勾配の交差面積。五区分＋未確認＝100%。境界外は表示のみ。標高は範囲内DEMの推定値・資料の標高基準。高低差＝最高−最低。`,11,281,397,{size:2.65,maxLines:1})
   const missing=[model.contextStatus!=='ready'?'周辺地図の一部または全部が未取得。':'',model.noParcelMetadata?'地番資料なし・地番未取得。':'',model.missingParcels?`地番未記載 ${model.missingParcels}区域。`:'',model.unplacedParcels?`図上に収まらない地番：${model.unplacedParcels}。`:''].join('')
-  drawText(ctx,`${missing}参考図・施工可否未確認。配置方位は北0°時計回り、モジュール傾斜は水平から。取得日は標高の測量日ではありません。`,11,286,397,{size:2.65,maxLines:1,ellipsis:true})
+  drawText(ctx,`${missing}参考図・施工可否未確認。矢印はDEM高→低の参考方向で、現地の排水計画ではありません。モジュール傾斜は水平から。取得日は標高の測量日ではありません。`,11,286,397,{size:2.65,maxLines:1,ellipsis:true})
 }
 
 function pageSimpleResults(ctx, model) {
@@ -387,7 +390,7 @@ function modelFromElement(report, element, checkDeadline) {
   // Do not combine an old report argument with the DOM of a newer analysis.
   if (values.length !== 5 || values.some((row, index) => row[1] !== expected[index])) fail('表示と計算結果が更新されました。地形図面を開き直してください。')
   const distribution = terrainSlopeDistribution(analysis), bins = rows('.terrain-report-bins tbody > tr')
-  const expectedBins = distribution.bins.map(bin => [bin.max === 90 ? `${bin.min}°以上` : `${bin.min}–${bin.max}°未満`, `${Number.isFinite(bin.percent) ? `${numeric(bin.percent)}%` : '未計算'} / ${formatTerrainSlopeArea(bin.areaM2)}`])
+  const expectedBins = distribution.bins.map(bin => [bin.max === null ? `${bin.min}°以上` : `${bin.min}–${bin.max}°未満`, `${Number.isFinite(bin.percent) ? `${numeric(bin.percent)}%` : '未計算'} / ${formatTerrainSlopeArea(bin.areaM2)}`])
   expectedBins.push(['未確認 / NoData', `${numeric(distribution.unknownPercent)}% / ${formatTerrainSlopeArea(distribution.unknownAreaM2)}`])
   if (bins.length !== expectedBins.length || bins.some((row, index) => row[0] !== expectedBins[index][0] || row[1] !== expectedBins[index][1])) fail('勾配の割合・推定面積の表示が計算結果と一致しません。地形図面を開き直してください。')
   const distributionSummary = text(element.querySelector('.terrain-report-distribution-summary'))
@@ -403,7 +406,7 @@ function modelFromElement(report, element, checkDeadline) {
   return {
     titles: sheets.map(sheet => text(sheet.querySelector('h2'))), pageCount: sheets.length, layoutSheets: layoutModels, notes,
     simpleRows: simpleReviewReportRows(report.simpleReview),
-    name: terrainReportTitle(report),
+    name: terrainReportTitle(report), elevationLabel:terrainElevationLabel(s),
     coordinates: report.position ? `地点 N${report.position.lat.toFixed(6)} / E${report.position.lon.toFixed(6)} · ` : '',
     appVersion: String(report.appVersion || '—'),
     fetchedAt: Number.isFinite(sourceDate.getTime()) ? sourceDate.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '未記録',

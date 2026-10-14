@@ -3042,7 +3042,7 @@ export default function App() {
         ['範囲地形の標高確認率(%)', currentTerrainArea.summary.coveragePercent],
         ['範囲地形の勾配確認率(%)', currentTerrainArea.summary.slopeCoveragePercent],
         ['範囲地形の割合の分母', '勾配を計算できた範囲内の格子点。登記面積ではありません。'],
-        ...currentTerrainArea.summary.slopeBins.map(bin => [`範囲地形の勾配 ${bin.max === 90 ? `${bin.min}度以上` : `${bin.min}-${bin.max}度未満`}(%)`, bin.percent]),
+        ...currentTerrainArea.summary.slopeBins.map(bin => [`範囲地形の勾配 ${bin.max === null ? `${bin.min}度以上` : `${bin.min}-${bin.max}度未満`}(%)`, bin.percent]),
         ['範囲地形の用途', '地図上の参考範囲。造成量・設置可能容量・施工可否は未判定。'],
       ] : []),
       ['地番所在地', [selectedParcel?.municipality, selectedParcel?.area].filter(Boolean).join(' ')],

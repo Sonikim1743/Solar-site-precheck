@@ -1,4 +1,5 @@
 import proj4 from 'proj4'
+import { terrainSlopeDistribution } from './terrainSlopeDistribution.js'
 import { validatePolygonGeometry, geometryPolygons, geometryBounds } from '../services/parcelGeometry.js'
 
 export const TERRAIN_AREA_VERSION = 1
@@ -284,9 +285,13 @@ export function normalizeTerrainArea(value, expectedGeometry) {
     coveragePercent: valid.length / insideCount * 100, slopeCoveragePercent: validSlopes.length / insideCount * 100,
     minElevation, maxElevation, heightRange: maxElevation - minElevation,
     medianSlope: quantile(validSlopes, .5), p90Slope: quantile(validSlopes, .9), maxSlope: validSlopes.at(-1) ?? null,
-    slopeBins: [[0, 10], [10, 20], [20, 30], [30, 90]].map(([min, max]) => ({ min, max, percent: validSlopes.length ? validSlopes.filter(v => v >= min && v < max).length / validSlopes.length * 100 : null })),
+    slopeBins: [],
   }
-  return { version: TERRAIN_AREA_VERSION, geometryKey: plan.geometryKey, geometry: plan.geometry, fetchedAt: new Date(value.fetchedAt).toISOString(), source, grid, summary, contours: terrainContours(grid) }
+  const analysis = { version: TERRAIN_AREA_VERSION, geometryKey: plan.geometryKey, geometry: plan.geometry, fetchedAt: new Date(value.fetchedAt).toISOString(), source, grid, summary, contours: terrainContours(grid) }
+  const distribution = terrainSlopeDistribution(analysis)
+  summary.slopeBins = distribution.bins
+  summary.slopeCoveragePercent = distribution.coveragePercent
+  return analysis
 }
 
 export function terrainAreaSnapshot(value) {

@@ -8,7 +8,7 @@ const close=(a,b)=>assert.ok(Math.abs(a-b)<1e-7,`${a} != ${b}`)
 const fixture=()=>({grid:{width:3,height:2,xMin:0,yMin:0,step:10,boundary:[[ring(0,0,15,10),ring(2,2,4,4)]],elevations:[100,100,100,100,100,100],slopes:[0,0,30,0,0,30]}})
 test('slope area weights partial cells and subtracts holes instead of counting grid points',()=>{
  const a=fixture(),d=terrainSlopeDistribution(a)
- close(d.totalAreaM2,146);close(d.bins[0].areaM2,96);close(d.bins[1].areaM2,50);close(d.bins[0].percent,96/146*100)
+ close(d.totalAreaM2,146);close(d.bins[0].areaM2,96);close(d.bins[3].areaM2,50);close(d.bins[0].percent,96/146*100)
  close(d.coveragePercent,100);close(d.unknownPercent,0);assert.equal(d.method,'projected-cell-intersection')
 })
 test('NoData retains total denominator and receives its own area and percentage',()=>{
@@ -18,8 +18,8 @@ test('NoData retains total denominator and receives its own area and percentage'
 })
 test('uncovered disconnected areas remain unknown, and bin thresholds do not overlap',()=>{
  const a=fixture();a.grid.boundary.push([ring(25,0,30,10)]);a.grid.slopes.fill(20)
- const d=terrainSlopeDistribution(a);close(d.totalAreaM2,196);close(d.bins[2].areaM2,146);close(d.unknownAreaM2,50)
- for(const i of [0,1,3])close(d.bins[i].areaM2,0)
+ const d=terrainSlopeDistribution(a);close(d.totalAreaM2,196);close(d.bins[4].areaM2,146);close(d.unknownAreaM2,50)
+ for(const i of [0,1,2,3])close(d.bins[i].areaM2,0)
 })
 test('drawing adds minimum ten metre context without changing geometry or the statistical denominator',()=>{
  const a=fixture(),before=JSON.stringify(a),v=terrainDrawingViewport(a.grid)

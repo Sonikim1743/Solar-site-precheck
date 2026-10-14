@@ -5,11 +5,13 @@ import { loadTerrainDrawingContext } from '../services/terrainDrawingContext.js'
 import { geometryPolygons, featureInteriorPoint } from '../services/parcelGeometry.js'
 import { layoutTerrainLabels, terrainLabelBounds } from '../utils/terrainLabelLayout.js'
 import { getTerrainCellSlope } from '../utils/terrainLayout.js'
+import { terrainSlopeIndex } from '../utils/terrainSlopeClasses.js'
+import { terrainDrainageArrows, terrainDrainageArrowDrawing } from '../utils/terrainDrainage.js'
 import { TERRAIN_SLOPE_COLORS } from '../utils/terrainSlopeDistribution.js'
 import { terrainDrawingLabelFits } from '../utils/terrainDrawingLabels.js'
 
 const path=(points,project,close=true)=>points.map((p,i)=>`${i?'L':'M'}${project(p).map(v=>v.toFixed(2)).join(' ')}`).join(' ')+(close?' Z':'')
-const slopeIndex=s=>!Number.isFinite(s)?-1:s<10?0:s<20?1:s<30?2:3
+const slopeIndex=terrainSlopeIndex
 
 export default function TerrainDrawingPair({analysis,layout,fence,parcels}) {
   const id=`drawing-${useId().replace(/:/g,'')}`,g=analysis.grid
@@ -22,7 +24,7 @@ export default function TerrainDrawingPair({analysis,layout,fence,parcels}) {
   },[analysis])
   const contextStatus=contexts.some(c=>c.status==='loading')?'loading':contexts.every(c=>c.status==='ready')?'ready':'unavailable'
   const models=useMemo(()=>[1,TERRAIN_DRAWING_PHOTO_EXTENT].map(factor=>{
-    const v=terrainDrawingViewport(g,10,factor),boundary=g.boundary.flat().map(r=>path(r,v.project)).join(' '),fills=[[],[],[],[]]
+    const v=terrainDrawingViewport(g,10,factor),boundary=g.boundary.flat().map(r=>path(r,v.project)).join(' '),fills=TERRAIN_SLOPE_COLORS.map(()=>[])
     for(let row=0;row<g.height-1;row++)for(let col=0;col<g.width-1;col++){
       const i=slopeIndex(getTerrainCellSlope(g,row,col));if(i<0)continue
       const x=g.xMin+col*g.step,y=g.yMin+row*g.step
@@ -54,8 +56,20 @@ export default function TerrainDrawingPair({analysis,layout,fence,parcels}) {
     // A 10m contour in the surrounding DEM may lie outside this selected area.
     // Retain the real 2m contours, and label those when no major label fits.
     if(!contourLabels.length)for(const c of analysis.contours||[]){if(contourLabels.length>=12)break;if(c.level%10!==0)placeContour(c)}
-    return {v,boundary,fills:fills.map(ps=>ps.join(' ')),parcelPaths,labels:placed,contourLabels,unplaced:[...labelLayout.unplaced,...outsideLabels],missing:parcels.filter(p=>p.role==='target'&&!p.info?.number).length,noParcelMetadata:!parcels.some(p=>p.role==='target')}
-  }),[g,parcels,analysis.contours])
+    const arrowBoxes=[]
+    // Rails are sampled at grid intervals: small segment boxes keep the arrow
+    // halo clear of the fence without hiding an entire diagonal enclosure.
+    const fenceBoxes=(fence?.rails||[]).flatMap(rail=>rail.points.slice(1).map((point,i)=>{
+      const a=v.project(rail.points[i]),b=v.project(point)
+      return {left:Math.min(a[0],b[0])-2,right:Math.max(a[0],b[0])+2,top:Math.min(a[1],b[1])-2,bottom:Math.max(a[1],b[1])+2}
+    }))
+    const drainage= factor===1 ? [] : terrainDrainageArrows(analysis).map(a=>({...a,icon:terrainDrainageArrowDrawing(a,v.project,{symbolic:true})})).filter(a=>{
+      const p=a.icon.tail,q=a.icon.head,b={left:Math.min(p[0],q[0])-8,right:Math.max(p[0],q[0])+8,top:Math.min(p[1],q[1])-8,bottom:Math.max(p[1],q[1])+8}
+      if(!a.icon.path||b.left<35||b.right>765||b.top<25||b.bottom>685||[...occupied,...arrowBoxes,...fenceBoxes].some(o=>b.left<o.right+5&&b.right>o.left-5&&b.top<o.bottom+5&&b.bottom>o.top-5))return false
+      arrowBoxes.push(b);return true
+    })
+    return {drainage,v,boundary,fills:fills.map(ps=>ps.join(' ')),parcelPaths,labels:placed,contourLabels,unplaced:[...labelLayout.unplaced,...outsideLabels],missing:parcels.filter(p=>p.role==='target'&&!p.info?.number).length,noParcelMetadata:!parcels.some(p=>p.role==='target')}
+  }),[g,parcels,analysis.contours,fence])
   const model=models[1]
   return <div ref={source} className="terrain-drawing-export-source" aria-hidden="true" data-context-status={contextStatus} data-map-context-status={contexts[0].status} data-photo-context-status={contexts[1].status} data-context-tiles={contexts.reduce((n,c)=>n+c.tiles.length,0)} data-no-parcel-metadata={model.noParcelMetadata} data-unplaced-parcels={model.unplaced.map(p=>p.number).join('、')} data-missing-parcels={model.missing}>
     {[true,false].map((modules,index)=>{const model=models[index],{v,boundary,fills}=model,bar=terrainDrawingScaleBar(v,models[0].v);return <svg key={index} viewBox="0 0 800 740" data-drawing-view={modules?'layout':'terrain'} data-context-layer={modules?'std':'seamlessphoto'} data-geometry-key={analysis.geometryKey} data-viewport={JSON.stringify([v.west,v.south,v.east,v.north])} data-context-factor={modules?1:TERRAIN_DRAWING_PHOTO_EXTENT} data-scale-m={bar.meters} data-scale-px={bar.pixelLength} data-margin-m="10" role="img">
@@ -74,6 +88,7 @@ export default function TerrainDrawingPair({analysis,layout,fence,parcels}) {
         {fence?.rails?.map(r=><path key={r.id} d={path(r.points,v.project,false)} fill="none" stroke="#6b4938" strokeWidth="2" strokeDasharray="6 3 1 3" data-terrain-fence="rail"/>)}
         {!modules&&<g data-parcel-boundaries="effective-area" clipPath={`url(#${id}-${index}-boundary)`}>{model.parcelPaths.map((d,i)=><path key={i} d={d} fill="none" stroke="#207b83" strokeWidth="1.3"/>)}</g>}
         <path d={boundary} fill="none" stroke="#755a0c" strokeWidth="5" fillRule="evenodd"/><path d={boundary} fill="none" stroke="#ffe073" strokeWidth="2.5" fillRule="evenodd"/>
+        {!modules&&<g data-terrain-drainage="dem-downhill" aria-label="地形上の想定排水方向">{model.drainage.map((a,i)=><g key={i} data-drainage-tail={JSON.stringify(a.tail)} data-drainage-head={JSON.stringify(a.head)} data-drainage-drop={a.tailElevation-a.headElevation} data-drainage-slope={a.slopeDeg} data-drainage-length-px={a.icon.lengthPx} data-drainage-kind={a.kind}><path d={a.icon.path} fill="none" stroke="#fff" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round"/><path d={a.icon.path} fill="none" stroke="#164e63" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></g>)}</g>}
         {!modules&&<g data-parcel-labels="effective-area" clipPath={`url(#${id}-${index}-boundary)`}>{model.labels.map(l=><g key={l.id}>{l.displaced&&<line x1={l.anchorScreen[0]} y1={l.anchorScreen[1]} x2={l.screen[0]} y2={l.screen[1]-6} stroke="#207b83"/>}<text x={l.screen[0]} y={l.screen[1]} textAnchor="middle" data-parcel-number={l.number} fontSize="18" fontWeight="700" fill="#142e35" stroke="#fff" strokeWidth="3" paintOrder="stroke">{l.number}</text></g>)}</g>}
         {!modules&&<g clipPath={`url(#${id}-${index}-boundary)`}>{model.contourLabels.map(l=><text key={l.level} x={l.screen[0]} y={l.screen[1]} textAnchor="middle" data-contour-level={l.level} style={{fontSize:18,fontWeight:700,fill:'#183b29',stroke:'#fff',strokeWidth:3.5,paintOrder:'stroke'}}>{l.level} m</text>)}</g>}
       </g>

@@ -31,6 +31,17 @@ test('plane gradient is two-axis 10m central difference; metre axes and coverage
   assert.ok(a.summary.polygonAreaM2 > 6399 && a.summary.polygonAreaM2 < 6401)
 })
 
+test('site elevation extrema exclude holes and outside padding and derive the height difference',()=>{
+  const shape={type:'Polygon',coordinates:[ring(-40,-40,40,40),ring(-10,-10,10,10)]}
+  const raw=fixture(shape),g=raw.grid
+  g.elevations=g.elevations.map((z,i)=>g.inside[i]?z:(i%2?300:0))
+  const inside=g.elevations.filter((z,i)=>g.inside[i]&&Number.isFinite(z)),a=normalizeTerrainArea(raw)
+  assert.equal(a.summary.minElevation,Math.min(...inside))
+  assert.equal(a.summary.maxElevation,Math.max(...inside))
+  assert.equal(a.summary.heightRange,a.summary.maxElevation-a.summary.minElevation)
+  assert.ok(a.summary.minElevation>0&&a.summary.maxElevation<300)
+})
+
 test('courtyard and disjoint parts never count as terrain; contours are clipped to same boundary', () => {
   const shape = { type: 'MultiPolygon', coordinates: [[ring(-50, -50, 20, 50), ring(-30, -20, -10, 20)], [ring(35, -10, 55, 10)]] }
   const a = normalizeTerrainArea(fixture(shape))

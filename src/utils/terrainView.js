@@ -27,6 +27,13 @@ export function orbitTerrainView(view, deltaX, deltaY) {
   return normalizeTerrainView({ ...camera, azimuth: camera.azimuth - (finite(deltaX) ? deltaX : 0) * 180, pitch: clamp(camera.pitch - (finite(deltaY) ? deltaY : 0) * 90, 0, 90) })
 }
 
+// The same discrete steps drive keyboard and the controls beneath the cube.
+export function stepTerrainView(view, mode, key) {
+  const dx=key==='ArrowLeft'?-10/180:key==='ArrowRight'?10/180:0
+  const dy=key==='ArrowUp'?-5/90:key==='ArrowDown'?5/90:0
+  return mode==='orbit'?orbitTerrainView(view,dx,dy):dragTerrainView(view,dx,dy)
+}
+
 // Compatibility for an elevation-only interaction at the same object centre.
 export function elevateTerrainView(view, deltaY) {
   return orbitTerrainView(view, 0, deltaY)

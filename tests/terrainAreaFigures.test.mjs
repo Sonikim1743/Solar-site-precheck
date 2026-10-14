@@ -9,7 +9,7 @@ import { createTerrainPlan, normalizeTerrainArea, terrainTilePoint } from '../sr
 
 // Every coordinate, elevation and source entry below is synthetic. No site
 // records or downloaded DEM/parcel data are used by these rendering tests.
-let viteServer, TerrainArea3D, TerrainAreaReport
+let viteServer, TerrainArea3D, TerrainAreaReport, TerrainDrawingPair
 before(async () => {
   viteServer = await createServer({
     configFile: false, root: process.cwd(), plugins: [react()],
@@ -18,8 +18,26 @@ before(async () => {
   })
   TerrainArea3D = (await viteServer.ssrLoadModule('/src/components/TerrainAreaFigures.jsx')).TerrainArea3D
   TerrainAreaReport = (await viteServer.ssrLoadModule('/src/components/TerrainAreaReport.jsx')).default
+  TerrainDrawingPair = (await viteServer.ssrLoadModule('/src/components/TerrainDrawingPair.jsx')).default
 }, { timeout: 30_000 })
 after(async () => { await viteServer?.close() })
+
+test('only the expanded non-module drawing contains corroborated downhill arrows',()=>{
+ const a=localFixture(),g=a.grid
+ Object.assign(g,{width:9,height:9,xMin:-10,yMin:-10,elevations:Array(81).fill(0),slopes:Array(81).fill(0)})
+ g.elevations=g.elevations.map((_,i)=>100-.2*(g.xMin+i%g.width*g.step)+.1*(g.yMin+Math.floor(i/g.width)*g.step))
+ g.slopes.fill(Math.atan(Math.hypot(.2,.1))*180/Math.PI)
+ const html=renderToStaticMarkup(React.createElement(TerrainDrawingPair,{analysis:a,layout:{rackCount:0,racks:[]},parcels:[]}))
+ const [left,right]=[...html.matchAll(/<svg[\s\S]*?<\/svg>/g)].map(x=>x[0])
+ assert.match(left,/data-context-factor="1"/);assert.match(right,/data-context-factor="1.25"/)
+ assert.doesNotMatch(left,/data-terrain-drainage/);assert.match(right,/data-terrain-drainage="dem-downhill"/)
+ const drops=[...right.matchAll(/data-drainage-drop="([\d.]+)"/g)].map(x=>Number(x[1]))
+ assert.ok(drops.length>0&&drops.length<=24);assert.ok(drops.every(x=>x>0))
+ const fence={rails:[{id:'test-rail',points:[[0,0,100],[20,0,100],[20,20,100],[0,20,100],[0,0,100]]}]}
+ const fenced=renderToStaticMarkup(React.createElement(TerrainDrawingPair,{analysis:a,layout:{rackCount:0,racks:[]},parcels:[],fence}))
+ assert.match(fenced,/data-terrain-fence="rail"/)
+ assert.doesNotMatch(fenced,/data-drainage-drop=/,'boundary symbols that collide with the fence are omitted without changing direction')
+})
 
 const square = (x, y, size) => [[x,y],[x+size,y],[x+size,y+size],[x,y+size],[x,y]]
 const close = (actual, expected, epsilon = .025) => assert.ok(Math.abs(actual - expected) < epsilon, `${actual} != ${expected}`)
@@ -263,7 +281,7 @@ test('report mode rejects interactive controls even when requested on a solid fi
   assert.ok(paths(html,'wall').length>0)
 })
 
-test('interactive camera controls expose viewpoint movement without introducing extra buttons or changing terrain values',()=>{
+test('interactive camera controls group movement under the cube with one zoom and home and preserve terrain values',()=>{
   const analysis=localFixture(),original=structuredClone(analysis)
   const html=renderToStaticMarkup(React.createElement(TerrainArea3D,{analysis,interactive:true}))
   assert.match(html,/data-view-azimuth="35" data-view-pitch="32"/)
@@ -272,6 +290,10 @@ test('interactive camera controls expose viewpoint movement without introducing 
   assert.equal((modes.match(/<button\b/g)||[]).length,2)
   assert.match(modes,/>回転<\/button>/)
   assert.match(modes,/>視点の移動<\/button>/)
+  assert.match(html,/terrain-navigation-controls/)
+  for(const label of ['地形を左へ回転','地形を右へ回転','視点を左へ回す','見下ろしを増やす','見下ろしを減らす','視点を右へ回す','3Dを縮小','3Dを拡大','最初の視点に戻す']) {
+    assert.equal(html.split(`aria-label="${label}"`).length-1,1,label)
+  }
   assert.deepEqual(analysis,original)
 })
 

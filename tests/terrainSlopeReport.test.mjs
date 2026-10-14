@@ -47,7 +47,7 @@ test('the fixed A3 distribution retains both share and estimated area in the PDF
   assert.equal((html.match(/report-print-page terrain-report-sheet/g) || []).length, 3)
   assert.match(table(html), /割合 \/ 推定面積/)
   assert.ok(table(html).includes(`<td>100% / ${area(total)}</td>`))
-  assert.equal((table(html).match(/<td>0% \/ 0 m²<\/td>/g) || []).length, 4)
+  assert.equal((table(html).match(/<td>0% \/ 0 m²<\/td>/g) || []).length, 5)
   assert.ok(html.includes(`有効範囲（除外後）：${area(total)}`))
   assert.doesNotMatch(html, /未計算：/)
   assert.match(html, /登記面積ではありません/)
@@ -74,7 +74,7 @@ test('PDF export refuses an older slope table that omits the estimated areas rat
   const selectors = {
     '.terrain-report-sheet': [{}, {}, {}], '.terrain-area-figure svg': [{}, {}, {}],
     '.terrain-report-values > div': values.map((value, index) => row(String(index), value)),
-    '.terrain-report-bins tbody > tr': s.slopeBins.map(bin => row(bin.max === 90 ? `${bin.min}°以上` : `${bin.min}–${bin.max}°未満`, `${number(bin.percent)}%`)),
+    '.terrain-report-bins tbody > tr': s.slopeBins.map(bin => row(bin.max === null ? `${bin.min}°以上` : `${bin.min}–${bin.max}°未満`, `${number(bin.percent)}%`)),
   }
   const element = { isConnected: true, querySelectorAll: selector => selectors[selector] || [] }
   const previousDocument = Object.getOwnPropertyDescriptor(globalThis, 'document')

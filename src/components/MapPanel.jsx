@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import GridEquipmentDetails from './GridEquipmentDetails.jsx'
 import TerrainAreaMapOverlay from './TerrainAreaMapOverlay.jsx'
+import { TERRAIN_SLOPE_COLORS, TERRAIN_SLOPE_LABELS } from '../utils/terrainSlopeClasses.js'
 import MapRegionLabel, { getMapRegionLabel } from './MapRegionLabel.jsx'
 import MapPlaceNamesOverlay from './MapPlaceNamesOverlay.jsx'
 import PublicParcelOverlay, { PublicParcelOverlayStatus } from './PublicParcelOverlay.jsx'
@@ -911,7 +912,7 @@ export default function MapPanel({
       <small>角を順に指定し、開始点をもう一度押すと完成します。「確定」でも完成できます。</small>
     </div>}
     {drawingMessage && <p className="parcel-review-message parcel-review-message--error" role="alert">{drawingMessage}</p>}
-    {terrainArea && <div className="terrain-map-legend" aria-label="検討範囲の勾配凡例"><button type="button" aria-pressed={showTerrainArea} onClick={() => setShowTerrainArea(value => !value)}>{showTerrainArea ? '等高線・勾配 ON' : '等高線・勾配 OFF'}</button>{showTerrainArea && <><span><i style={{ background: '#cfe3cd' }} />10°未満</span><span><i style={{ background: '#efe8ad' }} />10–20°</span><span><i style={{ background: '#eabd8d' }} />20–30°</span><span><i style={{ background: '#df9d9b' }} />30°以上</span><span><i style={{ background: '#b5bcb5' }} />勾配未確認</span><small>黄色線：分析した参考範囲 / 色は施工可否を示しません</small></>}</div>}
+    {terrainArea && <div className="terrain-map-legend" aria-label="検討範囲の勾配凡例"><button type="button" aria-pressed={showTerrainArea} onClick={() => setShowTerrainArea(value => !value)}>{showTerrainArea ? '等高線・勾配 ON' : '等高線・勾配 OFF'}</button>{showTerrainArea && <>{TERRAIN_SLOPE_LABELS.map((label,i)=><span key={label}><i style={{ background: TERRAIN_SLOPE_COLORS[i] }} />{label}</span>)}<span><i style={{ background: '#b5bcb5' }} />未確認 / NoData</span><small>黄色線：分析した参考範囲 / 色は施工可否を示しません</small></>}</div>}
     {!!(parcelReview?.parcels?.length || parcelReview?.boundary || parcelReview?.exclusions?.length) && <div className="parcel-map-footer"><div className="parcel-map-legend" aria-label="地図の凡例">
       <span><i className="parcel-map-legend__target" />対象</span><span><i className="parcel-map-legend__reference" />参考</span><span><i className="parcel-map-legend__boundary" />検討範囲</span><span><i className="parcel-map-legend__exclusion" />除外</span>
     </div>{Number.isFinite(reviewAreaM2) && <p className="parcel-map-area">有効範囲 <strong>約{reviewAreaM2.toLocaleString('ja-JP', { maximumFractionDigits: 0 })} m²</strong>{parcelReview.exclusions?.length > 0 && <span>（除外後）</span>}</p>}</div>}

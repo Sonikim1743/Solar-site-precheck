@@ -110,7 +110,7 @@ export default function TerrainLayoutPreview({ analysis, preview, onChange, parc
       <button type="button" disabled={busy} onClick={() => calculate({}, false, true)}>地形勾配15° / 20°を比較</button>
       {pool && <button type="button" className="terrain-layout-optimize" disabled={busy} onClick={() => calculate({}, true)}>最適配置を比較</button>}
       <button type="button" className="terrain-layout-optimize" disabled={busy} onClick={()=>calculate({},false,false,true)}>真南固定・最大配置を比較</button>
-      <label className="terrain-layout-slope-select">勾配<select aria-label="参考配置の勾配条件" title="選んだ局所勾配未満で参考配置を比較。施工可否の判定ではありません。" value={options.slopeLimitDeg} disabled={busy} onChange={event => changeSlope(Number(event.target.value))}>{[10,15,20].map(degrees => <option key={degrees} value={degrees}>{degrees}°未満</option>)}</select></label>
+      <label className="terrain-layout-slope-select">配置可能な地形勾配<select aria-label="参考配置の勾配条件" title="選んだ局所勾配未満で参考配置を比較。施工可否の判定ではありません。" value={options.slopeLimitDeg} disabled={busy} onChange={event => changeSlope(Number(event.target.value))}>{[10,15,20].map(degrees => <option key={degrees} value={degrees}>{degrees}°未満</option>)}</select></label>
     </div>
     <div className="terrain-layout-utility">
       <button type="button" aria-expanded={conditionsOpen} aria-controls={conditionsId} onClick={() => setConditionsOpen(value => !value)}><span aria-hidden="true">{conditionsOpen ? '▾' : '▸'}</span> 配置条件</button>

@@ -1,12 +1,22 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createTerrainProjection, dragTerrainView, elevateTerrainView, orbitTerrainView, normalizeTerrainView, terrainFaceVisible, zoomTerrainView } from '../src/utils/terrainView.js'
+import { createTerrainProjection, dragTerrainView, elevateTerrainView, orbitTerrainView, normalizeTerrainView, terrainFaceVisible, zoomTerrainView, stepTerrainView } from '../src/utils/terrainView.js'
 import { buildTerrainSolid } from '../src/utils/terrainSolid.js'
 
 const settings = { bounds: { west: -50, south: -40, east: 50, north: 40 }, base: 300, maxElevation: 360 }
 const distance = (a, b) => Math.hypot(...a.map((v, i) => v - b[i]))
 const frame = { zoom: 1 }
 const close = (actual, expected, tolerance = 1e-10) => assert.ok(Math.abs(actual - expected) < tolerance, `${actual} != ${expected}`)
+
+test('cube controls and keyboard use bounded steps of the existing camera, preserving zoom',()=>{
+  const view={azimuth:355,pitch:88,zoom:1.8},before={...view}
+  assert.deepEqual(stepTerrainView(view,'rotate','ArrowLeft'),{azimuth:5,pitch:88,zoom:1.8})
+  assert.deepEqual(stepTerrainView(view,'orbit','ArrowUp'),{azimuth:355,pitch:90,zoom:1.8})
+  assert.deepEqual(stepTerrainView(view,'orbit','ArrowDown'),{azimuth:355,pitch:83,zoom:1.8})
+  assert.deepEqual(stepTerrainView(view,'rotate','ArrowRight'),dragTerrainView(view,10/180,0))
+  assert.deepEqual(stepTerrainView(view,'orbit','ArrowLeft'),orbitTerrainView(view,-10/180,0))
+  assert.deepEqual(view,before)
+})
 
 test('terrain view wraps bearings and supports a true overhead camera', () => {
   assert.deepEqual(normalizeTerrainView({ azimuth: -725, pitch: -100 }), { azimuth: 355, pitch: 0, ...frame })

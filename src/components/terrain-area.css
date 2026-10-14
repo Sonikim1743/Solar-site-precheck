@@ -332,6 +332,14 @@
 .terrain-navigation-tools button:focus-visible,.terrain-navigation-menu button:focus-visible { outline:3px solid #17664f; outline-offset:2px; }
 .terrain-navigation-menu { grid-column:1/-1; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px; padding:6px; border:1px solid #c8d6cd; border-radius:8px; background:#fff; }
 .terrain-navigation-menu button { min-height:44px; border:1px solid #c8d6cd; border-radius:5px; background:#fff; color:#284736; font:inherit; font-size:13px; cursor:pointer; }
+.terrain-navigation-controls { grid-column:1/-1; display:grid; gap:6px; width:100%; min-width:0; }
+.terrain-navigation-controls>div { grid-area:auto; display:flex; align-items:center; justify-content:space-between; gap:4px; min-width:0; }
+.terrain-navigation-controls button { box-sizing:border-box; min-width:44px; min-height:44px; padding:6px; border:1px solid #c8d6cd; border-radius:6px; background:#fff; color:#284736; font:inherit; font-size:14px; cursor:pointer; }
+.terrain-navigation-controls .terrain-area-camera-modes button,.terrain-navigation-controls .terrain-navigation-rotate button { flex:1; }
+.terrain-navigation-controls button[aria-pressed="true"] { border-color:#17664f; background:#edf6ef; }
+.terrain-navigation-controls button:focus-visible { outline:3px solid #17664f; outline-offset:2px; }
+.terrain-navigation-controls button:disabled { opacity:.4; cursor:default; }
+.terrain-navigation-controls .terrain-area-camera-zoom span { min-width:30px; }
 @media(max-width:640px) {
   .terrain-area-model--navigation { grid-template-columns:minmax(0,1fr); gap:0; }
   .terrain-view-navigation { grid-column:1; grid-row:1; justify-self:end; margin:0 8px 0 0; }

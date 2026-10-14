@@ -44,8 +44,8 @@ export function normalizeTerrainLayoutOptions(options = {}) {
 }
 
 // Shared with the terrain renderer: four finite DEM heights AND four finite
-// slopes, averaged per surface cell. The renderer's green category stays below
-// 10°; layout eligibility applies the selected strict threshold to this mean.
+// slopes, averaged per surface cell. The five colour classes and layout
+// eligibility use this same mean; the selected cutoff remains strict (<).
 export function getTerrainCellSlope(grid, row, col) {
   if (!Number.isInteger(row) || !Number.isInteger(col) || row < 0 || col < 0 || row >= grid?.height - 1 || col >= grid?.width - 1) return null
   const index = row * grid.width + col
