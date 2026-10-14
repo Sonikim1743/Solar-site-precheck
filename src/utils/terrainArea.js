@@ -25,17 +25,33 @@ export function terrainPointToLocal(position, origin) {
   return projection(origin).forward([position.lon, position.lat])
 }
 
-// Exact serialized geometry identity, not a claim that reordered vertices differ
-// on the ground. Conservative invalidation is preferable to stale results.
-export function terrainGeometryKey(geometry) {
-  const raw = JSON.stringify(geometry)
+function hashTerrainGeometry(raw, version) {
   if (!raw || raw.length > 1024 * 1024) fail('範囲の図形が大きすぎます。')
   let a = 2166136261, b = 2246822507
   for (let i = 0; i < raw.length; i++) {
     a = Math.imul(a ^ raw.charCodeAt(i), 16777619)
     b = Math.imul(b ^ raw.charCodeAt(i), 3266489909)
   }
-  return `terrain-v1-${(a >>> 0).toString(16)}-${(b >>> 0).toString(16)}`
+  return `terrain-${version}-${(a >>> 0).toString(16)}-${(b >>> 0).toString(16)}`
+}
+export const legacyTerrainGeometryKey = geometry => hashTerrainGeometry(JSON.stringify(geometry), 'v1')
+// Identity only: retain the original double-precision geometry for all drawing,
+// projection and measurement. Round the identity to nine decimal degrees
+// (sub-millimetre), then canonicalize ring starts/directions and part order.
+// This tolerates platform floating-point noise without hiding meaningful edits.
+export function terrainGeometryKey(geometry) {
+  if(!geometry || !['Polygon','MultiPolygon'].includes(geometry.type) || JSON.stringify(geometry).length>1024*1024) fail('範囲の図形が不正または大きすぎます。')
+  const ringKey = ring => {
+    const points=ring.slice(0,-1).map(p=>p.map(v=>Number(v.toFixed(9))).join(','))
+    const rotations=values=>{
+      let start=0
+      for(let i=1;i<values.length;i++)if(values[i]<values[start])start=i
+      return values.slice(start).concat(values.slice(0,start)).join(';')
+    }
+    return [rotations(points),rotations([...points].reverse())].sort()[0]
+  }
+  const polygons=geometryPolygons(geometry).map(p=>[ringKey(p[0]),...p.slice(1).map(ringKey).sort()]).sort((a,b)=>{const x=JSON.stringify(a),y=JSON.stringify(b);return x<y?-1:x>y?1:0})
+  return hashTerrainGeometry(JSON.stringify(polygons), 'v2')
 }
 
 function ringArea(ring) {
@@ -152,6 +168,9 @@ export function terrainContours(grid) {
     const i = row * width + col
     const zs = [elevations[i], elevations[i + 1], elevations[i + width + 1], elevations[i + width]]
     if (!zs.every(finite)) continue
+    // Bilinear interpolation can leave sub-nanometre noise on a flat DEM.
+    // It must not invent islands at a contour level on an otherwise flat cell.
+    if (Math.max(...zs) - Math.min(...zs) < 1e-8) continue
     const x = xMin + col * step, y = yMin + row * step
     const corners = [[x, y], [x + step, y], [x + step, y + step], [x, y + step]]
     for (let level = Math.ceil(Math.min(...zs) / 2) * 2; level <= Math.max(...zs); level += 2) {
@@ -226,7 +245,8 @@ export function normalizeTerrainArea(value, expectedGeometry) {
   const n = raw.width * raw.height
   if (!Array.isArray(raw.elevations) || raw.elevations.length !== n || !Array.isArray(raw.sourceIds) || raw.sourceIds.length !== n) fail('格子の値・出典数が寸法と一致しません。')
   const plan = createTerrainPlan(value.geometry)
-  if (value.geometryKey !== plan.geometryKey || (expectedGeometry && terrainGeometryKey(expectedGeometry) !== plan.geometryKey)) fail('保存結果と現在の範囲が一致しません。再計算してください。')
+  const savedKeyMatches=value.geometryKey === plan.geometryKey || value.geometryKey === legacyTerrainGeometryKey(value.geometry)
+  if (!savedKeyMatches || (expectedGeometry && terrainGeometryKey(expectedGeometry) !== plan.geometryKey)) fail('保存結果と現在の範囲が一致しません。再計算してください。')
   for (const key of ['width', 'height', 'step', 'xMin', 'yMin']) if (raw[key] !== plan.grid[key]) fail('格子の配置が対象範囲と一致しません。')
   if (raw.origin?.lat !== plan.grid.origin.lat || raw.origin?.lon !== plan.grid.origin.lon) fail('投影原点が対象範囲と一致しません。')
   if (raw.inside != null && (!Array.isArray(raw.inside) || raw.inside.length !== n || Array.from(raw.inside).some((v, i) => v !== plan.grid.inside[i]))) fail('範囲内マスクが図形と一致しません。')

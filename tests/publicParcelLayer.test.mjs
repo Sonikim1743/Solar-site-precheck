@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { PUBLIC_PARCEL_SOURCE, isPublicParcelFeature, publicParcelNumber, publicParcelLabelAnchor, publicParcelStatus } from '../src/utils/publicParcelLayer.js'
+import { PUBLIC_PARCEL_SOURCE, isPublicParcelFeature, publicParcelNumber, publicParcelLabelAnchor, publicParcelStatus, publicParcelReferenceInfo } from '../src/utils/publicParcelLayer.js'
 
 const feature = { geomType: 3, props: { 座標系: '公共座標6系', 地番: '123-4' } }
 const ring = coordinates => coordinates.map(([x, y]) => ({ x, y }))
@@ -31,6 +31,15 @@ test('missing coverage, communication failure, zoom advice and reference boundar
   assert.match(publicParcelStatus('empty').message, /公開地番がありません/)
   assert.match(publicParcelStatus('error').message, /取得できません/)
   assert.match(publicParcelStatus('zoom').message, /拡大/)
-  assert.match(publicParcelStatus('ready').message, /2024年.*参考境界/)
+  assert.match(publicParcelStatus('ready').message, /公開地番.*参考境界/)
   assert.equal(publicParcelStatus('off').message, '')
+})
+
+test('2024 reference selection has a stable source ID and never supplies tile geometry as review input', () => {
+ const a = { id: 87696805, geomType: 3, props: { 座標系: '公共座標5系', 地番: '合成-1', 地番区域: '合成地区' }, geom: [[{ x: -80, y: 0 }]] }
+ const b = { ...a, geom: [[{ x: 4096, y: 2000 }]] }
+ assert.deepEqual(publicParcelReferenceInfo(a), publicParcelReferenceInfo(b))
+ assert.equal(publicParcelReferenceInfo(a).geometryScope, 'unverified-tile-boundary')
+ assert.equal('geometry' in publicParcelReferenceInfo(a), false)
+ assert.equal(publicParcelReferenceInfo({ ...a, id: undefined }), null)
 })

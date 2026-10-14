@@ -453,6 +453,7 @@ export async function analyzeSurroundingTerrain(
   siteElevation,
   obstructionHeight = 20,
   directions = HORIZON_DIRECTIONS,
+  options = {},
 ) {
   const distances = [250, 375, 500, 750, 1000, 1500, 2000, 3000, 4000, 5000]
   const samples = await mapWithConcurrency(
@@ -462,7 +463,8 @@ export async function analyzeSurroundingTerrain(
       const profile = await mapWithConcurrency(distances, 4, async (distance) => {
         const point = pointAtDistance(lat, lon, distance, bearing)
         try {
-          const result = await fetchElevation(point.lat, point.lon)
+          if (options.signal?.aborted) throw options.signal.reason
+          const result = await (options.fetchElevationImpl || fetchElevation)(point.lat, point.lon, { signal: options.signal })
           const curvatureDrop = distance ** 2 / (2 * 6371000)
           const terrainElevationDiff = result.value - siteElevation - curvatureDrop
           const terrainAngle = (Math.atan2(terrainElevationDiff, distance) * 180) / Math.PI
@@ -485,5 +487,6 @@ export async function analyzeSurroundingTerrain(
     },
   )
 
+  if (options.signal?.aborted) throw options.signal.reason || new DOMException('中止', 'AbortError')
   return summarizeTerrainSamples(samples, '250m〜5km・各方位10点', obstructionHeight)
 }

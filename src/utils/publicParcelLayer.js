@@ -20,6 +20,11 @@ export function publicParcelNumber(feature) {
   return /^(?:別図|地区外|調査外|区域外)/.test(text) ? '' : text.slice(0, 60)
 }
 
+export function publicParcelReferenceInfo(feature) {
+  if (!isPublicParcelFeature(feature) || !Number.isSafeInteger(feature.id)) return null
+  return { id: `2024:${feature.id}`, number: publicParcelNumber(feature), area: String(feature.props['地番区域'] || ''), mapName: String(feature.props['地図名'] || ''), year: 2024, geometryScope: 'unverified-tile-boundary' }
+}
+
 function pointInsideRings(point, rings) {
   let inside = false
   for (const ring of rings) {
@@ -58,8 +63,8 @@ export function publicParcelStatus(state) {
   const messages = {
     off: '',
     zoom: '地番を見るには地図を拡大してください。',
-    loading: '公開地番（2024年）を読み込み中…',
-    ready: '公開地番（2024年）／参考境界',
+    loading: '公開地番を読み込み中…',
+    ready: '公開地番／参考境界',
     empty: 'この表示範囲には公開地番がありません。地番ファイルも利用できます。',
     error: '公開地番の一部または全部を取得できません。通信を確認するか、地番ファイルを利用してください。',
   }

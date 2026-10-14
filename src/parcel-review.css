@@ -94,3 +94,16 @@
   .parcel-drawing-toolbar__buttons button { flex: 1; min-height: 44px; }
 }
 @media print { .parcel-drawing-toolbar, .parcel-review-panel, .parcel-settings, .map-draw-controls { display: none !important; } }
+
+/* Location/reset actions own a separate flow row below Leaflet attribution. */
+.map-location-control.map-location-control { position:static; max-width:100%; box-sizing:border-box; display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:8px; padding:8px 2px; pointer-events:auto; }
+.map-location-control .map-location-buttons { display:flex; flex-wrap:wrap; gap:6px; }
+.map-location-control button { min-height:44px; }
+.map-location-control .map-google-open { position:static; max-width:100%; box-sizing:border-box; }
+.map-shell .leaflet-control-attribution { max-width:calc(100% - 10px); overflow-wrap:anywhere; }
+@media(max-width:640px) { .map-location-control { right:auto; bottom:auto; } .map-location-control button,.map-location-control small { max-width:100%; } }
+
+.map-location-control .map-location-buttons > button { width:auto; }
+.public-parcel-selected { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:8px 0; }
+.public-parcel-selected button { min-height:44px; padding:6px 12px; }
+.leaflet-interactive[role="button"]:focus { outline:3px solid white; stroke:#ffe26c; stroke-width:4; }

@@ -2,7 +2,7 @@ import React from 'react'
 import L from 'leaflet'
 import { createElementObject, createLayerComponent } from '@react-leaflet/core'
 import { leafletLayer, PolygonSymbolizer } from 'protomaps-leaflet'
-import { PUBLIC_PARCEL_SOURCE, isPublicParcelFeature, publicParcelNumber, publicParcelStatus } from '../utils/publicParcelLayer.js'
+import { PUBLIC_PARCEL_SOURCE, isPublicParcelFeature, publicParcelNumber, publicParcelStatus, publicParcelReferenceInfo } from '../utils/publicParcelLayer.js'
 import { ParcelNumberSymbolizer } from '../utils/publicParcelLabelLayout.js'
 import { PUBLIC_PARCEL_TERRAIN_LIMITS, PUBLIC_PARCEL_TERRAIN_SOURCE, buildPublicParcelTerrainSnapshot, createPublicParcelSnapshotGate, publicParcelViewportKey } from '../utils/publicParcelTerrain.js'
 import './public-parcel-overlay.css'
@@ -13,6 +13,7 @@ const ATTRIBUTION = '<a href="https://source.coop/smartmaps/amx-2024-04" target=
 export { ParcelNumberSymbolizer }
 
 function createPublicParcelLayer(props, context) {
+  let selectedIds = new Set((props.referenceSelections || []).map(p => p.id))
   // The official Leaflet renderer expects the same Leaflet singleton globally.
   globalThis.L = L
   const pane = context.map.getPane(PANE_NAME) || context.map.createPane(PANE_NAME)
@@ -32,6 +33,7 @@ function createPublicParcelLayer(props, context) {
     paintRules: [
       { dataSource: 'parcels', dataLayer: 'fude', filter: (_, feature) => isPublicParcelFeature(feature), symbolizer: new PolygonSymbolizer({ fill: 'rgba(0,0,0,0)', stroke: 'rgba(22,58,56,.65)', width: 2.3 }) },
       { dataSource: 'parcels', dataLayer: 'fude', filter: (_, feature) => isPublicParcelFeature(feature), symbolizer: new PolygonSymbolizer({ fill: 'rgba(0,0,0,0)', stroke: '#d6ffff', width: 1.15 }) },
+      { dataSource: 'parcels', dataLayer: 'fude', filter: (_, feature) => selectedIds.has(`2024:${feature.id}`), symbolizer: new PolygonSymbolizer({ fill: 'rgba(255,220,98,.35)', stroke: '#ffdc62', width: 3 }) },
     ],
     labelRules: [{ dataSource: 'parcels', dataLayer: 'fude', minzoom: 15, filter: (_, feature) => Boolean(publicParcelNumber(feature)), symbolizer: new ParcelNumberSymbolizer() }],
   })
@@ -103,6 +105,8 @@ function createPublicParcelLayer(props, context) {
   layer.setCallbacks = nextProps => {
     callback = nextProps.onStatus
     parcelsCallback = nextProps.onPublicParcelsChange
+    const nextIds = new Set((nextProps.referenceSelections || []).map(p => p.id))
+    if (nextIds.size !== selectedIds.size || [...nextIds].some(id => !selectedIds.has(id))) { selectedIds = nextIds; layer.rerenderTiles() }
     if (contextKey !== (nextProps.contextKey || '')) {
       contextKey = nextProps.contextKey || ''
       invalidateSnapshot()
@@ -139,6 +143,11 @@ function createPublicParcelLayer(props, context) {
     context.map.on('moveend', moveEnd)
     report(context.map.getZoom() < PUBLIC_PARCEL_SOURCE.minZoom ? 'zoom' : 'loading')
     scheduleSnapshot()
+    props.onPickerChange?.(latlng => {
+      if (!active || context.map.getZoom() < PUBLIC_PARCEL_SOURCE.minZoom) return null
+      const picked = view.queryFeatures(latlng.lng, latlng.lat, context.map.getZoom(), 0).find(p => p.layerName === 'fude' && isPublicParcelFeature(p.feature))?.feature
+      return publicParcelReferenceInfo(picked)
+    })
   })
   layer.on('loading', () => report('loading'))
   layer.on('load', () => {
@@ -152,6 +161,7 @@ function createPublicParcelLayer(props, context) {
     for (const key of requestedTiles.keys()) if (!keys.includes(key)) requestedTiles.delete(key)
   })
   layer.on('remove', () => {
+    props.onPickerChange?.(null)
     active = false
     invalidateSnapshot()
     requestedTiles.clear()

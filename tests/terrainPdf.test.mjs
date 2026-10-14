@@ -73,7 +73,7 @@ test('image and content stream Length values count actual bytes and preserve bot
 })
 
 test('writer rejects missing pages, invalid JPEGs and mismatched image dimensions', () => {
-  for (const pages of [null, [], [page()], [page(),page(),page()]]) assert.throws(() => createTerrainPdfBytes(pages), /2ページ/)
+  for (const pages of [null, [], Array.from({length:6},page)]) assert.throws(() => createTerrainPdfBytes(pages), /1〜5ページ/)
   assert.throws(() => createTerrainPdfBytes([{ ...page(), width: 3 }, page()]), /寸法/)
   assert.throws(() => createTerrainPdfBytes([{ ...page(), height: 0 }, page()]), /寸法/)
   assert.throws(() => createTerrainPdfBytes([{ ...page(), bytes: new Uint8Array([255,216,255,217]) }, page()]), /JPEG/)
@@ -99,4 +99,14 @@ test('Japanese filenames are safe, bounded and dated in Japan time', () => {
 
 test('the browser exporter fails explicitly in a non-browser runtime', async () => {
   await assert.rejects(exportTerrainAreaPdf({ report: {}, element: null }), /ブラウザー/)
+})
+
+for (const count of [1,3,4,5]) test(`PDF writer creates ${count} A3 pages with valid dynamic object offsets`, () => {
+  const bytes=createTerrainPdfBytes(Array.from({length:count},page)), pdf=asLatin1(bytes)
+  assert.equal([...pdf.matchAll(/\/Type \/Page\b/g)].length,count)
+  assert.match(pdf,new RegExp(`/Count ${count}`))
+  const start=Number(pdf.match(/startxref\n(\d+)/)[1]), size=3+count*3
+  assert.equal(pdf.slice(start,start+`xref\n0 ${size}\n`.length),`xref\n0 ${size}\n`)
+  const entries=pdf.slice(start).split('\n').slice(2,2+size)
+  for(let id=1;id<size;id++) assert.equal(pdf.slice(Number(entries[id].slice(0,10)),Number(entries[id].slice(0,10))+`${id} 0 obj\n`.length),`${id} 0 obj\n`)
 })

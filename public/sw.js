@@ -17,7 +17,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
+      .then((keys) => Promise.all(keys.filter((key) => key.startsWith('solar-site-precheck-') && key !== CACHE_NAME).map((key) => caches.delete(key))))
       .then(() => self.clients.claim()),
   )
 })
@@ -29,6 +29,9 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return
   if (url.origin !== self.location.origin) return
   if (url.pathname.startsWith('/api/')) return
+  // The parcel provider verifies byte length and SHA-256 before writing its
+  // separate cache. Do not populate a second, unverified shell cache here.
+  if (url.pathname.startsWith('/parcels/')) return
   // Capacity data must not silently fall back to obsolete operating values.
   if (url.pathname.startsWith('/data/grid-capacity/')) {
     event.respondWith(fetch(request))

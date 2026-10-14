@@ -79,12 +79,12 @@ export function parseMonsolaHtml(html, expectedMesh = '') {
   }
 }
 
-export async function fetchMonsolaWeb(meshCode) {
+export async function fetchMonsolaWeb(meshCode, { signal } = {}) {
   if (!/^\d{8}$/.test(String(meshCode))) throw new Error('3次メッシュ番号が不正です。')
   const path = `/api/nedo-monsola?mesh=${encodeURIComponent(meshCode)}`
   let response
   try {
-    response = await fetch(path, { cache: 'no-store' })
+    response = await fetch(path, { cache: 'no-store', signal })
   } catch {
     throw new Error('NEDO Web取得用のローカル中継に接続できませんでした。RUN_APP.cmdを開き直してから再試行してください。')
   }

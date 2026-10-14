@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import proj4 from 'proj4'
 import { analyzeTerrainArea } from '../src/services/terrainArea.js'
-import { createTerrainPlan, terrainGeometryKey, normalizeTerrainArea, terrainAreaSnapshot, terrainContours, pointInTerrainBoundary, terrainPointToLocal, terrainTilePoint, decodeDemRgba, bilinearTerrainValue, TERRAIN_AREA_LIMITS } from '../src/utils/terrainArea.js'
+import { createTerrainPlan, terrainGeometryKey, legacyTerrainGeometryKey, normalizeTerrainArea, terrainAreaSnapshot, terrainContours, pointInTerrainBoundary, terrainPointToLocal, terrainTilePoint, decodeDemRgba, bilinearTerrainValue, TERRAIN_AREA_LIMITS } from '../src/utils/terrainArea.js'
 
 const project = proj4('EPSG:4326', '+proj=aeqd +lat_0=35 +lon_0=135 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs')
 const ring = (x0, y0, x1, y1) => [[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]].map(p => project.inverse(p))
@@ -104,6 +104,21 @@ test('forged layout/mask/source URLs and metadata are rejected; keys track chang
   assert.throws(() => normalizeTerrainArea({ version: 1, grid: { width: 100000000, height: 100000000 } }), /寸法/)
 })
 
+test('geometry identity tolerates platform noise and ring order while preserving exact coordinates and legacy records',()=>{
+  const f=fixture(),before=JSON.stringify(f.geometry),key=terrainGeometryKey(f.geometry)
+  const rotate=ring=>{const open=ring.slice(0,-1),next=open.slice(2).concat(open.slice(0,2));return [...next,next[0]]}
+  const moved=structuredClone(f.geometry);moved.coordinates=moved.coordinates.map(rotate)
+  moved.coordinates=moved.coordinates.map(r=>[...r].reverse().map(p=>p.map(v=>v+2e-13)))
+  assert.equal(terrainGeometryKey(moved),key)
+  assert.equal(JSON.stringify(f.geometry),before)
+  const legacy={...f,geometryKey:legacyTerrainGeometryKey(f.geometry)}
+  assert.equal(normalizeTerrainArea(legacy).geometryKey,key)
+  assert.throws(()=>normalizeTerrainArea({...legacy,geometryKey:'terrain-v1-forged'}),/範囲/)
+  const changed=structuredClone(f.geometry);changed.coordinates[0][1][0]+=.000001
+  assert.notEqual(terrainGeometryKey(changed),key)
+  assert.throws(()=>normalizeTerrainArea(legacy,changed),/範囲/)
+})
+
 test('service requests only official tile URLs with at most four simultaneous fetches', async () => {
   let active = 0, peak = 0, count = 0
   const a = await analyzeTerrainArea(geometry(), {
@@ -173,4 +188,10 @@ test('tile count stays bounded and user abort remains distinct from no-data', as
   assert.ok(calls <= 64)
   const c = new AbortController(); c.abort()
   await assert.rejects(analyzeTerrainArea(geometry(), { signal: c.signal, fetchImpl: async () => { throw new Error('must not request') } }), { name: 'AbortError' })
+})
+
+test('flat DEM interpolation noise does not invent contour islands', () => {
+  const grid={width:2,height:2,step:5,xMin:0,yMin:0,elevations:[100-1e-12,100+1e-12,100+1e-12,100-1e-12],boundary:[[[[0,0],[5,0],[5,5],[0,5],[0,0]]]]}
+  assert.deepEqual(terrainContours(grid),[])
+  assert.ok(terrainContours({...grid,elevations:[99,101,99,101]}).length>0)
 })

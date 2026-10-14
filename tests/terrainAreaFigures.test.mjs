@@ -236,17 +236,17 @@ function reportFixture() {
   return {terrainArea,parcelReview,position:{lat:35.0002,lon:135.0002},siteName:'合成地形・描画回帰用',appVersion:'test'}
 }
 
-test('the Japanese report remains two sheets with fixed views, source limits and unchanged real statistics',()=>{
+test('the Japanese report keeps two terrain sheets plus consolidated annotations with fixed views, source limits and unchanged real statistics',()=>{
   const report=reportFixture(), original=structuredClone(report)
   const html=renderToStaticMarkup(React.createElement(TerrainAreaReport,{report}))
-  assert.equal((html.match(/report-print-page terrain-report-sheet/g)||[]).length,2)
+  assert.equal((html.match(/report-print-page terrain-report-sheet/g)||[]).length,3)
   assert.equal((html.match(/<svg\b/g)||[]).length,3)
   assert.match(html,/北から時計回り35°/)
   assert.match(html,/北から時計回り145°/)
-  assert.match(html,/3D高さ強調なし（1:1）/)
+  assert.match(html,/高さ強調なし（1:1）/)
   assert.match(html,/data-view-azimuth="35" data-view-pitch="32"/)
   assert.match(html,/data-view-azimuth="145" data-view-pitch="32"/,'the A3 views retain their fixed directions')
-  assert.match(html,/立体の底面/)
+  assert.match(html,/側面・底面/)
   assert.match(html,/地層・土量を示しません/)
   assert.match(html,/<dt>高低差<\/dt><dd>0 m<\/dd>/,'the visual 5m base is not terrain height difference')
   assert.match(html,/写真測量/)

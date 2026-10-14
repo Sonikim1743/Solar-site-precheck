@@ -179,3 +179,9 @@
 .chapter-body { padding-top:24px; }
 .cadastre-option__body .parcel-review-panel { margin-top:14px; }
 @media(max-width:640px) { .solar-generation--page h1 { font-size:22px; } .chapter-summary { gap:10px; } .chapter-summary h2 { font-size:17px; } .chapter-toggle { font-size:0; padding:8px; } .chapter-toggle::after { content:'＋'; font-size:16px; } details[open] > .chapter-summary .chapter-toggle::after { content:'−'; } }
+.mode-choice { display:flex; gap:4px; }
+.mode-choice button { min-height:44px; }
+.mode-choice button[aria-pressed="true"] { background:#176b50; color:white; }
+.site-report-name { display:flex; align-items:center; gap:12px; margin:0 0 14px; color:#234d42; }
+.site-report-name span { flex:0 0 auto; font-weight:600; }
+.site-report-name input { width:100%; min-width:0; min-height:44px; box-sizing:border-box; border:1px solid #bad1c4; border-radius:7px; padding:8px 12px; font:inherit; }

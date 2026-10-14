@@ -43,14 +43,14 @@ const table = html => html.match(/<table class="terrain-report-bins">[\s\S]*?<\/
 test('the fixed A3 distribution retains both share and estimated area in the PDF-readable value cell', () => {
   const report = fixture(), original = structuredClone(report), html = render(report)
   const total = report.terrainArea.summary.polygonAreaM2
-  assert.equal((html.match(/report-print-page terrain-report-sheet/g) || []).length, 2)
+  assert.equal((html.match(/report-print-page terrain-report-sheet/g) || []).length, 3)
   assert.match(table(html), /割合 \/ 推定面積/)
   assert.ok(table(html).includes(`<td>100% / ${area(total)}</td>`))
   assert.equal((table(html).match(/<td>0% \/ 0 m²<\/td>/g) || []).length, 3)
   assert.ok(html.includes(`有効範囲（除外後）：${area(total)}`))
   assert.doesNotMatch(html, /未計算：/)
   assert.match(html, /登記面積ではありません/)
-  assert.match(html, /3D高さ強調なし（1:1）/)
+  assert.match(html, /高さ強調なし（1:1）/)
   assert.deepEqual(report, original)
 })
 
@@ -71,7 +71,7 @@ test('PDF export refuses an older slope table that omits the estimated areas rat
   const row = (label, value) => ({ querySelector: selector => ({ textContent: selector === 'dt,th' ? label : value }) })
   const values = [`${number(s.polygonAreaM2, 0)} m²`, `${number(s.minElevation)}–${number(s.maxElevation)} m`, `${number(s.heightRange)} m`, `${number(s.medianSlope)}°`, `${number(s.p90Slope)}°`]
   const selectors = {
-    '.terrain-report-sheet': [{}, {}], '.terrain-area-figure svg': [{}, {}, {}],
+    '.terrain-report-sheet': [{}, {}, {}], '.terrain-area-figure svg': [{}, {}, {}],
     '.terrain-report-values > div': values.map((value, index) => row(String(index), value)),
     '.terrain-report-bins tbody > tr': s.slopeBins.map(bin => row(bin.max === 90 ? `${bin.min}°以上` : `${bin.min}–${bin.max}°未満`, `${number(bin.percent)}%`)),
   }

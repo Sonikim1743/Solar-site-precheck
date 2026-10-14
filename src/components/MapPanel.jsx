@@ -4,6 +4,8 @@ import TerrainAreaMapOverlay from './TerrainAreaMapOverlay.jsx'
 import MapRegionLabel, { getMapRegionLabel } from './MapRegionLabel.jsx'
 import MapPlaceNamesOverlay from './MapPlaceNamesOverlay.jsx'
 import PublicParcelOverlay, { PublicParcelOverlayStatus } from './PublicParcelOverlay.jsx'
+import RegionalParcelOverlay from './RegionalParcelOverlay.jsx'
+import { REGIONAL_PARCEL_SOURCE } from '../services/regionalParcels.js'
 import L from 'leaflet'
 import { Circle, CircleMarker, GeoJSON, MapContainer, Marker, Polygon, Polyline, Popup, Rectangle, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet'
 import MapDistanceScale from './MapDistanceScale.jsx'
@@ -26,7 +28,7 @@ const PARCEL_MODE_HINTS = {
   point: '地図をクリックして計算地点を指定',
   target: '筆をクリックして対象に追加・変更',
   reference: '筆をクリックして参考に追加・変更',
-  boundary: '角を順に指定 · 作図中はさらに拡大できます · 開始点で完成',
+  boundary: '地図に最初の点を指定 · 角を順に指定 · 作図中はさらに拡大できます · 開始点で完成',
   exclusion: '除外する角を指定 · 作図中はさらに拡大できます · 開始点で完成',
 }
 
@@ -44,11 +46,11 @@ const currentLocationIcon = L.divIcon({
   iconAnchor: [12, 12],
 })
 
-function ClickHandler({ onSelect, mode, locked, onAddVertex, onFinish }) {
+function ClickHandler({ onSelect, mode, locked, onAddVertex, onFinish, onPublicParcelPick }) {
   useMapEvents({
     click(event) {
       if (locked) return
-      if (mode === 'point') onSelect?.({ lat: event.latlng.lat, lon: event.latlng.lng })
+      if (mode === 'point' || mode === 'target' || mode === 'reference') { if (onPublicParcelPick?.(event.latlng)) return; if (mode === 'point') onSelect?.({ lat: event.latlng.lat, lon: event.latlng.lng }) }
       else if (mode === 'boundary' || mode === 'exclusion') {
         // A double-click emits two click events before dblclick. Keep one vertex.
         if (event.originalEvent?.detail > 1) return
@@ -529,7 +531,7 @@ function ParcelLayer({ data, review, selectedParcelId, focusParcelId, onParcelSe
     group.clearLayers()
     group.addData(combinedData)
     const bounds = group.getBounds()
-    if (bounds?.isValid() && (data !== previousDataRef.current || !initialBoundsShownRef.current)) {
+    if (data && bounds?.isValid() && (data !== previousDataRef.current || !initialBoundsShownRef.current)) {
       map.fitBounds(bounds, { padding: [24, 24], maxZoom: 17 })
       initialBoundsShownRef.current = true
     }
@@ -651,8 +653,13 @@ export default function MapPanel({
   onParcelDrawingError,
   onParcelModeChange,
   onPublicParcelsChange,
+  referenceSelections = [],
+  onReferenceSelectionsChange,
+  onConfirmRegionalParcels,
+  regionalConfirmError = '',
   terrainSection,
   terrainArea,
+  simplePosition,
   powerGrid,
   capacityMatches,
   googleMapsUrl,
@@ -661,6 +668,33 @@ export default function MapPanel({
   const hasRegionLabel = Boolean(getMapRegionLabel(position, placeInfo))
   const [showTerrainArea, setShowTerrainArea] = useState(true)
   const [showPublicParcels, setShowPublicParcels] = useState(false)
+  const confirmedRegional = parcelReview.parcels.filter(p=>p.role==='target'&&p.source.fileName===REGIONAL_PARCEL_SOURCE)
+  const confirmedDraft = () => confirmedRegional.map(p=>({type:'Feature',id:p.info.id,geometry:p.geometry,properties:{地番:p.info.number,__parcelId:p.info.id,__parcelSourceName:REGIONAL_PARCEL_SOURCE}}))
+  const [regionalDraft,setRegionalDraft] = useState(confirmedDraft)
+  const [regionalCoverage,setRegionalCoverage] = useState(null)
+  const [regionalCandidates,setRegionalCandidates] = useState([])
+  const [regionalRetry,setRegionalRetry] = useState(0)
+  const [regionalMessage,setRegionalMessage] = useState('')
+  const [regionalDirty,setRegionalDirty] = useState(false)
+  const confirmedRegionalKey=confirmedRegional.map(p=>p.id).join('|')
+  useEffect(()=>{if(!regionalDirty)setRegionalDraft(confirmedDraft())},[confirmedRegionalKey])
+  const toggleRegional = feature => {
+    if(feature.selectionError){setRegionalMessage(feature.selectionError);return}
+    setRegionalDraft(previous=>previous.some(f=>f.id===feature.id)?previous.filter(f=>f.id!==feature.id):previous.length<100?[...previous,feature]:previous)
+    setRegionalDirty(true)
+    setRegionalMessage('選択変更は未確定です。「選択完了」で適用します（100筆まで）。')
+    setRegionalCandidates([])
+  }
+  const setReferenceSelections = onReferenceSelectionsChange || (() => {})
+  const publicPickerRef = useRef(null)
+  const pickPublicReference = latlng => {
+    if (!showPublicParcels || regionalCoverage !== false) return false
+    const picked = publicPickerRef.current?.(latlng)
+    if (!picked) return false
+    if (referenceSelections.length >= 100 && !referenceSelections.some(p => p.id === picked.id)) { setPublicParcelStatus({ state: 'error', message: '参考仮選択は100筆までです。不要な選択を解除してください。既存の選択は保持しています。' }); return true }
+    setReferenceSelections(previous => previous.some(p => p.id === picked.id) ? previous.filter(p => p.id !== picked.id) : previous.length >= 100 ? previous : [...previous, picked])
+    return true
+  }
   const [baseMap, setBaseMap] = useState('photo')
   const [showPlaceNames, setShowPlaceNames] = useState(true)
   const [publicParcelStatus, setPublicParcelStatus] = useState({ state: 'off', message: '' })
@@ -673,11 +707,13 @@ export default function MapPanel({
   const mapShellRef = useRef(null)
   const lastVertexEventRef = useRef(null)
   const [drawingMessage, setDrawingMessage] = useState('')
-  const mapLocked = isCompactMap && !mapInteractionEnabled
+  const mapLocked = isCompactMap && !mapInteractionEnabled && !['boundary', 'exclusion'].includes(parcelMode)
   const isDrawing = parcelMode === 'boundary' || parcelMode === 'exclusion'
 
   useEffect(() => {
     if (!isDrawing) return
+    setMapInteractionEnabled(true)
+    mapShellRef.current?.focus({ preventScroll: true })
     const reduceMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
     mapShellRef.current?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' })
   }, [parcelMode, isDrawing])
@@ -754,7 +790,7 @@ export default function MapPanel({
 
   return (
     <>
-    <div ref={mapShellRef} data-basemap={baseMap} className={`map-shell${isDrawing ? ' map-shell--parcel-drawing' : ''}`} onKeyDown={(event) => {
+    <div ref={mapShellRef} tabIndex={-1} data-basemap={baseMap} className={`map-shell${isDrawing ? ' map-shell--parcel-drawing' : ''}`} onKeyDown={(event) => {
       if (!isDrawing || event.target.closest?.('input, textarea, select, button, a, summary')) return
       if (event.key === 'Escape') { event.preventDefault(); cancelDrawing() }
       if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); finishDrawing() }
@@ -774,9 +810,10 @@ export default function MapPanel({
           maxNativeZoom={18}
         />
         {showPlaceNames && <MapPlaceNamesOverlay dimmed={isDrawing} onStatus={setPlaceNameStatus} />}
-        {showPublicParcels && <PublicParcelOverlay onStatus={setPublicParcelStatus} onPublicParcelsChange={onPublicParcelsChange} contextKey={position ? `${position.lat},${position.lon}` : ''} />}
+        {showPublicParcels && regionalCoverage===false && <PublicParcelOverlay referenceSelections={referenceSelections} onPickerChange={picker => { publicPickerRef.current = picker }} onPublicParcelsChange={onPublicParcelsChange} />}
+        {showPublicParcels && <RegionalParcelOverlay draft={regionalDraft} mode={parcelMode} locked={mapLocked} retry={regionalRetry} onStatus={setPublicParcelStatus} onCoverage={setRegionalCoverage} onToggle={toggleRegional} onCandidates={setRegionalCandidates} onError={setRegionalMessage} />}
         <MapDistanceScale position="bottomleft" />
-        <ClickHandler onSelect={onSelect} mode={parcelMode} locked={mapLocked} onAddVertex={addDraftVertex} onFinish={finishDrawing} />
+        <ClickHandler onPublicParcelPick={pickPublicReference} onSelect={onSelect} mode={parcelMode} locked={mapLocked} onAddVertex={addDraftVertex} onFinish={finishDrawing} />
         <MapController position={position} />
         <MapInteractionController locked={mapLocked} drawing={isDrawing} />
         <ParcelLayer
@@ -796,6 +833,7 @@ export default function MapPanel({
         <CurrentLocationLayer currentLocation={currentLocation} />
         <TerrainSectionMapOverlay analysis={terrainSection} dimmed={isDrawing} />
         {terrainArea && showTerrainArea && <TerrainAreaMapOverlay analysis={terrainArea} dimmed={isDrawing} />}
+        {simplePosition && <CircleMarker center={[simplePosition.lat, simplePosition.lon]} radius={7} pathOptions={{color:'#fff',weight:2,fillColor:'#175e8c',fillOpacity:1}}><Tooltip>シンプル解析・内部代表点</Tooltip></CircleMarker>}
         <SiteMarker position={position} placeInfo={placeInfo} suppressPopup={hasRegionLabel || hasTerrainOverlay || (terrainArea && showTerrainArea) || parcelMode !== 'point'} />
         <ReviewGeometryLayers review={parcelReview} vertices={draftVertices} onClose={finishDrawing} locked={mapLocked} dimmed={isDrawing} />
       </MapContainer>
@@ -807,19 +845,21 @@ export default function MapPanel({
       <div className="map-draw-controls" role="group" aria-label="地番表示・範囲の作図">
         <button type="button" className={parcelMode === 'boundary' ? 'is-active' : ''} aria-pressed={parcelMode === 'boundary'} onClick={() => onParcelModeChange?.(parcelMode === 'boundary' ? 'point' : 'boundary')} disabled={!onParcelModeChange}>範囲を描く</button>
         <button type="button" className={parcelMode === 'exclusion' ? 'is-active' : ''} aria-pressed={parcelMode === 'exclusion'} onClick={() => onParcelModeChange?.(parcelMode === 'exclusion' ? 'point' : 'exclusion')} disabled={!onParcelModeChange}>除外</button>
-        <button type="button" className={`map-public-parcel-toggle${showPublicParcels ? ' is-active' : ''}`} aria-pressed={showPublicParcels} aria-label={`公開地番を${showPublicParcels ? '非表示' : '表示'}`} title="公開地番（2024年）の参考表示。対象・検討範囲・除外は保持します。" onClick={() => setShowPublicParcels(value => !value)}>地番 {showPublicParcels ? 'ON' : 'OFF'}</button>
+        <button type="button" className={`map-public-parcel-toggle${showPublicParcels ? ' is-active' : ''}`} aria-pressed={showPublicParcels} aria-label="地番選択" title="準備済み地域は原本の全筆を選択できます。資料年・範囲は出典情報を参照。" onClick={() => setShowPublicParcels(value => !value)}>地番選択 {showPublicParcels ? 'ON' : 'OFF'}</button>
       </div>
       {isDrawing && <div className="map-hint">{PARCEL_MODE_HINTS[parcelMode]}</div>}
       {isCompactMap && (
         <button
           type="button"
-          className={`map-touch-toggle ${mapInteractionEnabled ? 'map-touch-toggle--active' : ''}`}
+          className={`map-touch-toggle ${mapInteractionEnabled ? 'map-touch-toggle--active' : ''}`} disabled={isDrawing}
           onClick={() => setMapInteractionEnabled((value) => !value)}
           aria-pressed={mapInteractionEnabled}
         >
           {mapInteractionEnabled ? '地図操作ON' : '地図操作を有効化'}
         </button>
       )}
+      {parcelData && <div className="parcel-map-badge">地番レイヤー {parcelData.features.length.toLocaleString()}筆</div>}
+    </div>
       <div className="map-location-control">
         {googleMapsUrl && <a className="map-google-open" href={googleMapsUrl} target="_blank" rel="noreferrer">Googleマップで開く</a>}
         <div className="map-location-buttons">
@@ -832,14 +872,14 @@ export default function MapPanel({
           <small className={locationStatus.status === 'error' ? 'is-error' : ''}>{locationStatus.message}</small>
         )}
       </div>
-      {parcelData && <div className="parcel-map-badge">地番レイヤー {parcelData.features.length.toLocaleString()}筆</div>}
-    </div>
     <PublicParcelOverlayStatus status={publicParcelStatus} />
+    {showPublicParcels && <div className="public-parcel-selected regional-parcel-selection" aria-label="原本地番の選択"><strong>選択中 {regionalDraft.length}筆 / 確定済み {confirmedRegional.length}筆</strong>{regionalDraft.map(f=><button key={f.id} type="button" onClick={()=>toggleRegional(f)}>{f.properties['地番']} ×</button>)}<button type="button" className="regional-parcel-complete" disabled={!regionalDraft.length&&!confirmedRegional.length} onClick={()=>{if(onConfirmRegionalParcels?.(regionalDraft)){setRegionalDirty(false);setRegionalMessage('選択を確定しました。下の3Dとシンプル解析に同じ全筆形状を使用します。');setRegionalCandidates([]);document.querySelector('.selected-parcel-3d')?.scrollIntoView({behavior:'smooth',block:'start'})}}}>選択完了 → 3D</button><button type="button" onClick={()=>{setRegionalDirty(false);setRegionalDraft(confirmedDraft());setRegionalCandidates([]);setRegionalMessage('未確定の選択変更を中止しました。確定済みの筆と結果は保持しています。')}}>選択を中止</button>{publicParcelStatus.state==='error'&&<button type="button" onClick={()=>setRegionalRetry(n=>n+1)}>地番を再取得</button>}{regionalMessage&&<p role="status">{regionalMessage}</p>}{regionalConfirmError&&<p role="alert">{regionalConfirmError}</p>}<details><summary>選択・出典の扱い</summary><p>全筆とは公開2024 SHPの1行に含まれる全領域・穴です。現在の登記や測量境界の保証ではありません。PMTilesとは識別子を自動一致させません。選択完了はこの資料の対象筆だけを更新し、他資料の既存対象筆は保持して合併します。既存の手描き範囲・除外は保存したまま、筆の3Dとシンプル解析は全対象筆の形状を使用します。</p></details>{regionalCandidates.length>0&&<div role="group" aria-label="重なる原本候補"><p>同じ位置に複数の原本候補があります。地番・原図を確認して選択してください。分筆前後を自動一致させません。</p>{regionalCandidates.map(f=><button key={f.id} type="button" disabled={Boolean(f.selectionError)} onClick={()=>toggleRegional(f)}>{f.properties['地番']} / {f.properties['地図名']} / 原本行 {f.properties.__sourceRecord}{f.selectionError?'（形状確認必要）':''}</button>)}</div>}</div>}
+    {showPublicParcels && regionalCoverage===false && <div className="public-parcel-selected"><strong>仮選択 {referenceSelections.length}筆 · 面積計算外</strong>{referenceSelections.map(p => <button key={p.id} type="button" title={`${p.area} / ${p.mapName}`} onClick={() => setReferenceSelections(previous => previous.filter(x => x.id !== p.id))}>{p.number || '地番未記載'} ×</button>)}{!!referenceSelections.length && <><span>全筆境界未確認。タイルで切れる境界は計算に使いません。</span><span>全図形を返す照会元が必要です。確認済みの全筆は下の3D表示で使用できます。</span></>}</div>}
     {placeNameStatus?.state === 'error' && <p className="public-parcel-overlay-status is-error" role="status">地名を取得できません。標準地図でも確認できます。</p>}
     {isDrawing && <div className="parcel-drawing-toolbar" aria-label="範囲の作図操作">
       <div className="parcel-drawing-toolbar__instruction">
         <strong>{parcelMode === 'boundary' ? '検討範囲' : '除外範囲'}を作図</strong>
-        <span aria-live="polite">{draftVertices.length}点を指定 · 3点以上で開始点を押して閉じる</span>
+        <span aria-live="polite">{draftVertices.length === 0 ? '地図に最初の点を指定' : `${draftVertices.length}点を指定 · 3点以上で開始点を押して閉じる`}</span>
         {mapLocked && <small>先に「地図操作を有効化」を押してください。</small>}
       </div>
       <div className="parcel-drawing-toolbar__buttons">

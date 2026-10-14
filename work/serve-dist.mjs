@@ -37,6 +37,7 @@ const types = {
   '.mjs': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
+  '.geojson': 'application/geo+json; charset=utf-8',
   '.webmanifest': 'application/manifest+json; charset=utf-8',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
@@ -69,7 +70,7 @@ function fileForUrl(url) {
   const chunkMatch = pathname.match(/^\/assets\/(index|nedoWeb|nedoPdf|nedoValidation|pdfToJpg|inheritancePdf|pdfCompat)-[A-Za-z0-9_-]+\.(?:js|jsf|mjs)$/)
   if (chunkMatch) return findCurrentChunk(`${chunkMatch[1]}-`)
   if (/^\/assets\/pdfToJpg-[A-Za-z0-9_-]+\.jsf?$/.test(pathname)) return findCurrentChunk('pdfToJpg-')
-  if (/^\/(?:assets|data|icons|screenshots|templates|manual|ocr)\//.test(pathname)) return null
+  if (/^\/(?:assets|data|parcels|icons|screenshots|templates|manual|ocr)\//.test(pathname)) return null
   return join(root, 'index.html')
 }
 

@@ -1,5 +1,6 @@
 /* Map controls only. Keep the map instance, drawing state and data untouched. */
-.app .map-panel .map-shell .map-draw-controls{top:10px;left:48px;gap:6px;max-width:calc(100% - 142px)}
+.app .map-panel .map-shell .map-draw-controls{top:10px;left:48px;gap:6px;max-width:calc(100% - 142px);flex-wrap:wrap}
+.app .map-panel .map-shell .map-draw-controls button{flex-shrink:0}
 .app .map-panel .map-shell .map-draw-controls button,
 .app .map-panel .map-shell .map-location-buttons>button,
 .app .map-panel .map-shell .map-touch-toggle,
@@ -30,8 +31,16 @@
   .app .map-panel .map-shell .map-base-toggle{padding-inline:7px;font-size:11px}
 }
 @media(max-width:340px){
+  .app .map-panel .map-shell .map-draw-controls{max-width:calc(100% - 58px)}
   .app .map-panel .map-shell .map-display-controls{top:54px}
-  .app .map-panel .map-shell .map-touch-toggle{top:98px}
-  .app .map-panel .map-shell>.map-region-label{top:142px}
+  .app .map-panel .map-shell .map-touch-toggle{top:98px;max-width:calc(100% - 96px);height:auto;white-space:normal}
+  .app .map-panel .map-shell>.map-region-label{top:158px}
 }
 @media print{.map-display-controls{display:none!important}}
+.regional-parcel-selection { flex-wrap: wrap; gap: 8px; }
+.regional-parcel-selection button { min-height: 44px; white-space: normal; overflow-wrap: anywhere; border: 1px solid #a9c8b7; border-radius: 8px; background: white; color: #234d42; padding: 8px 12px; }
+.regional-parcel-selection .regional-parcel-complete { background: #176b50; color: white; font-weight: 700; }
+.regional-parcel-selection button:disabled { opacity: .5; }
+.regional-parcel-selection p { flex-basis: 100%; margin: 4px 0; }
+.regional-parcel-selection [role="group"] { width: 100%; display: flex; flex-wrap: wrap; gap: 8px; }
+.regional-parcel-selection [role="group"] button { max-width: 100%; text-align: left; }
