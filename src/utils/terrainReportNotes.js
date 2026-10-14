@@ -1,12 +1,14 @@
 import { terrainLayoutReportConditions, TERRAIN_LAYOUT_LIMIT, TERRAIN_LAYOUT_SAVE } from './terrainLayoutReport.js'
+import { isMapParcel, MAP_PARCEL_NOTICE } from './mapParcelSelection.js'
 
 export function terrainReportNotes(report, layouts) {
   const { source, grid } = report.terrainArea
   const sources = (source.layers || []).map(layer => `${layer.label} / 原資料${layer.nativeResolutionMeters}m級`).join('、')
   const notes = [
-    { id: '1', title: '範囲・標高資料・地形の計算', body: `対象筆と指定範囲の共通部分から除外分を引いた図形を、平面・3D・集計で共通使用。参考の筆は集計しません。黄色の二重線は地形の検討範囲であり、測量で確認した筆界ではありません。標高資料：国土地理院 標高タイル${source.mixed ? '（資料混在）' : ''}。${sources}。出典 https://maps.gsi.go.jp/development/ichiran.html 。表示・集計格子 ${grid.step}m / 局所勾配は東西・南北10m幅の中央差分 / 等高線2m、太線10m。割合は勾配を計算できた格子点内の分布。推定面積は除外後の図形面積と格子点の比率で換算し、未計算分を配分しません。登記面積ではありません。補間・表示間隔は測量精度ではなく、欠測・除外を埋めません。標高資料の境目には勾配差が出る可能性があります。色は施工可否の判定基準ではありません。` },
+    { id: '1', title: '範囲・標高資料・地形の計算', body: `対象筆と指定範囲の共通部分から除外分を引いた図形を、平面・3D・集計で共通使用。参考の筆は集計しません。黄色の二重線は地形の検討範囲であり、測量で確認した筆界ではありません。標高資料：国土地理院 標高タイル${source.mixed ? '（資料混在）' : ''}。${sources}。出典 https://maps.gsi.go.jp/development/ichiran.html 。表示・集計格子 ${grid.step}m / 局所勾配は東西・南北10m幅の中央差分 / 等高線2m、太線10m。色別の勾配はセル4点平均。面積割合は投影座標で各セルと有効範囲の交差面積を合計し、穴・除外後の全図形面積を分母にします。欠測・勾配未確認は別枠で、四色と未確認の合計100%。点数の比率ではありません。格子解像度に依存する推定値です。取得日は標高の測量・更新日を意味しません。単独配置図の境界外約10m以上は周辺地図の文脈表示だけで、配置・面積集計・標高補間へ追加しません。周辺地図は国土地理院標準地図。登記面積ではありません。補間・表示間隔は測量精度ではなく、欠測・除外を埋めません。標高資料の境目には勾配差が出る可能性があります。色は施工可否の判定基準ではありません。` },
     { id: '2', title: '3D表示・詳細検討への確認', body: `3Dは同じ実DEMと有効範囲を使い、高さ強調なし（1:1）、${layouts.current ? '地形と参考配置を同じ固定視点35°で並べます' : '固定視点35°・145°で表示します'}。地表・範囲線は同じ標高データ。側面・底面は高さを見やすくする表示用で、地下構造・地層・土量を示しません。樹木・建物・擁壁・造成後の形状は含みません。境界と資料記載面積の照合、接道・入口の段差・搬入経路・局所的な法面や擁壁、地盤・排水・造成後の現況、勾配に合わせた配置・基礎・必要な造成を確認してください。造成量、設置可能容量、施工可否は未判定です。現地測量・配置検討・詳細設計の前に使う参考図です。` },
   ]
+  if(report.parcelReview?.parcels?.some(isMapParcel))notes[0].body=`${MAP_PARCEL_NOTICE} 同じ地図IDの隣接断片の結合後、プレビューして適用した形状を計算範囲に使っています。出典 https://source.coop/smartmaps/amx-2024-04 。${notes[0].body}`
   if (layouts.current || layouts.comparison) {
     const warnings = [...new Set([layouts.current, ...(layouts.comparison?.layouts || [])].filter(Boolean).flatMap(layout => layout.warnings || []).map(warning => typeof warning === 'string' ? warning : warning.message).filter(Boolean))]
     notes.push({ id: '3', title: '参考配置・モジュール・容量', body: `${layouts.current ? `現在の適用案：${terrainLayoutReportConditions(layouts.current)} ` : ''}架台の黒い小矩形は使用モジュール、破線外形は個別除外（数量に含みません）。モジュール外形・出力はJKM720N-66HL5-BDVの参考仕様です。地形のセル4点平均の局所勾配が指定値未満で、架台全体と空きが有効範囲に収まる候補だけを数えます。欠測・除外は対象外。地形勾配のカットオフとパネル傾斜角は別です。「境界からの離隔距離」は対象勾配の端も含む配置有効範囲からの空きで、測量境界やパネルとフェンスの設計離隔ではありません。「モジュール高さ」は地表から最も低いモジュール下端までの仮の最低高さ設定値で、柱全長や上端高さではありません。AC参考帯はDC÷1.5を既存の標準刻みで切り下げ・切り上げした範囲を示し、不確実性の幅ではありません。${TERRAIN_LAYOUT_LIMIT} ${layouts.fence?.rails?.length || layouts.comparisonFences?.some(fence=>fence?.rails?.length) ? '仮フェンスは使用架台を囲む凸包に端の空き分を加え、有効範囲と交差した高さ1.2mの参考表示です。離れた架台間も囲みます。欠測・除外はつなぎません。一点鎖線で表示し、実測境界・施工線ではありません。' : ''} ${warnings.join(' ')}` })

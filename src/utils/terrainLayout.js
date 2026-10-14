@@ -7,7 +7,7 @@ const MAX_GRID_NODES = 45000
 const MAX_GREEN_RUNS = 4000
 const clock = () => globalThis.performance?.now?.() ?? Date.now()
 const DEFAULTS = Object.freeze({ rows: 4, minColumns: 4, maxColumns: 8, moduleWidthM: 2.384, moduleHeightM: 1.303,
-  modulePowerW: 720, moduleGapM: .02, tiltDeg: 10, slopeLimitDeg: 10, rackGapM: 1, rowGapM: 4, setbackM: 1,
+  modulePowerW: 720, moduleGapM: .02, tiltDeg: 15, slopeLimitDeg: 10, rackGapM: 1, rowGapM: 3.3, setbackM: 1,
   azimuthDeg: 180, minClearanceM: .8, maxRacks: 200, maxCandidates: 12000, scanOffsetUM: 0, scanOffsetVM: 0 })
 
 const option = (options, key, min, max, integer = false) => {
@@ -250,6 +250,14 @@ export function buildOptimizedTerrainLayout(analysis, inputOptions = {}, baselin
   return compareTerrainLayouts(analysis, inputOptions, true, compatibleBaseline(analysis, normalizeTerrainLayoutOptions(inputOptions), baseline))
 }
 
+// North=0 clockwise: 180 is the module's south-facing front. Fix azimuth
+// alone, retaining vertical tilt and every spacing/terrain condition.
+export function buildSouthTerrainLayout(analysis, inputOptions = {}, baseline = null) {
+  const options={...inputOptions,azimuthDeg:180}
+  const previous=baseline?.options?.azimuthDeg===180?compatibleBaseline(analysis,normalizeTerrainLayoutOptions(options),baseline):null
+  return compareTerrainLayouts(analysis,options,true,previous,'south-fixed')
+}
+
 function compatibleBaseline(analysis, options, baseline) {
   if (!baseline || baseline.analysisReference !== analysis || !baseline.options || !baseline.stats ||
     !Array.isArray(baseline.stats.cappedBy) || !Array.isArray(baseline.warnings) || !Array.isArray(baseline.racks) ||
@@ -268,14 +276,14 @@ function compatibleBaseline(analysis, options, baseline) {
   return baseline
 }
 
-function compareTerrainLayouts(analysis, inputOptions, optimized, baseline) {
+function compareTerrainLayouts(analysis, inputOptions, optimized, baseline, mode) {
   const options = normalizeTerrainLayoutOptions(inputOptions), started = clock()
   const limit = (key, fallback, max) => clamp(finite(inputOptions?.[key]) ? Math.floor(inputOptions[key]) : fallback, 0, max)
   const trialCap = optimized ? 32 : 12, candidateCap = optimized ? 24000 : 12000, timeCap = optimized ? 8000 : 5000
   const maxTrials = Math.max(1, limit('autoMaxTrials', trialCap, trialCap)), maxCandidates = Math.max(1, limit('autoMaxCandidates', candidateCap, candidateCap))
   const timeLimitMs = limit('autoTimeLimitMs', timeCap, timeCap), deadline = started + timeLimitMs
-  const angles = optimized ? [0, -7.5, 7.5, -15, 15, -22.5, 22.5, -30, 30] : [0, -15, 15, -30, 30]
-  const trials = [], initial = angles.map(delta => ({ azimuthDeg: (options.azimuthDeg + delta + 360) % 360, scanOffsetUM: 0, scanOffsetVM: 0 }))
+  const angles = mode==='south-fixed'?[0]:optimized ? [0, -7.5, 7.5, -15, 15, -22.5, 22.5, -30, 30] : [0, -15, 15, -30, 30]
+  const trials = [], initial = angles.map(delta => ({ azimuthDeg: (options.azimuthDeg + delta + 360) % 360, scanOffsetUM: mode==='south-fixed'?options.scanOffsetUM:0, scanOffsetVM: mode==='south-fixed'?options.scanOffsetVM:0 }))
   let totalCandidates = 0, best = baseline, timeLimited = false, candidateLimited = false
   const bearingDistance = azimuth => Math.abs(((azimuth - options.azimuthDeg + 540) % 360) - 180)
   const supportScore = layout => layout.moduleCount ? layout.racks.reduce((sum, rack) => sum + Math.max(0, rack.supportHeightRangeM[1] - 2) * rack.moduleCount, 0) / layout.moduleCount : Infinity
@@ -299,7 +307,7 @@ function compareTerrainLayouts(analysis, inputOptions, optimized, baseline) {
     const leaders = [...trials].sort(compare)
     const width = options.maxColumns * options.moduleWidthM + (options.maxColumns - 1) * options.moduleGapM
     const depth = (options.rows * options.moduleHeightM + (options.rows - 1) * options.moduleGapM) * Math.cos(options.tiltDeg * Math.PI / 180)
-    const phases = optimized ? [[.25, 0], [.5, 0], [.75, 0], [0, .25], [0, .5], [0, .75], [.25, .25], [.5, .5], [.75, .75]]
+    const phases = mode==='south-fixed'?[0,.2,.4,.6,.8].flatMap(u=>[0,1/6,2/6,3/6,4/6,5/6].map(v=>[u,v])):optimized ? [[.25, 0], [.5, 0], [.75, 0], [0, .25], [0, .5], [0, .75], [.25, .25], [.5, .5], [.75, .75]]
       : [[.5, 0], [0, .5], [.5, .5]]
     const offsets = phases.map(([u, v]) => [(width + options.rackGapM) * u, (depth + options.rowGapM) * v])
     outer: for (const leader of leaders.slice(0, 3)) {
@@ -312,13 +320,14 @@ function compareTerrainLayouts(analysis, inputOptions, optimized, baseline) {
   if (!best) best = buildTerrainLayout(analysis, { ...options, __deadlineAtMs: deadline })
   if (totalCandidates >= maxCandidates && trials.some(layout => layout.stats.cappedBy.includes('candidates'))) candidateLimited = true
   const warnings = [...best.warnings]
+  if(mode==='south-fixed')warnings.push('真南180°固定。確認した開始位置候補内の最多配置であり、数学的な全域最大の保証ではありません。')
   const cappedBy = [...best.stats.cappedBy]
   if (timeLimited && !cappedBy.includes('time')) { cappedBy.push('time'); warnings.push('自動比較の時間上限に達しました。確認できた候補案だけを表示しています。') }
   if (candidateLimited && !cappedBy.includes('auto-candidates')) { cappedBy.push('auto-candidates'); warnings.push('自動比較の候補確認上限に達しました。確認できた候補案だけを表示しています。') }
   const elapsedMs = Math.round(clock() - started)
   return { ...best, auto: true, warnings: [...new Set(warnings)], stats: { ...best.stats,
     capped: best.stats.capped || timeLimited || candidateLimited, cappedBy,
-    autoSearch: { mode: optimized ? 'optimized' : 'standard', trials: trials.length, totalCandidates, maxTrials, maxCandidates, timeLimitMs, elapsedMs, timeLimited, candidateLimited,
+    autoSearch: { mode: mode || (optimized ? 'optimized' : 'standard'), trials: trials.length, totalCandidates, maxTrials, maxCandidates, timeLimitMs, elapsedMs, timeLimited, candidateLimited,
       baselineModuleCount: baseline?.moduleCount ?? null, baselineRetained: Boolean(baseline && best === baseline),
       baseAzimuthDeg: options.azimuthDeg, selectedAzimuthDeg: best.options.azimuthDeg, selectedOffsetUM: best.options.scanOffsetUM, selectedOffsetVM: best.options.scanOffsetVM,
       candidates: trials.map(layout => ({ azimuthDeg: layout.options.azimuthDeg, scanOffsetUM: layout.options.scanOffsetUM,

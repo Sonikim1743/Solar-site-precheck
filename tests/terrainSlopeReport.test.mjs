@@ -6,6 +6,7 @@ import { createServer } from 'vite'
 import react from '@vitejs/plugin-react'
 import { createEmptyParcelReview, measureParcelReview } from '../src/utils/parcelReview.js'
 import { createTerrainPlan, normalizeTerrainArea, terrainTilePoint } from '../src/utils/terrainArea.js'
+import { terrainSlopeDistribution } from '../src/utils/terrainSlopeDistribution.js'
 import { exportTerrainAreaPdf } from '../src/utils/terrainPdf.js'
 
 // Synthetic flat DEM and polygon only; no candidate or downloaded site data.
@@ -46,7 +47,7 @@ test('the fixed A3 distribution retains both share and estimated area in the PDF
   assert.equal((html.match(/report-print-page terrain-report-sheet/g) || []).length, 3)
   assert.match(table(html), /割合 \/ 推定面積/)
   assert.ok(table(html).includes(`<td>100% / ${area(total)}</td>`))
-  assert.equal((table(html).match(/<td>0% \/ 0 m²<\/td>/g) || []).length, 3)
+  assert.equal((table(html).match(/<td>0% \/ 0 m²<\/td>/g) || []).length, 4)
   assert.ok(html.includes(`有効範囲（除外後）：${area(total)}`))
   assert.doesNotMatch(html, /未計算：/)
   assert.match(html, /登記面積ではありません/)
@@ -56,12 +57,12 @@ test('the fixed A3 distribution retains both share and estimated area in the PDF
 
 test('partial DEM coverage leaves unknown area unallocated despite a 100 percent share of valid points', () => {
   const report = fixture({ missing: true }), { summary } = report.terrainArea, html = render(report)
-  const classified = summary.polygonAreaM2 * summary.slopeValidCount / summary.insideCount
-  const unknown = summary.polygonAreaM2 - classified
+  const distribution = terrainSlopeDistribution(report.terrainArea)
+  const classified = distribution.classifiedAreaM2, unknown = distribution.unknownAreaM2
   assert.ok(summary.slopeValidCount < summary.insideCount && classified < summary.polygonAreaM2)
-  assert.ok(table(html).includes(`<td>100% / ${area(classified)}</td>`))
+  assert.ok(table(html).includes(`<td>${distribution.bins[0].percent.toLocaleString('ja-JP',{maximumFractionDigits:1})}% / ${area(classified)}</td>`))
   assert.ok(html.includes(`未計算：${area(unknown)}`))
-  assert.match(html, /未計算分を配分しません/)
+  assert.match(html, /欠測・勾配未確認は別枠/)
   assert.match(html, /範囲全体の確定値ではありません/)
 })
 

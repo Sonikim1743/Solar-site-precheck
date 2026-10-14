@@ -1,4 +1,5 @@
-// Display-only public parcel data. Never adopted as review geometry or area.
+// The investigation layer is display-only. Explicit map-reference selection
+// is handled separately by mapParcelSelection, with preview and limitations.
 export const PUBLIC_PARCEL_SOURCE = Object.freeze({
   url: 'https://data.source.coop/smartmaps/amx-2024-04/MojMap_amx_2024.pmtiles',
   pageUrl: 'https://source.coop/smartmaps/amx-2024-04',

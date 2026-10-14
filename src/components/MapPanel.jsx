@@ -4,8 +4,7 @@ import TerrainAreaMapOverlay from './TerrainAreaMapOverlay.jsx'
 import MapRegionLabel, { getMapRegionLabel } from './MapRegionLabel.jsx'
 import MapPlaceNamesOverlay from './MapPlaceNamesOverlay.jsx'
 import PublicParcelOverlay, { PublicParcelOverlayStatus } from './PublicParcelOverlay.jsx'
-import RegionalParcelOverlay from './RegionalParcelOverlay.jsx'
-import { REGIONAL_PARCEL_SOURCE } from '../services/regionalParcels.js'
+import { MAP_PARCEL_SOURCE, MAP_PARCEL_NOTICE } from '../utils/mapParcelSelection.js'
 import L from 'leaflet'
 import { Circle, CircleMarker, GeoJSON, MapContainer, Marker, Polygon, Polyline, Popup, Rectangle, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet'
 import MapDistanceScale from './MapDistanceScale.jsx'
@@ -668,33 +667,44 @@ export default function MapPanel({
   const hasRegionLabel = Boolean(getMapRegionLabel(position, placeInfo))
   const [showTerrainArea, setShowTerrainArea] = useState(true)
   const [showPublicParcels, setShowPublicParcels] = useState(false)
-  const confirmedRegional = parcelReview.parcels.filter(p=>p.role==='target'&&p.source.fileName===REGIONAL_PARCEL_SOURCE)
-  const confirmedDraft = () => confirmedRegional.map(p=>({type:'Feature',id:p.info.id,geometry:p.geometry,properties:{地番:p.info.number,__parcelId:p.info.id,__parcelSourceName:REGIONAL_PARCEL_SOURCE}}))
+  const confirmedRegional = parcelReview.parcels.filter(p=>p.role==='target'&&p.source.fileName===MAP_PARCEL_SOURCE)
+  const confirmedDraft = () => confirmedRegional.map(p=>({type:'Feature',id:p.info.id,geometry:p.geometry,properties:{地番:p.info.number,__parcelId:p.info.id,__parcelSourceName:MAP_PARCEL_SOURCE}}))
   const [regionalDraft,setRegionalDraft] = useState(confirmedDraft)
-  const [regionalCoverage,setRegionalCoverage] = useState(null)
   const [regionalCandidates,setRegionalCandidates] = useState([])
-  const [regionalRetry,setRegionalRetry] = useState(0)
   const [regionalMessage,setRegionalMessage] = useState('')
   const [regionalDirty,setRegionalDirty] = useState(false)
+  const [mapPickBusy,setMapPickBusy] = useState(false)
+  const mapPickJob=useRef(0)
   const confirmedRegionalKey=confirmedRegional.map(p=>p.id).join('|')
   useEffect(()=>{if(!regionalDirty)setRegionalDraft(confirmedDraft())},[confirmedRegionalKey])
   const toggleRegional = feature => {
     if(feature.selectionError){setRegionalMessage(feature.selectionError);return}
     setRegionalDraft(previous=>previous.some(f=>f.id===feature.id)?previous.filter(f=>f.id!==feature.id):previous.length<100?[...previous,feature]:previous)
     setRegionalDirty(true)
-    setRegionalMessage('選択変更は未確定です。「選択完了」で適用します（100筆まで）。')
+    setRegionalMessage('選択変更は未確定です。「選択完了」で適用します（100区域まで）。')
     setRegionalCandidates([])
   }
   const setReferenceSelections = onReferenceSelectionsChange || (() => {})
   const publicPickerRef = useRef(null)
+  const beginMapPick = picked => {
+    if(mapPickBusy)return
+    const job=++mapPickJob.current
+    setMapPickBusy(true);setRegionalCandidates([]);setRegionalMessage(`地番 ${picked.number} の地図境界と隣接断片を確認中…`)
+    let timer
+    Promise.race([picked.resolve(),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('地図境界の取得が20秒以内に完了しませんでした。再選択できます。')),20000)})]).then(feature=>{if(mapPickJob.current!==job)return;setMapPickBusy(false);toggleRegional(feature);setRegionalMessage(feature.properties.__selectionWarning)})
+      .catch(error=>{if(mapPickJob.current!==job)return;setMapPickBusy(false);setRegionalMessage(`${error.message} 前回の選択・結果は保持しています。`)})
+      .finally(()=>clearTimeout(timer))
+  }
   const pickPublicReference = latlng => {
-    if (!showPublicParcels || regionalCoverage !== false) return false
+    if (!showPublicParcels || ['boundary','exclusion'].includes(parcelMode)) return false
+    if(mapPickBusy)return true
     const picked = publicPickerRef.current?.(latlng)
-    if (!picked) return false
-    if (referenceSelections.length >= 100 && !referenceSelections.some(p => p.id === picked.id)) { setPublicParcelStatus({ state: 'error', message: '参考仮選択は100筆までです。不要な選択を解除してください。既存の選択は保持しています。' }); return true }
-    setReferenceSelections(previous => previous.some(p => p.id === picked.id) ? previous.filter(p => p.id !== picked.id) : previous.length >= 100 ? previous : [...previous, picked])
+    if (!picked) { setRegionalMessage('地番の表示境界の内側を押してください（ズーム16以上）。現在の地点・選択・結果は保持しています。'); return true }
+    if(picked.candidates.length>1){setRegionalCandidates(picked.candidates);setRegionalMessage('重なる表示境界があります。下の地番候補から選択してください。')}
+    else beginMapPick(picked.candidates[0])
     return true
   }
+  useEffect(()=>()=>{mapPickJob.current++},[])
   const [baseMap, setBaseMap] = useState('photo')
   const [showPlaceNames, setShowPlaceNames] = useState(true)
   const [publicParcelStatus, setPublicParcelStatus] = useState({ state: 'off', message: '' })
@@ -810,8 +820,7 @@ export default function MapPanel({
           maxNativeZoom={18}
         />
         {showPlaceNames && <MapPlaceNamesOverlay dimmed={isDrawing} onStatus={setPlaceNameStatus} />}
-        {showPublicParcels && regionalCoverage===false && <PublicParcelOverlay referenceSelections={referenceSelections} onPickerChange={picker => { publicPickerRef.current = picker }} onPublicParcelsChange={onPublicParcelsChange} />}
-        {showPublicParcels && <RegionalParcelOverlay draft={regionalDraft} mode={parcelMode} locked={mapLocked} retry={regionalRetry} onStatus={setPublicParcelStatus} onCoverage={setRegionalCoverage} onToggle={toggleRegional} onCandidates={setRegionalCandidates} onError={setRegionalMessage} />}
+        {showPublicParcels && <PublicParcelOverlay referenceSelections={regionalDraft} onStatus={setPublicParcelStatus} onPickerChange={picker => { publicPickerRef.current = picker }} onPublicParcelsChange={onPublicParcelsChange} />}
         <MapDistanceScale position="bottomleft" />
         <ClickHandler onPublicParcelPick={pickPublicReference} onSelect={onSelect} mode={parcelMode} locked={mapLocked} onAddVertex={addDraftVertex} onFinish={finishDrawing} />
         <MapController position={position} />
@@ -835,6 +844,7 @@ export default function MapPanel({
         {terrainArea && showTerrainArea && <TerrainAreaMapOverlay analysis={terrainArea} dimmed={isDrawing} />}
         {simplePosition && <CircleMarker center={[simplePosition.lat, simplePosition.lon]} radius={7} pathOptions={{color:'#fff',weight:2,fillColor:'#175e8c',fillOpacity:1}}><Tooltip>シンプル解析・内部代表点</Tooltip></CircleMarker>}
         <SiteMarker position={position} placeInfo={placeInfo} suppressPopup={hasRegionLabel || hasTerrainOverlay || (terrainArea && showTerrainArea) || parcelMode !== 'point'} />
+        {showPublicParcels&&regionalDraft.length>0&&<GeoJSON key={JSON.stringify(regionalDraft.map(f=>[f.id,f.geometry]))} data={{type:'FeatureCollection',features:regionalDraft}} style={{color:'#ffd454',weight:3,fillColor:'#ffe588',fillOpacity:.18}} interactive={false}/>}
         <ReviewGeometryLayers review={parcelReview} vertices={draftVertices} onClose={finishDrawing} locked={mapLocked} dimmed={isDrawing} />
       </MapContainer>
       <MapRegionLabel position={position} placeInfo={placeInfo} />
@@ -845,7 +855,7 @@ export default function MapPanel({
       <div className="map-draw-controls" role="group" aria-label="地番表示・範囲の作図">
         <button type="button" className={parcelMode === 'boundary' ? 'is-active' : ''} aria-pressed={parcelMode === 'boundary'} onClick={() => onParcelModeChange?.(parcelMode === 'boundary' ? 'point' : 'boundary')} disabled={!onParcelModeChange}>範囲を描く</button>
         <button type="button" className={parcelMode === 'exclusion' ? 'is-active' : ''} aria-pressed={parcelMode === 'exclusion'} onClick={() => onParcelModeChange?.(parcelMode === 'exclusion' ? 'point' : 'exclusion')} disabled={!onParcelModeChange}>除外</button>
-        <button type="button" className={`map-public-parcel-toggle${showPublicParcels ? ' is-active' : ''}`} aria-pressed={showPublicParcels} aria-label="地番選択" title="準備済み地域は原本の全筆を選択できます。資料年・範囲は出典情報を参照。" onClick={() => setShowPublicParcels(value => !value)}>地番選択 {showPublicParcels ? 'ON' : 'OFF'}</button>
+        <button type="button" className={`map-public-parcel-toggle${showPublicParcels ? ' is-active' : ''}`} aria-pressed={showPublicParcels} aria-label="地番選択" title="表示境界を参考領域として選択。原本全筆は未確認。出典情報を参照。" onClick={() => { if(showPublicParcels){mapPickJob.current++;setMapPickBusy(false)}else setMapInteractionEnabled(true);setShowPublicParcels(value => !value) }}>地番選択 {showPublicParcels ? 'ON' : 'OFF'}</button>
       </div>
       {isDrawing && <div className="map-hint">{PARCEL_MODE_HINTS[parcelMode]}</div>}
       {isCompactMap && (
@@ -873,8 +883,19 @@ export default function MapPanel({
         )}
       </div>
     <PublicParcelOverlayStatus status={publicParcelStatus} />
-    {showPublicParcels && <div className="public-parcel-selected regional-parcel-selection" aria-label="原本地番の選択"><strong>選択中 {regionalDraft.length}筆 / 確定済み {confirmedRegional.length}筆</strong>{regionalDraft.map(f=><button key={f.id} type="button" onClick={()=>toggleRegional(f)}>{f.properties['地番']} ×</button>)}<button type="button" className="regional-parcel-complete" disabled={!regionalDraft.length&&!confirmedRegional.length} onClick={()=>{if(onConfirmRegionalParcels?.(regionalDraft)){setRegionalDirty(false);setRegionalMessage('選択を確定しました。下の3Dとシンプル解析に同じ全筆形状を使用します。');setRegionalCandidates([]);document.querySelector('.selected-parcel-3d')?.scrollIntoView({behavior:'smooth',block:'start'})}}}>選択完了 → 3D</button><button type="button" onClick={()=>{setRegionalDirty(false);setRegionalDraft(confirmedDraft());setRegionalCandidates([]);setRegionalMessage('未確定の選択変更を中止しました。確定済みの筆と結果は保持しています。')}}>選択を中止</button>{publicParcelStatus.state==='error'&&<button type="button" onClick={()=>setRegionalRetry(n=>n+1)}>地番を再取得</button>}{regionalMessage&&<p role="status">{regionalMessage}</p>}{regionalConfirmError&&<p role="alert">{regionalConfirmError}</p>}<details><summary>選択・出典の扱い</summary><p>全筆とは公開2024 SHPの1行に含まれる全領域・穴です。現在の登記や測量境界の保証ではありません。PMTilesとは識別子を自動一致させません。選択完了はこの資料の対象筆だけを更新し、他資料の既存対象筆は保持して合併します。既存の手描き範囲・除外は保存したまま、筆の3Dとシンプル解析は全対象筆の形状を使用します。</p></details>{regionalCandidates.length>0&&<div role="group" aria-label="重なる原本候補"><p>同じ位置に複数の原本候補があります。地番・原図を確認して選択してください。分筆前後を自動一致させません。</p>{regionalCandidates.map(f=><button key={f.id} type="button" disabled={Boolean(f.selectionError)} onClick={()=>toggleRegional(f)}>{f.properties['地番']} / {f.properties['地図名']} / 原本行 {f.properties.__sourceRecord}{f.selectionError?'（形状確認必要）':''}</button>)}</div>}</div>}
-    {showPublicParcels && regionalCoverage===false && <div className="public-parcel-selected"><strong>仮選択 {referenceSelections.length}筆 · 面積計算外</strong>{referenceSelections.map(p => <button key={p.id} type="button" title={`${p.area} / ${p.mapName}`} onClick={() => setReferenceSelections(previous => previous.filter(x => x.id !== p.id))}>{p.number || '地番未記載'} ×</button>)}{!!referenceSelections.length && <><span>全筆境界未確認。タイルで切れる境界は計算に使いません。</span><span>全図形を返す照会元が必要です。確認済みの全筆は下の3D表示で使用できます。</span></>}</div>}
+    {showPublicParcels && <div className="public-parcel-selected regional-parcel-selection" aria-label="地図境界の選択">
+      <strong>選択中 {regionalDraft.length}区域 / 適用済み {confirmedRegional.length}区域</strong>
+      {regionalDraft.map(f=><button key={f.id} type="button" disabled={mapPickBusy} onClick={()=>toggleRegional(f)}>{f.properties['地番']} ×</button>)}
+      <button type="button" className="regional-parcel-complete" disabled={mapPickBusy||isDrawing||(!regionalDraft.length&&!confirmedRegional.length)} onClick={()=>{if(onConfirmRegionalParcels?.(regionalDraft)){setRegionalDirty(false);setRegionalMessage('表示境界を参考領域として適用しました。下の3D・シンプル解析に同じ選択形状を使います。');setRegionalCandidates([])}}}>選択完了 → 3D</button>
+      <button type="button" onClick={()=>{mapPickJob.current++;setMapPickBusy(false);setRegionalDirty(false);setRegionalDraft(confirmedDraft());setRegionalCandidates([]);setRegionalMessage('未適用の選択変更を中止しました。適用済み領域と結果は保持しています。')}}>選択を中止</button>
+      {isDrawing?<p role="status">作図中です。範囲を「確定」または「取消」した後、地番を選択してください。</p>:!regionalDraft.length&&!confirmedRegional.length&&<p role="status">地図を拡大し、表示された地番の内側を押して選択してください（ズーム16以上）。</p>}
+      <p className="map-parcel-scope">{MAP_PARCEL_NOTICE} 選択境界を地図上の黄色線で確認してから適用してください。</p>
+      {mapPickBusy&&<p role="status">選択境界を取得中…</p>}{regionalMessage&&<p role="status">{regionalMessage}</p>}{regionalConfirmError&&<p role="alert">{regionalConfirmError}</p>}
+      {regionalDraft.some(f=>f.properties.__selectionLimited)&&<p role="alert">連続境界を確認できない区域があります。表示境界の欠落があり得ます。プレビューした範囲だけを参考領域に使います。</p>}
+      <details><summary>選択・出典の扱い</summary><p>現在の地図と同じAMX公開2024 PMTilesを使用。同じID・地番・地図名の隣接タイル断片のみ結合し、穴・分離領域を保持します。別の区域を地番文字だけで結合しません。未収録・量子化・離れた部分の欠落を元の境界として保証しません。別途の原本ファイル準備は不要です。既存の手描き範囲・除外・他資料の対象は保存したまま、選択区域の3Dとシンプル解析は対象の合併形状を使います。</p></details>
+      {regionalCandidates.length>0&&<div role="group" aria-label="重なる地図境界の候補"><p>表示境界が重なっています。選択する地番を確認してください。</p>{regionalCandidates.map((c,i)=><button key={i} type="button" disabled={mapPickBusy} onClick={()=>beginMapPick(c)}>{c.number} / {c.mapName}</button>)}</div>}
+      {referenceSelections.length>0&&<p>以前の仮選択 {referenceSelections.map(p=>p.number).join('・')} はまだ計算外です。同じ境界を地図で選び直すと参考領域として使えます。以前の選択は保持しています。</p>}
+    </div>}
     {placeNameStatus?.state === 'error' && <p className="public-parcel-overlay-status is-error" role="status">地名を取得できません。標準地図でも確認できます。</p>}
     {isDrawing && <div className="parcel-drawing-toolbar" aria-label="範囲の作図操作">
       <div className="parcel-drawing-toolbar__instruction">

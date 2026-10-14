@@ -56,7 +56,7 @@ test('drawn panels share the terrain metre scale instead of using decorative pix
   assert.ok(barPixels>0&&barMeters>0)
   const pixelsPerMeter=barPixels/barMeters
   assert.ok(Math.abs(Math.hypot(pairs[1][0]-pairs[0][0],pairs[1][1]-pairs[0][1])-2.384*pixelsPerMeter)<.025)
-  assert.ok(Math.abs(Math.hypot(pairs[2][0]-pairs[1][0],pairs[2][1]-pairs[1][1])-1.303*Math.cos(10*Math.PI/180)*pixelsPerMeter)<.025)
+  assert.ok(Math.abs(Math.hypot(pairs[2][0]-pairs[1][0],pairs[2][1]-pairs[1][1])-1.303*Math.cos(15*Math.PI/180)*pixelsPerMeter)<.025)
   assert.ok(layout.racks.every(rack=>rack.rows===4&&rack.columns>=4&&rack.columns<=8))
 })
 

@@ -2,9 +2,10 @@ import { simpleReviewReportRows } from './simpleReviewReport.js'
 import { terrainReportTitle } from './terrainReportTitle.js'
 import { terrainReportNotes } from './terrainReportNotes.js'
 import { terrainReportLayouts, terrainLayoutReportRows, terrainLayoutReportConditions } from './terrainLayoutReport.js'
+import { isMapParcel } from './mapParcelSelection.js'
 import { terrainGeometryKey } from './terrainArea.js'
 import { measureParcelReview } from './parcelReview.js'
-import { terrainSlopeDistribution, formatTerrainSlopeArea } from './terrainSlopeDistribution.js'
+import { terrainSlopeDistribution, formatTerrainSlopeArea, TERRAIN_SLOPE_COLORS } from './terrainSlopeDistribution.js'
 
 const PAGE_MM = [420, 297]
 const DPI = 240
@@ -119,7 +120,7 @@ function localSvgValue(value) {
 
 function snapshotSvg(svg, widthMm, checkDeadline, drawingOnly = false) {
   checkDeadline()
-  if (svg.querySelector('image, foreignObject, script, use, iframe, style')) fail('図の形式に対応していません。')
+  if (svg.querySelector('foreignObject, script, use, iframe, style') || [...svg.querySelectorAll('image')].some(image => !/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(image.getAttribute('href') || ''))) fail('図の形式に対応していません。')
   const clone = svg.cloneNode(true)
   const originals = [svg, ...svg.querySelectorAll('*')], copies = [clone, ...clone.querySelectorAll('*')]
   originals.forEach((node, index) => {
@@ -134,8 +135,8 @@ function snapshotSvg(svg, widthMm, checkDeadline, drawingOnly = false) {
   })
   const viewBox = svg.viewBox.baseVal
   if (!(viewBox.width > 0 && viewBox.height > 0)) fail('図の表示寸法を確認できません。')
-  if (drawingOnly) { clone.setAttribute('viewBox', '0 0 800 458'); clone.querySelector('.terrain-area-svg-legend')?.remove() }
-  const ratio = drawingOnly ? 458 / 800 : viewBox.height / viewBox.width
+  if (drawingOnly) clone.querySelector('.terrain-area-svg-legend')?.remove()
+  const ratio = viewBox.height / viewBox.width
   clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
   clone.setAttribute('width', String(Math.ceil(widthMm * PX_PER_MM)))
   clone.setAttribute('height', String(Math.ceil(widthMm * PX_PER_MM * ratio)))
@@ -211,7 +212,7 @@ function pageOne(ctx, model, images) {
     rule(ctx, 280, y + 10.5, 128); y += 12
   }
   y = drawText(ctx, model.observation, 280, y + 2, 128, { size: 3.6, lineHeight: 5.2, maxLines: 4 }) + 4
-  y = heading(ctx, '勾配の分布（10m幅で見た局所勾配）', 280, y, 128)
+  y = heading(ctx, '勾配の分布（セル交差面積）', 280, y, 128)
   for (const [label, value] of model.bins) {
     drawText(ctx, label, 282, y, 45, { size: 3.2, maxLines: 1 })
     drawText(ctx, value, 331, y, 75, { size: 3.4, weight: 700, maxLines: 1 })
@@ -272,41 +273,54 @@ function pageLayout(ctx, model, images, sheet, index) {
 
 function pageDrawing(ctx, model, images) {
   ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, ...PAGE_MM)
-  ctx.drawImage(images[0], 55, 12, 310, 310 * model.snapshots[0].ratio)
-  ctx.strokeStyle = '#222'; ctx.lineWidth = .35; ctx.strokeRect(8, 8, 404, 281)
-  const sheet = model.layoutSheets[0], layout = sheet.layouts[0], o = layout.options
-  drawText(ctx, `DEM標高 ${model.values[1][1]} · ${model.coordinates}`, 12, 194, 396, { size: 3, maxLines: 1 })
-  rule(ctx, 8, 203, 404); rule(ctx, 8, 211, 404); rule(ctx, 8, 237, 404)
-  drawText(ctx, `参考配置図 · ${model.name}`, 12, 205, 335, { size: 4, weight: 700, maxLines: 1, ellipsis: true })
-  drawText(ctx, 'A3横 / 1 of 1 / 北上', 353, 206, 55, { size: 3, maxLines: 1 })
-  const metric = (label, value, unit, x) => {
-    drawText(ctx, label, x, 214, 128, { size: 3.7, color: MUTED, maxLines: 1 })
-    drawText(ctx, value, x, 221, 106, { size: 9.5, weight: 700, maxLines: 1 })
-    const offset = ctx.measureText(value).width
-    drawText(ctx, unit, x + offset + 3, 227, Math.max(20, 128 - offset - 3), { size: 4.2, weight: 700, maxLines: 1 })
+  ctx.strokeStyle = '#222'; ctx.lineWidth = .3; ctx.strokeRect(6, 5, 408, 286)
+  const sheet = model.layoutSheets[0], layout = sheet.layouts[0], o = layout.options, d = model.drawingDistribution
+  // Equal physical viewport area, north-up orientation, scale and context.
+  // No site-name header: the two maps occupy the main A3 page area.
+  for(let i=0;i<2;i++){
+    const x=i?214:8
+    drawText(ctx,i?'地形・勾配・地番':'参考モジュール配置',x+3,7,192,{size:3.5,weight:700,maxLines:1})
+    ctx.drawImage(images[i],x,12,198,198*model.snapshots[i].ratio)
   }
-  metric(`使用架台（個別除外 ${layout.disabledRacks?.length || 0}）`, numeric(layout.rackCount,0), '架台', 12)
-  metric('モジュール枚数', numeric(layout.moduleCount,0), '枚', 147)
-  metric('DC容量', numeric(layout.dcKw,2), 'kW', 282)
+  drawText(ctx,`DEM標高 ${model.values[1][1]} · 北上・両図同一縮尺`,11,196,193,{size:3,maxLines:1})
+  drawText(ctx,`分母：穴・除外後 ${numeric(d.totalAreaM2,0)} m² / 勾配確認 ${numeric(d.coveragePercent)}%`,11,202,193,{size:2.95,maxLines:1})
+  const legend=[...d.bins.map((b,i)=>({label:b.max===90?'30°以上':`${b.min}–${b.max}°未満`,percent:b.percent,color:TERRAIN_SLOPE_COLORS[i]})),{label:'未確認 / NoData',percent:d.unknownPercent,color:'#eef0ed'}]
+  legend.forEach((b,i)=>{
+    const x=217+i*38
+    ctx.fillStyle=b.color;ctx.fillRect(x,197,5,3.2);ctx.strokeStyle='#7b887c';ctx.lineWidth=.15;ctx.strokeRect(x,197,5,3.2)
+    drawText(ctx,b.label,x+6,196.5,32,{size:2.85,maxLines:1})
+    drawText(ctx,`${numeric(b.percent)}%`,x+6,202,32,{size:3.7,weight:700,maxLines:1})
+  })
+  rule(ctx,6,211,408);rule(ctx,6,235,408)
+  const metric=(label,value,unit,x)=>{
+    drawText(ctx,label,x,214,126,{size:3.5,color:MUTED,maxLines:1})
+    drawText(ctx,value,x,220,105,{size:9,weight:700,maxLines:1})
+    const offset=ctx.measureText(value).width
+    drawText(ctx,unit,x+offset+3,227,Math.max(20,126-offset-3),{size:4,weight:700,maxLines:1})
+  }
+  metric(`使用架台（個別除外 ${layout.disabledRacks?.length||0}）`,numeric(layout.rackCount,0),'架台',11)
+  metric('モジュール枚数',numeric(layout.moduleCount,0),'枚',148)
+  metric('DC容量',numeric(layout.dcKw,2),'kW',285)
   const tableRows = [
     [['モジュール型式', 'JKM720N-66HL5-BDV'], ['出力 / 外形', '720W / 2.384 × 1.303m']],
-    [['パネル設置角', `${numeric(o.tiltDeg)}°（水平から）`], ['方位 / 地形勾配', `${numeric(o.azimuthDeg)}° / ${o.slopeLimitDeg}°未満`]],
+    [['モジュール傾斜', `${numeric(o.tiltDeg)}°（水平から）`], ['配置方位 / 地形除外', `${numeric(o.azimuthDeg)}° / ${o.slopeLimitDeg}°未満`]],
     [['アレイ間左右間隔', `${numeric(o.rackGapM)}m`], ['アレイ間前後間隔', `${numeric(o.rowGapM)}m`]],
     [['境界からの離隔距離', `${numeric(o.setbackM)}m`], ['モジュール間隔', `${numeric(o.moduleGapM*1000,0)}mm`]],
     [['モジュール高さ', `${numeric(o.minClearanceM)}m`], ['架台構成 / 開始位置', `4段 × ${o.minColumns === o.maxColumns ? o.minColumns : `${o.minColumns}〜${o.maxColumns}`}列 / ${numeric(o.scanOffsetUM,2)}, ${numeric(o.scanOffsetVM,2)}m`]],
-    [['AC参考容量', `約 ${numeric(layout.acRangeKw?.[0],0)}〜${numeric(layout.acRangeKw?.[1],0)} kW`], ['取得日 / 出力版', `${model.fetchedAt.split(' ')[0]} / v${model.appVersion}`]],
+    [['AC参考容量', `約 ${numeric(layout.acRangeKw?.[0],0)}〜${numeric(layout.acRangeKw?.[1],0)} kW`], ['配置方式 / 取得日', `${layout.stats?.autoSearch?.mode==='south-fixed'?'真南固定・探索内最多':'方位探索 / 適用案'} / ${model.fetchedAt.split(' ')[0]}`]],
   ]
   tableRows.forEach((pairs, row) => pairs.forEach(([label, value], column) => {
-    const x = 8 + column * 202, y = 238 + row * 6.6
-    ctx.fillStyle = '#fff'; ctx.fillRect(x, y, 66, 6.6)
-    ctx.strokeStyle = '#222'; ctx.lineWidth = .2; ctx.strokeRect(x, y, 202, 6.6)
-    ctx.beginPath(); ctx.moveTo(x+66,y); ctx.lineTo(x+66,y+6.6); ctx.stroke()
+    const x = 8 + column * 202, y = 236 + row * 6.3
+    ctx.fillStyle = '#fff'; ctx.fillRect(x, y, 66, 6.3)
+    ctx.strokeStyle = '#222'; ctx.lineWidth = .2; ctx.strokeRect(x, y, 202, 6.3)
+    ctx.beginPath(); ctx.moveTo(x+66,y); ctx.lineTo(x+66,y+6.3); ctx.stroke()
     drawText(ctx, label, x+3, y+1.4, 60, { size: 3.05, weight: 700, maxLines: 1 })
     drawText(ctx, value, x+69, y+1.4, 129, { size: 3.3, maxLines: 1 })
   }))
-  drawText(ctx, `出典：国土地理院DEM https://maps.gsi.go.jp/development/ichiran.html / モジュール参考仕様。黒矩形＝使用、破線＝除外。${sheet.fenceOn ? '一点鎖線＝仮フェンス（高さ1.2m）。' : ''}`, 12, 280, 396, { size: 2.8, maxLines: 1 })
-  drawText(ctx, '参考図・施工可否未確認。ACは10/50kW刻み・下限10kW。地番は含まず、配置・仮フェンスのJSON保存未対応。方位は北0°・時計回り。', 12, 285, 396, { size: 2.7, maxLines: 1 })
-
+  drawText(ctx,`出典：国土地理院 DEM・標準地図${model.mapReference?' / AMX公開地図2024 https://source.coop/smartmaps/amx-2024-04':' / 範囲・地番資料は報告書の出典参照'} 。${sheet.fenceOn?'一点鎖線＝仮フェンス（1.2m）。':''}`,11,276,397,{size:2.65,maxLines:1})
+  drawText(ctx,`${model.mapReference?'地図表示境界の参考領域・原本全筆未確認。':'地図上の参考図形・測量筆界未確認。'}セル${model.gridStep}m・4点平均の勾配を交差面積で集計。四区分＋未確認＝100%。境界外約10m以上は表示のみ。`,11,281,397,{size:2.65,maxLines:1})
+  const missing=[model.contextStatus!=='ready'?'周辺地図の一部または全部が未取得。':'',model.noParcelMetadata?'地番資料なし・地番未取得。':'',model.missingParcels?`地番未記載 ${model.missingParcels}区域。`:'',model.unplacedParcels?`図上に収まらない地番：${model.unplacedParcels}。`:''].join('')
+  drawText(ctx,`${missing}参考図・施工可否未確認。配置方位は北0°時計回り、モジュール傾斜は水平から。取得日は標高の測量日ではありません。`,11,286,397,{size:2.65,maxLines:1,ellipsis:true})
 }
 
 function pageSimpleResults(ctx, model) {
@@ -369,8 +383,9 @@ function modelFromElement(report, element, checkDeadline) {
   const expected = [`${numeric(s.polygonAreaM2, 0)} m²`, `${numeric(s.minElevation)}–${numeric(s.maxElevation)} m`, `${numeric(s.heightRange)} m`, `${numeric(s.medianSlope)}°`, `${numeric(s.p90Slope)}°`]
   // Do not combine an old report argument with the DOM of a newer analysis.
   if (values.length !== 5 || values.some((row, index) => row[1] !== expected[index])) fail('表示と計算結果が更新されました。地形図面を開き直してください。')
-  const distribution = terrainSlopeDistribution(s), bins = rows('.terrain-report-bins tbody > tr')
+  const distribution = terrainSlopeDistribution(analysis), bins = rows('.terrain-report-bins tbody > tr')
   const expectedBins = distribution.bins.map(bin => [bin.max === 90 ? `${bin.min}°以上` : `${bin.min}–${bin.max}°未満`, `${Number.isFinite(bin.percent) ? `${numeric(bin.percent)}%` : '未計算'} / ${formatTerrainSlopeArea(bin.areaM2)}`])
+  expectedBins.push(['未確認 / NoData', `${numeric(distribution.unknownPercent)}% / ${formatTerrainSlopeArea(distribution.unknownAreaM2)}`])
   if (bins.length !== expectedBins.length || bins.some((row, index) => row[0] !== expectedBins[index][0] || row[1] !== expectedBins[index][1])) fail('勾配の割合・推定面積の表示が計算結果と一致しません。地形図面を開き直してください。')
   const distributionSummary = text(element.querySelector('.terrain-report-distribution-summary'))
   const expectedDistributionSummary = `有効範囲（除外後）：${formatTerrainSlopeArea(distribution.totalAreaM2)}${distribution.unknownAreaM2 === null || distribution.unknownAreaM2 > 0 ? ` / 未計算：${formatTerrainSlopeArea(distribution.unknownAreaM2)}` : ''}`
@@ -416,12 +431,23 @@ export async function exportTerrainAreaPdf({ report, element, drawingOnly = fals
   const images = []
   let canvas
   try {
-    // Capture matching text, computed SVG styles and geometry before any await.
+    if (drawingOnly) await boundedWait(new Promise(resolve => { const poll = () => { if (controller.signal.aborted || !element?.isConnected || element.querySelector('.terrain-drawing-export-source')?.dataset.contextStatus !== 'loading') resolve(); else setTimeout(poll, 50) }; poll() }), controller.signal, '周辺地図の取得が完了しませんでした。再試行してください。')
+    // Capture matching text, computed SVG styles and geometry as one snapshot.
     const model = modelFromElement(report, element, checkDeadline)
     if (drawingOnly) {
       if (!terrainReportLayouts(report.terrainArea, report.terrainPreview).current) fail('適用済みの参考配置がありません。先に参考配置を計算してください。')
-      const plan = element.querySelector('.terrain-drawing-export-source svg')
-      model.snapshots = [snapshotSvg(plan, 310, checkDeadline, true)]
+      const pair = element.querySelector('.terrain-drawing-export-source')
+      if(!pair)fail('単独配置図の2つの図面が表示されていません。')
+      const plans = [...pair.querySelectorAll('svg')]
+      if(plans.length!==2 || plans[0].dataset.viewport!==plans[1].dataset.viewport || plans.some(p=>p.dataset.geometryKey!==report.terrainArea.geometryKey) || plans[1].querySelector('[data-layout-racks]')) fail('2つの図の範囲・縮尺・配置が一致しません。')
+      model.snapshots = plans.map(plan=>snapshotSvg(plan, 198, checkDeadline, true))
+      model.drawingDistribution = terrainSlopeDistribution(report.terrainArea)
+      model.gridStep = report.terrainArea.grid.step
+      model.mapReference = report.parcelReview.parcels.some(isMapParcel)
+      model.contextStatus = pair.dataset.contextStatus
+      model.missingParcels = Number(pair.dataset.missingParcels)||0
+      model.noParcelMetadata = pair.dataset.noParcelMetadata==='true'
+      model.unplacedParcels = pair.dataset.unplacedParcels
     }
     checkDeadline()
     if (document.fonts?.ready) await boundedWait(document.fonts.ready, controller.signal, '日本語フォントの準備が完了しませんでした。図面を開き直して再試行してください。')

@@ -30,8 +30,8 @@ test('defaults expose the landscape 720W preset and normalize bounded editable l
   const options = normalizeTerrainLayoutOptions()
   assert.equal(options.rows, 4); assert.equal(options.minColumns, 4); assert.equal(options.maxColumns, 8)
   assert.equal(options.moduleWidthM, 2.384); assert.equal(options.moduleHeightM, 1.303); assert.equal(options.modulePowerW, 720)
-  assert.equal(options.moduleGapM, .02); assert.equal(options.tiltDeg, 10); assert.equal(options.slopeLimitDeg, 10)
-  assert.equal(options.rackGapM, 1); assert.equal(options.rowGapM, 4); assert.equal(options.setbackM, 1); assert.equal(options.azimuthDeg, 180)
+  assert.equal(options.moduleGapM, .02); assert.equal(options.tiltDeg, 15); assert.equal(options.slopeLimitDeg, 10)
+  assert.equal(options.rackGapM, 1); assert.equal(options.rowGapM, 3.3); assert.equal(options.setbackM, 1); assert.equal(options.azimuthDeg, 180)
   const bounded = normalizeTerrainLayoutOptions({ minColumns: 8, maxColumns: 4, tiltDeg: 100, setbackM: -2, maxRacks: Infinity, maxCandidates: 1e9, azimuthDeg: -180, modulePowerW: 655 })
   assert.equal(bounded.maxColumns, 8); assert.equal(bounded.tiltDeg, 60); assert.equal(bounded.setbackM, 0)
   assert.equal(bounded.maxRacks, 200); assert.equal(bounded.maxCandidates, 12000); assert.equal(bounded.azimuthDeg, 180); assert.equal(bounded.modulePowerW, 720)
@@ -218,7 +218,7 @@ test('adaptive packing advances by the selected width and fits eight then five c
   assert.equal(layout.moduleCount, 52)
   const [first, second] = layout.racks
   close(second.footprint[0][0] - first.footprint[1][0], 1, 1e-9)
-  close(first.depthM, 5.272 * Math.cos(10 * Math.PI / 180), 1e-9)
+  close(first.depthM, 5.272 * Math.cos(15 * Math.PI / 180), 1e-9)
   const fixed = buildTerrainLayout(analysis, { minColumns: 4, maxColumns: 4 })
   assert.deepEqual(fixed.racks.map(rack => rack.columns), [4, 4, 4])
   assert.equal(fixed.moduleCount, 48)
@@ -234,13 +234,13 @@ test('four-row landscape modules retain their exact metre dimensions, 20mm gaps 
     assert.equal(rack.rows, 4); assert.equal(rack.columns, columns); assert.equal(rack.moduleCount, 4 * columns)
     close(distance3(first[0], first[1]), 2.384, 1e-9)
     close(distance3(first[0], first[3]), 1.303, 1e-9)
-    close(distance2(first[0], first[3]), 1.303 * Math.cos(10 * Math.PI / 180), 1e-9)
-    close(first[3][2] - first[0][2], 1.303 * Math.sin(10 * Math.PI / 180), 1e-9)
+    close(distance2(first[0], first[3]), 1.303 * Math.cos(15 * Math.PI / 180), 1e-9)
+    close(first[3][2] - first[0][2], 1.303 * Math.sin(15 * Math.PI / 180), 1e-9)
     close(distance3(first[1], nextColumn[0]), .02, 1e-9)
     close(distance3(first[3], nextRow[0]), .02, 1e-9)
     close(distance3(rack.corners[0], rack.corners[1]), columns * 2.384 + (columns - 1) * .02, 1e-9)
     close(distance3(rack.corners[0], rack.corners[3]), 4 * 1.303 + 3 * .02, 1e-9)
-    close(distance2(rack.footprint[0], rack.footprint[3]), 5.272 * Math.cos(10 * Math.PI / 180), 1e-9)
+    close(distance2(rack.footprint[0], rack.footprint[3]), 5.272 * Math.cos(15 * Math.PI / 180), 1e-9)
     close(distance2(rack.footprint[0], rack.footprint[1]), columns === 4 ? 9.596 : 19.212, 1e-9)
   }
 })
@@ -377,7 +377,7 @@ test('optimized comparison adds 7.5-degree bearings and quarter phases while sta
   assert.equal(search.mode, 'optimized'); assert.equal(search.trials, 32)
   assert.deepEqual(search.candidates.slice(0, 9).map(candidate => candidate.azimuthDeg), [0, 352.5, 7.5, 345, 15, 337.5, 22.5, 330, 30])
   assert.equal(search.baseAzimuthDeg, 0)
-  const pitchU = 8 * 2.384 + 7 * .02 + 1, pitchV = 5.272 * Math.cos(10 * Math.PI / 180) + 4
+  const pitchU = 8 * 2.384 + 7 * .02 + 1, pitchV = 5.272 * Math.cos(15 * Math.PI / 180) + 3.3
   for (const phase of [.25, .5, .75]) {
     assert.ok(search.candidates.some(candidate => Math.abs(candidate.scanOffsetUM - pitchU * phase) < 1e-9))
     assert.ok(search.candidates.some(candidate => Math.abs(candidate.scanOffsetVM - pitchV * phase) < 1e-9))

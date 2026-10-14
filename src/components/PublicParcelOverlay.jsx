@@ -6,6 +6,7 @@ import { PUBLIC_PARCEL_SOURCE, isPublicParcelFeature, publicParcelNumber, public
 import { ParcelNumberSymbolizer } from '../utils/publicParcelLabelLayout.js'
 import { PUBLIC_PARCEL_TERRAIN_LIMITS, PUBLIC_PARCEL_TERRAIN_SOURCE, buildPublicParcelTerrainSnapshot, createPublicParcelSnapshotGate, publicParcelViewportKey } from '../utils/publicParcelTerrain.js'
 import './public-parcel-overlay.css'
+import { resolveMapParcelSelection } from '../utils/mapParcelSelection.js'
 
 const PANE_NAME = 'publicParcelReference'
 const ATTRIBUTION = '<a href="https://source.coop/smartmaps/amx-2024-04" target="_blank" rel="noopener noreferrer">公開地番2024：法務省データをAMXが加工</a>'
@@ -13,7 +14,8 @@ const ATTRIBUTION = '<a href="https://source.coop/smartmaps/amx-2024-04" target=
 export { ParcelNumberSymbolizer }
 
 function createPublicParcelLayer(props, context) {
-  let selectedIds = new Set((props.referenceSelections || []).map(p => p.id))
+  const selectionId = p => p.properties?.__mvtId != null ? `2024:${p.properties.__mvtId}` : p.id
+  let selectedIds = new Set((props.referenceSelections || []).map(selectionId))
   // The official Leaflet renderer expects the same Leaflet singleton globally.
   globalThis.L = L
   const pane = context.map.getPane(PANE_NAME) || context.map.createPane(PANE_NAME)
@@ -105,7 +107,7 @@ function createPublicParcelLayer(props, context) {
   layer.setCallbacks = nextProps => {
     callback = nextProps.onStatus
     parcelsCallback = nextProps.onPublicParcelsChange
-    const nextIds = new Set((nextProps.referenceSelections || []).map(p => p.id))
+    const nextIds = new Set((nextProps.referenceSelections || []).map(selectionId))
     if (nextIds.size !== selectedIds.size || [...nextIds].some(id => !selectedIds.has(id))) { selectedIds = nextIds; layer.rerenderTiles() }
     if (contextKey !== (nextProps.contextKey || '')) {
       contextKey = nextProps.contextKey || ''
@@ -144,9 +146,12 @@ function createPublicParcelLayer(props, context) {
     report(context.map.getZoom() < PUBLIC_PARCEL_SOURCE.minZoom ? 'zoom' : 'loading')
     scheduleSnapshot()
     props.onPickerChange?.(latlng => {
-      if (!active || context.map.getZoom() < PUBLIC_PARCEL_SOURCE.minZoom) return null
-      const picked = view.queryFeatures(latlng.lng, latlng.lat, context.map.getZoom(), 0).find(p => p.layerName === 'fude' && isPublicParcelFeature(p.feature))?.feature
-      return publicParcelReferenceInfo(picked)
+      if (!active || context.map.getZoom() < 16) return null
+      const picked = view.queryFeatures(latlng.lng, latlng.lat, context.map.getZoom(), 0).filter(p => p.layerName === 'fude' && isPublicParcelFeature(p.feature)).map(p=>p.feature)
+      if(!picked.length)return null
+      const z=Math.min(Math.round(context.map.getZoom())-view.levelDiff,view.maxDataLevel)
+      const seed={z,x:Math.floor((latlng.lng+180)/360*2**z),y:Math.floor((1-Math.asinh(Math.tan(latlng.lat*Math.PI/180))/Math.PI)/2*2**z)}
+      return { candidates: picked.map(feature=>({number:publicParcelNumber(feature),mapName:String(feature.props['地図名']||''),resolve:()=>resolveMapParcelSelection(feature,seed,async coords=>({data:await view.tileCache.get(coords),z:coords.z,dataTile:coords,scale:1,origin:{x:coords.x*256,y:coords.y*256},dim:256}))})) }
     })
   })
   layer.on('loading', () => report('loading'))

@@ -4,14 +4,14 @@ import polygonClipping from 'polygon-clipping'
 import { terrainPointToLocal, pointInTerrainBoundary } from '../utils/terrainArea.js'
 import { createTerrainProjection, dragTerrainView, normalizeTerrainView, orbitTerrainView, zoomTerrainView, terrainFaceVisible } from '../utils/terrainView.js'
 import { buildTerrainSolid } from '../utils/terrainSolid.js'
-import { terrainSlopeDistribution, formatTerrainSlopeArea } from '../utils/terrainSlopeDistribution.js'
+import { terrainSlopeDistribution, formatTerrainSlopeArea, TERRAIN_SLOPE_COLORS } from '../utils/terrainSlopeDistribution.js'
 import { getTerrainCellSlope } from '../utils/terrainLayout.js'
 import { createTerrainOverlayVisibility, visibleTerrainLineParts } from '../utils/terrainOverlayVisibility.js'
 import { layoutTerrainLabels } from '../utils/terrainLabelLayout.js'
 import { hitTestTerrainRack } from '../utils/terrainRackHitTest.js'
 import './terrain-area.css'
 
-const COLORS = ['#cfe3cd', '#efe8ad', '#eabd8d', '#df9d9b']
+const COLORS = TERRAIN_SLOPE_COLORS
 const LABELS = ['0–10°未満', '10–20°未満', '20–30°未満', '30°以上']
 const W = 800, H = 520
 const finite = Number.isFinite
@@ -51,32 +51,32 @@ function figurePoint(position, grid) {
   try { return terrainPointToLocal(position, grid.origin) } catch { return null }
 }
 
-const slopeShare = (summary, index) => {
-  const bin = summary?.slopeBins?.find(bin => bin.min === index * 10 && bin.max === (index === 3 ? 90 : (index + 1) * 10))
+const slopeShare = (analysis, index) => {
+  const bin = terrainSlopeDistribution(analysis).bins[index]
   return finite(bin?.percent) ? `${bin.percent.toLocaleString('ja-JP', { maximumFractionDigits: 1 })}%` : '未計算'
 }
 
-function Legend({ y = 469, summary }) {
-  const distribution = terrainSlopeDistribution(summary)
+function Legend({ y = 469, analysis }) {
+  const distribution = terrainSlopeDistribution(analysis)
   return <g className="terrain-area-svg-legend" transform={`translate(60 ${y})`}>
     {LABELS.map((label, index) => <g key={label} transform={`translate(${index * 173} 0)`}>
       <rect width="27" height="14" y="-12" fill={COLORS[index]} stroke="#8b918b" strokeWidth="0.4" />
       <text x="35" y="0">{label}</text>
-      <text x="35" y="25" className="terrain-area-svg-share">{slopeShare(summary, index)}</text>
+      <text x="35" y="25" className="terrain-area-svg-share">{slopeShare(analysis, index)}</text>
       <text x="35" y="44" className="terrain-area-svg-area">{formatTerrainSlopeArea(distribution.bins[index].areaM2)}</text>
     </g>)}
   </g>
 }
 
-function SlopeDistribution({ summary }) {
-  const distribution = terrainSlopeDistribution(summary)
+function SlopeDistribution({ analysis }) {
+  const distribution = terrainSlopeDistribution(analysis)
   return <div className="terrain-area-slope-distribution">
-    <table><caption>10m幅で見た局所勾配 <span>割合・推定面積</span><span className="terrain-area-distribution-total">有効範囲 {formatTerrainSlopeArea(distribution.totalAreaM2)}（除外後）</span></caption>
+    <table><caption>セル勾配 <span>範囲面積比・推定面積</span><span className="terrain-area-distribution-total">有効範囲 {formatTerrainSlopeArea(distribution.totalAreaM2)}（除外後）</span></caption>
       <thead><tr>{LABELS.map((label, index) => <th key={label} scope="col"><i style={{ background: COLORS[index] }} />{label}</th>)}</tr></thead>
-      <tbody><tr>{LABELS.map((label, index) => <td key={label}><span>{slopeShare(summary, index)}</span><small>{formatTerrainSlopeArea(distribution.bins[index].areaM2)}</small></td>)}</tr></tbody>
+      <tbody><tr>{LABELS.map((label, index) => <td key={label}><span>{slopeShare(analysis, index)}</span><small>{formatTerrainSlopeArea(distribution.bins[index].areaM2)}</small></td>)}</tr></tbody>
     </table>
-    {distribution.unknownAreaM2 > 0 && <p className="terrain-area-distribution-unknown">勾配未確認 {formatTerrainSlopeArea(distribution.unknownAreaM2)}</p>}
-    <p>割合は範囲内で勾配を計算できた格子点の分布です。面積は有効範囲と取得率からの概算。色と数値は実際のDEMによる参考値で、施工可否の基準ではありません。</p>
+    <p className="terrain-area-distribution-unknown">未確認 / NoData {distribution.unknownPercent.toFixed(1)}% · {formatTerrainSlopeArea(distribution.unknownAreaM2)} / 勾配確認 {distribution.coveragePercent.toFixed(1)}%</p>
+    <p>穴・除外後の全図形面積が分母。セルと範囲の交差面積を集計し、四区分と未確認の合計100%。格子解像度に依存する推定値で、施工可否の基準ではありません。</p>
   </div>
 }
 
@@ -200,11 +200,11 @@ export function TerrainAreaPlan({ analysis, position, reportMode = false, compac
       <g transform="translate(755 49)" className="terrain-area-north"><text textAnchor="middle" y="-13">N</text><path d="M0 -5 L-6 11 L0 7 L6 11 Z" /><path d="M0 7 V27" /></g>
       <Scale project={project} bounds={bounds} />
       <text x="756" y="443" textAnchor="end" className="terrain-area-svg-note">黄色線：検討範囲{partial ? '　斜線：未取得・未計算' : ''}</text>
-      <Legend summary={analysis.summary} />
+      <Legend analysis={analysis} />
     </svg>
     {!reportMode && rackControls}
     {parcelLabels && <ParcelLabelNote {...parcelLabels} />}
-    <figcaption>{compactReport ? `DEM標高 ${finite(analysis.summary?.minElevation) ? analysis.summary.minElevation.toFixed(1) : '—'}–${finite(analysis.summary?.maxElevation) ? analysis.summary.maxElevation.toFixed(1) : '—'}m · 等高線・局所勾配 · ${noteRef}（最終ページ）` : <>等高線2m間隔・10mごとに太線。割合は勾配を計算できた範囲内の格子点が分母です。面積は有効範囲と勾配取得率からの概算。色分けは施工可否の基準ではありません。{position && !pointVisible ? '選択地点は図の範囲外です。' : ''}</>}</figcaption>
+    <figcaption>{compactReport ? `DEM標高 ${finite(analysis.summary?.minElevation) ? analysis.summary.minElevation.toFixed(1) : '—'}–${finite(analysis.summary?.maxElevation) ? analysis.summary.maxElevation.toFixed(1) : '—'}m · 等高線・局所勾配 · ${noteRef}（最終ページ）` : <>等高線2m間隔・10mごとに太線。割合は穴・除外後の全図形面積が分母です。セル交差面積で集計し、欠測を別枠にします。色分けは施工可否の基準ではありません。{position && !pointVisible ? '選択地点は図の範囲外です。' : ''}</>}</figcaption>
   </figure>
 }
 
@@ -494,7 +494,7 @@ export function TerrainArea3D({ analysis, position, reportMode = false, compactR
       {point && point[0] > 25 && point[0] < 770 && point[1] > 32 && point[1] < 430 && <g transform={`translate(${point[0]} ${point[1]})`} className="terrain-area-selected-point"><circle r="5" fill="#197ca0" stroke="#fff" strokeWidth="2" /><text x="9" y="-8">選択地点</text></g>}
       <g className="terrain-area-3d-cardinals">{[['N', north], ['S', south], ['E', east], ['W', west]].map(([label, p]) => <text key={label} x={p[0]} y={p[1] + (label === 'N' ? -9 : 18)} textAnchor="middle">{label}</text>)}</g>
       </g>
-      {!canRotate && <><text x="44" y="443" className="terrain-area-svg-note">{compactReport ? `${noteRef}（最終ページ）` : '地表面と黄色線は同じ標高データ。樹木・建物・造成後の形状は含みません。'}</text><Legend summary={analysis.summary} /></>}
+      {!canRotate && <><text x="44" y="443" className="terrain-area-svg-note">{compactReport ? `${noteRef}（最終ページ）` : '地表面と黄色線は同じ標高データ。樹木・建物・造成後の形状は含みません。'}</text><Legend analysis={analysis} /></>}
       {canRotate && <rect ref={modelRef} className="terrain-area-drag-target" x="25" y="35" width="750" height="395" fill="transparent" onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerEnd} onPointerCancel={pointerEnd} onLostPointerCapture={pointerEnd} />}
     </svg>
     </div>
@@ -510,7 +510,7 @@ export function TerrainArea3D({ analysis, position, reportMode = false, compactR
       <button type="button" className="terrain-area-quiet-button" onClick={resetView}>最初の視点</button>
     </div>}
     {canRotate && rackControls}
-    {canRotate && <SlopeDistribution summary={analysis.summary} />}
+    {canRotate && <SlopeDistribution analysis={analysis} />}
     <figcaption>{compactReport ? `実DEM地形 · 1:1 · ${noteRef}（最終ページ）` : <>{drawing.faceCount ? '地表面と黄色線は同じDEM。樹木・建物・造成後の形状は含みません。側面・底面は表示用で、地層・土量を示しません。' : '連続した地表面を描ける標高点が不足しています。'} {!canRotate ? '面積は有効範囲と勾配取得率からの概算。' : ''} {analysis.summary?.coveragePercent < 100 ? '未取得部分の面は表示していません。' : ''}</>}</figcaption>
   </figure>
 }

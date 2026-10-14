@@ -143,6 +143,7 @@
 .terrain-area-height-controls p { flex:1 1 250px; margin:0 0 0 6px; color:#64786f; font-size:13px; line-height:1.5; }
 .terrain-area-height-controls button:focus-visible { outline:3px solid #4f9676; outline-offset:3px; }
 .terrain-area-slope-distribution { margin-top:12px; border-top:1px solid #dce5da; padding-top:10px; }
+.terrain-layout-angle-note { grid-column:1/-1; margin:0; font-size:12px; color:#617569; }
 .terrain-area-slope-distribution table { width:100%; table-layout:fixed; border-collapse:collapse; }
 .terrain-area-slope-distribution caption { padding-bottom:8px; text-align:left; color:#3d5646; font-size:14px; font-weight:600; }
 .terrain-area-slope-distribution caption span { color:#64786f; font-weight:400; margin-left:8px; }

@@ -12,3 +12,5 @@
 .simple-export-source { position:fixed; left:-10000px; top:0; width:1280px; pointer-events:none; }
 .simple-report-values > div { display:grid; grid-template-columns:1fr 2fr; gap:10px; padding:8px; border-bottom:1px solid #aabcb2; }
 @media(max-width:480px) { .simple-batch { padding:12px; } .simple-batch-downloads a { width:100%; overflow-wrap:anywhere; } }
+
+.simple-batch-downloads>div{display:flex;flex-wrap:wrap;gap:8px;width:100%}.simple-batch-downloads small,.terrain-pdf-links small{display:block;flex-basis:100%;overflow-wrap:anywhere}.terrain-pdf-links{display:inline-flex;flex-wrap:wrap;gap:8px}.map-parcel-scope{font-size:12px;color:#53685d}

@@ -13,7 +13,7 @@ function dependencies(s){return {fetchElevation:async()=>({value:100,dataSource:
 test('confirmed range uses an interior representative and untouched defaults, with explicit applied snapshot',async()=>{
  const s=fixture(),original=JSON.stringify(s.parcelReview),calls=[];const result=await runSimpleReview(s.parcelReview,{dependencies:dependencies(s),onProgress:p=>calls.push(p.name)})
  assert.equal(result.status,'complete');assert.ok(pointInGeometry(result.position,s.terrainArea.geometry));assert.equal(JSON.stringify(s.parcelReview),original)
- assert.equal(result.defaults.layout.slopeLimitDeg,10);assert.equal(result.defaults.layout.tiltDeg,10);assert.equal(result.defaults.sectionRangeM,100);assert.equal(result.defaults.obstructionHeightM,20)
+ assert.equal(result.defaults.layout.slopeLimitDeg,10);assert.equal(result.defaults.layout.tiltDeg,15);assert.equal(result.defaults.sectionRangeM,100);assert.equal(result.defaults.obstructionHeightM,20)
  assert.equal(result.steps.length,6);assert.equal(calls.length,6);assert.ok(result.results.layout.moduleCount>0);assert.equal(result.results.layout.dcKw,result.results.layout.moduleCount*.72)
  assert.ok(simpleReviewReportRows(result).some(([k,v])=>k==='配置で実際に適用した値'&&v.includes('DC')))
  assert.ok(simpleReviewReportRows(result).some(([k,v])=>k==='NEDO同一メッシュ'&&v.includes(thirdMeshCode(result.position.lat,result.position.lon))))
@@ -38,7 +38,7 @@ test('cancel during a late response blocks downstream stages and completion',asy
  const s=fixture(),deps=dependencies(s),c=new AbortController();let resolve,called=false;deps.section=()=>new Promise(r=>{resolve=r});deps.area=async()=>{called=true}
  const pending=runSimpleReview(s.parcelReview,{dependencies:deps,signal:c.signal});await new Promise(r=>setTimeout(r,0));c.abort();resolve({lines:[]});await assert.rejects(pending);assert.equal(called,false)
 })
-test('defaults return independent snapshots and never accept manual option mutation',()=>{const a=simpleReviewDefaults();a.layout.rowGapM=9;assert.equal(simpleReviewDefaults().layout.rowGapM,4)})
+test('defaults return independent snapshots and never accept manual option mutation',()=>{const a=simpleReviewDefaults();a.layout.rowGapM=9;assert.equal(simpleReviewDefaults().layout.rowGapM,3.3)})
 test('mismatched worker options or module capacity cannot be published as a PDF-ready result',async()=>{
  const s=fixture()
  for(const change of [l=>({...l,options:{...l.options,slopeLimitDeg:20}}),l=>({...l,dcKw:1}),l=>({...l,racks:[null]})]) {const deps=dependencies(s);deps.layout=async(a,o)=>change(buildTerrainLayout(a,o));const r=await runSimpleReview(s.parcelReview,{dependencies:deps});assert.equal(r.results.layout,null);assert.equal(r.steps.at(-1).status,'error');assert.equal(r.status,'review')}

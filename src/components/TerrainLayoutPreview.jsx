@@ -32,6 +32,7 @@ export default function TerrainLayoutPreview({ analysis, preview, onChange, parc
   const key = terrainLayoutAnalysisKey(analysis)
   const options = { ...normalizeTerrainLayoutOptions(), ...preview?.options }
   const draftChanged = Boolean(preview?.layout && JSON.stringify(normalizeTerrainLayoutOptions(options)) !== JSON.stringify(normalizeTerrainLayoutOptions(preview.appliedOptions || preview.layout.options)))
+  const southDraftChanged = Boolean(preview?.southComparison && !terrainLayoutResultMatchesOptions(preview.southComparison,normalizeTerrainLayoutOptions(options)))
   const pool = appliedTerrainPreview(analysis, preview)
   const layout = selectedTerrainLayout(pool, preview)
   const enabled = Boolean(layout && preview?.enabled)
@@ -39,7 +40,7 @@ export default function TerrainLayoutPreview({ analysis, preview, onChange, parc
     retryRef.current = null
     setBusy(false); setError('')
     onChangeRef.current(previous => previous?.layout && (previous.layout.analysisReference !== analysis || previous.layout.analysisKey !== key)
-      ? { ...previous, layout: null, comparison: null, activeRackCount: null, disabledRackIds: [], enabled: false, calculating: false } : previous?.calculating ? { ...previous, calculating: false } : previous)
+      ? { ...previous, layout: null, comparison: null, southComparison: null, activeRackCount: null, disabledRackIds: [], enabled: false, calculating: false } : previous?.calculating ? { ...previous, calculating: false } : previous)
     return () => { workerRef.current?.terminate(); workerRef.current = null; onChangeRef.current(previous => previous?.calculating ? { ...previous, calculating: false } : previous) }
   }, [analysis, key])
 
@@ -49,9 +50,9 @@ export default function TerrainLayoutPreview({ analysis, preview, onChange, parc
     setBusy(false); setError('')
     onChangeRef.current(previous => ({ ...previous, options: { ...options, ...patch }, calculating: false }))
   }
-  const calculate = (patch = {}, optimized = false, compareSlopes = false) => {
+  const calculate = (patch = {}, optimized = false, compareSlopes = false, fixedSouth = false) => {
     const runOptions = normalizeTerrainLayoutOptions({ ...options, ...patch })
-    retryRef.current = { options: runOptions, optimized, compareSlopes }
+    retryRef.current = { options: runOptions, optimized, compareSlopes, fixedSouth }
     workerRef.current?.terminate()
     workerRef.current = null
     setBusy(true); setError('')
@@ -64,6 +65,10 @@ export default function TerrainLayoutPreview({ analysis, preview, onChange, parc
         worker.terminate(); workerRef.current = null; setBusy(false)
         if (data.error) { setError(terrainLayoutErrorGuidance(data.code || 'calculation', data.error)); onChangeRef.current(previous => ({ ...previous, calculating: false })); return }
         if (compareSlopes ? !(data.comparison?.layouts?.length === 2 && data.comparison.layouts.every((result, index) => terrainLayoutResultMatchesOptions(result, { ...runOptions, slopeLimitDeg: [15,20][index] }))) : !terrainLayoutResultMatchesOptions(data.result, runOptions)) { setError(terrainLayoutErrorGuidance('worker')); onChangeRef.current(previous => ({ ...previous, calculating: false })); return }
+        if (fixedSouth) {
+          if(data.result.options.azimuthDeg!==180 || data.result.stats?.autoSearch?.mode!=='south-fixed'){setError(terrainLayoutErrorGuidance('worker'));onChangeRef.current(previous=>({...previous,calculating:false}));return}
+          onChangeRef.current(previous=>({...previous,southComparison:{...data.result,analysisKey:key,analysisReference:analysis},calculating:false}));return
+        }
         if (compareSlopes) {
           onChangeRef.current(previous => ({ ...previous, comparison: { ...data.comparison, analysisKey: key, analysisReference: analysis }, calculating: false }))
           return
@@ -77,7 +82,7 @@ export default function TerrainLayoutPreview({ analysis, preview, onChange, parc
         setError(terrainLayoutErrorGuidance('worker', event.message))
         onChangeRef.current(previous => ({ ...previous, calculating: false }))
       }
-      worker.postMessage({ analysis, options: runOptions, optimized, compareSlopes, baseline: optimized ? pool : null })
+      worker.postMessage({ analysis, options: runOptions, optimized, compareSlopes, fixedSouth, baseline: optimized || fixedSouth ? pool : null })
     } catch (failure) {
       workerRef.current?.terminate(); workerRef.current = null
       setBusy(false); setError(terrainLayoutErrorGuidance(failure?.name === 'DataCloneError' ? 'data' : 'startup'))
@@ -104,29 +109,31 @@ export default function TerrainLayoutPreview({ analysis, preview, onChange, parc
       <button type="button" className="terrain-layout-toggle" aria-pressed={enabled} disabled={busy} onClick={toggle}>{pool ? `参考配置 ${enabled ? 'ON' : 'OFF'}` : '自動で参考配置'}</button>
       <button type="button" disabled={busy} onClick={() => calculate({}, false, true)}>地形勾配15° / 20°を比較</button>
       {pool && <button type="button" className="terrain-layout-optimize" disabled={busy} onClick={() => calculate({}, true)}>最適配置を比較</button>}
+      <button type="button" className="terrain-layout-optimize" disabled={busy} onClick={()=>calculate({},false,false,true)}>真南固定・最大配置を比較</button>
       <label className="terrain-layout-slope-select">勾配<select aria-label="参考配置の勾配条件" title="選んだ局所勾配未満で参考配置を比較。施工可否の判定ではありません。" value={options.slopeLimitDeg} disabled={busy} onChange={event => changeSlope(Number(event.target.value))}>{[10,15,20].map(degrees => <option key={degrees} value={degrees}>{degrees}°未満</option>)}</select></label>
     </div>
     <div className="terrain-layout-utility">
       <button type="button" aria-expanded={conditionsOpen} aria-controls={conditionsId} onClick={() => setConditionsOpen(value => !value)}><span aria-hidden="true">{conditionsOpen ? '▾' : '▸'}</span> 配置条件</button>
-      <span className="terrain-layout-format">4段 × {columns} · パネル{options.tiltDeg}°</span>
+      <span className="terrain-layout-format">4段 × {columns} · モジュール{options.tiltDeg}°</span>
       <button type="button" className="terrain-layout-parcel-toggle" aria-pressed={Boolean(preview?.labels)} disabled={!parcelCount} onClick={() => onChangeRef.current(previous => ({ ...previous, labels: !previous.labels }))}>3D地番 {preview?.labels ? 'ON' : 'OFF'}</button>
       <TerrainHelpDialog title="参考配置の使い方・条件">
         <h4>操作</h4><p>青い架台をクリックで除外し、点線をクリックで戻します。増やす・減らすは図の下で操作できます。再配置すると個別の除外選択を初期化します。</p>
         <h4>実寸と対象範囲</h4>
-        <p>1架台：幅 {number(widthFor(options.minColumns), 3)}{options.maxColumns !== options.minColumns ? `〜${number(widthFor(options.maxColumns), 3)}` : ''}m × 水平奥行 {number(rackDepth, 3)}m（パネル面の奥行 {number(rackLength, 3)}m）。4段固定・横置きの実寸を地形と同じメートル座標で配置します。</p>
+        <p>1架台：幅 {number(widthFor(options.minColumns), 3)}{options.maxColumns !== options.minColumns ? `〜${number(widthFor(options.maxColumns), 3)}` : ''}m × 水平奥行 {number(rackDepth, 3)}m（パネル面の奥行 {number(rackLength, 3)}m）。前後の空き{number(options.rowGapM)}mを加えた行ピッチは{number(rackDepth+options.rowGapM,3)}m。4段固定・横置きの実寸を地形と同じメートル座標で配置します。初期値はモジュール15°・前後の空き3.3mで、日影を保証する離隔ではありません。</p>
         <p>JKM720N-66HL5-BDVの外形2.384 × 1.303m、モジュール間20mm、地表から最低0.8mの仮条件。地形のセル4点平均の局所勾配が{options.slopeLimitDeg}°未満で、架台全体と空きが有効範囲に収まるものだけを数えます。欠測と除外は使いません。15°・20°の選択は比較用で、施工可否の判定ではありません。</p>
         {layout && <p>対象勾配の参考面積：{layout.stats?.eligibleAreaCalculated === false ? '未計算' : `約${number(layout.eligibleAreaM2, 0)}m²`}。{pool.stats?.autoSearch && `${pool.stats.autoSearch.trials}案を比較、正面${number(pool.options.azimuthDeg, 0)}°。`}</p>}
         <h4>容量の目安</h4><p>DC＝枚数×720W。AC＝DC÷1.5を標準刻みで丸めた参考値（100kW以下は10kW、超えると50kW）。連系・機器・日影・基礎・造成・施工可否は未判定。高さ2倍は表示だけで、枚数と容量は変わりません。</p>
         {layout?.dcKw > 0 && <p>AC参考帯：{number(layout.acRangeKw?.[0], 0)}〜{number(layout.acRangeKw?.[1], 0)}kW。{layout.acTargetKw < 10 && '換算が10kW未満のため表示は下限10kWです。'}</p>}
         <h4>最適配置と仮フェンス</h4><p>最適配置は基準方位±30°を7.5°刻み・開始位置も比較する参考探索です。最大32案・8秒で、最大枚数を保証しません。</p><p>仮フェンスは選択中の架台全体を囲み、端の空きと同じ距離を外側に取る高さ1.2mの参考表示です。離れた架台の間も一緒に囲みます。有効範囲の外と欠測はつなぎません。実測境界・施工線ではありません。</p>
-        <h4>保存と地番</h4><p>参考配置の条件・結果はこの画面内の検討用で、適用済み配置（個別除外を反映）と計算済み15° / 20°比較は地形PDFに含みます。チェック時は使用架台を囲む仮フェンスもPDFに含みます。地番・未適用の入力は含みません。JSON検討記録には条件・結果・個別除外・仮フェンスを保存しません。再読込・他PCでは再計算が必要です。</p><p>地番は公開資料または読み込んだ筆の実データがある場合に表示し、住所から推測しません。</p>
+        <h4>保存と地番</h4><p>参考配置の条件・結果はこの画面内の検討用で、適用済み配置（個別除外を反映）と計算済み15° / 20°比較は地形PDFに含みます。チェック時は使用架台を囲む仮フェンスもPDFに含みます。単独配置図には選択資料の実地番を表示し、未適用の入力は含みません。JSON検討記録には条件・結果・個別除外・仮フェンスを保存しません。再読込・他PCでは再計算が必要です。</p><p>地番は公開資料または読み込んだ筆の実データがある場合に表示し、住所から推測しません。</p>
         {layout?.warnings?.length > 0 && <ul>{layout.warnings.map((warning, index) => <li key={index}>{typeof warning === 'string' ? warning : warning.message}</li>)}</ul>}
       </TerrainHelpDialog>
     </div>
     {draftChanged && <p className="terrain-layout-footnote" role="status">条件は未適用です。図・数量・PDFは前回の適用結果を保持しています。</p>}
     {preview?.comparison?.analysisReference === analysis && <div className="terrain-layout-comparison"><p>地形の局所勾配のみ変更。パネル傾斜・方位・開始位置・間隔・範囲は同一。個別除外なしの自動案です。</p><table><thead><tr><th>地形勾配</th><th>架台</th><th>枚数</th><th>DC kW</th><th>表示</th></tr></thead><tbody>{preview.comparison.layouts.map(result => <tr key={result.options.slopeLimitDeg}><th>{result.options.slopeLimitDeg}°未満</th><td>{result.rackCount}</td><td>{result.moduleCount}</td><td>{number(result.dcKw)}</td><td><button type="button" disabled={busy} onClick={() => { onChangeRef.current(previous => ({ ...previous, options: result.options, appliedOptions: result.options, layout: { ...result, analysisKey: key, analysisReference: analysis }, disabledRackIds: [], activeRackCount: null, enabled: true })); onShow3D?.() }}>この案を見る</button></td></tr>)}</tbody></table><p>差（20° − 15°）：{preview.comparison.layouts[1].rackCount - preview.comparison.layouts[0].rackCount}架台 / {preview.comparison.layouts[1].moduleCount - preview.comparison.layouts[0].moduleCount}枚 / {number(preview.comparison.layouts[1].dcKw - preview.comparison.layouts[0].dcKw)} kW。案の切替・再計算成功時は個別除外を初期化します。</p></div>}
+    {preview?.southComparison?.analysisReference===analysis && <div className="terrain-layout-comparison terrain-layout-south-comparison"><p><strong>真南180°固定 · 探索候補内の最多配置</strong> / モジュール傾斜{preview.southComparison.options.tiltDeg}°、間隔・離隔・地形条件は入力時の値を維持。開始位置を{preview.southComparison.stats.autoSearch.trials}案比較。全域最大は未保証。</p><table><thead><tr><th>案</th><th>架台</th><th>枚数</th><th>DC kW</th></tr></thead><tbody>{[['現在の適用案',layout],['真南固定案',preview.southComparison]].filter(([,result])=>result).map(([label,result])=><tr key={label}><th>{label}</th><td>{result.rackCount}</td><td>{result.moduleCount}</td><td>{number(result.dcKw)}</td></tr>)}</tbody></table><button type="button" disabled={busy||southDraftChanged} onClick={()=>{const result=preview.southComparison;onChangeRef.current(previous=>({...previous,options:result.options,appliedOptions:result.options,layout:result,activeRackCount:null,disabledRackIds:[],enabled:true}));onShow3D?.()}}>真南固定案を適用</button>{southDraftChanged&&<p role="status">比較後に配置条件を変更しました。入力条件を保つため、もう一度「真南固定」を比較してください。</p>}<p>比較だけでは現在の結果・個別除外を変えません。適用すると架台の個別除外を初期化します。描いた除外領域は引き続き配置対象外です。</p></div>}
     {busy && <div className="terrain-layout-status" role="status"><span>{options.slopeLimitDeg}°未満の地形と除外範囲を確認して配置中…</span><button type="button" onClick={cancel}>中止</button></div>}
-    {error && <TerrainLayoutErrorNotice error={error} onRetry={() => { const attempt = retryRef.current; calculate(attempt?.options, attempt?.optimized, attempt?.compareSlopes) }} onRefresh={() => window.location.reload()} onReacquire={onReacquire} onBoundary={onBoundary} onConditions={() => { setConditionsOpen(true); requestAnimationFrame(() => conditionsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })) }} />}
+    {error && <TerrainLayoutErrorNotice error={error} onRetry={() => { const attempt = retryRef.current; calculate(attempt?.options, attempt?.optimized, attempt?.compareSlopes, attempt?.fixedSouth) }} onRefresh={() => window.location.reload()} onReacquire={onReacquire} onBoundary={onBoundary} onConditions={() => { setConditionsOpen(true); requestAnimationFrame(() => conditionsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })) }} />}
     {layout && <>
       <dl className="terrain-layout-totals" aria-label="参考配置の予測規模">
         <div><dt>モジュール</dt><dd>{number(layout.moduleCount, 0)} <small>枚</small></dd></div>
@@ -139,13 +146,15 @@ export default function TerrainLayoutPreview({ analysis, preview, onChange, parc
     <div ref={conditionsRef} id={conditionsId} className="terrain-layout-conditions" hidden={!conditionsOpen}>
       <div className="terrain-layout-fields">
         <label>1架台の列数<select value={options.minColumns === options.maxColumns ? options.maxColumns : 'auto'} onChange={event => changeOptions(event.target.value === 'auto' ? { minColumns: 4, maxColumns: 8 } : { minColumns: Number(event.target.value), maxColumns: Number(event.target.value) })}><option value="auto">4〜8列で調整</option>{[4,5,6,7,8].map(columns => <option key={columns} value={columns}>4段 × {columns}列</option>)}</select></label>
-        <label>基準方位（±30°を比較）<select value={options.azimuthDeg} onChange={event => changeOptions({ azimuthDeg: Number(event.target.value) })}>{[0,45,90,135,180,225,270,315].map(angle => <option key={angle} value={angle}>{angle}°{angle === 180 ? '（南）' : angle === 0 ? '（北）' : angle === 90 ? '（東）' : angle === 270 ? '（西）' : ''}</option>)}</select></label>
-        <label>パネル傾斜（水平から）<input type="number" min="0" max="60" step="1" value={options.tiltDeg} onChange={event => changeOptions({ tiltDeg: event.target.value === '' ? '' : Number(event.target.value) })} /><span>°</span></label>
+        <label>配置方位（平面回転・最適時±30°）<select value={options.azimuthDeg} onChange={event => changeOptions({ azimuthDeg: Number(event.target.value) })}>{[0,45,90,135,180,225,270,315].map(angle => <option key={angle} value={angle}>{angle}°{angle === 180 ? '（南）' : angle === 0 ? '（北）' : angle === 90 ? '（東）' : angle === 270 ? '（西）' : ''}</option>)}</select></label>
+        <label>モジュール傾斜（水平から）<input type="number" min="0" max="60" step="1" value={options.tiltDeg} onChange={event => changeOptions({ tiltDeg: event.target.value === '' ? '' : Number(event.target.value) })} /><span>°</span></label>
+        <p className="terrain-layout-angle-note">配置方位は平面の向き、モジュール傾斜はパネル面の上下角。地形勾配の除外基準・3D視点とは独立です。</p>
         <label>架台左右の空き<input type="number" min="0" max="30" step="0.5" value={options.rackGapM} onChange={event => changeOptions({ rackGapM: event.target.value === '' ? '' : Number(event.target.value) })} /><span>m</span></label>
-        <label>前後の空き<input type="number" min="0" max="30" step="0.5" value={options.rowGapM} onChange={event => changeOptions({ rowGapM: event.target.value === '' ? '' : Number(event.target.value) })} /><span>m</span></label>
+        <label>アレイ間前後の空き<input type="number" min="0" max="30" step="0.1" value={options.rowGapM} onChange={event => changeOptions({ rowGapM: event.target.value === '' ? '' : Number(event.target.value) })} /><span>m</span></label>
         <div className="terrain-layout-setback-field"><span>範囲・対象勾配の端からの空き</span><div><label><input aria-label="範囲・対象勾配の端からの空き" type="number" min="0" max="30" step="0.5" value={options.setbackM} onChange={event => changeOptions({ setbackM: event.target.value === '' ? '' : Number(event.target.value) })} /><span>m</span></label><label className="terrain-layout-fence-toggle"><input type="checkbox" checked={Boolean(preview?.fence)} onChange={event => { const checked = event.target.checked; onChangeRef.current(previous => ({ ...previous, fence: checked })) }} />配置を囲むフェンス</label></div></div>
       </div>
       <button type="button" className="terrain-area-quiet-button" disabled={busy} onClick={() => calculate()}>この条件で再計算</button>
+      <button type="button" className="terrain-area-quiet-button" onClick={()=>changeOptions(normalizeTerrainLayoutOptions())}>基本値を入力（15° / 前後3.3m）</button>
     </div>
   </div>
 }
