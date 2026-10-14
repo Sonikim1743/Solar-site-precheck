@@ -1,16 +1,16 @@
 {
   "app": "Solar Site Precheck",
   "version": "1.28.2",
-  "buildDate": "2026-10-13",
-  "sourceCommit": "a7211cbaf4c7a862c4a1a6ef3e4dc9594e38f13e",
+  "buildDate": "2026-10-14",
+  "sourceCommit": "45e305c4e6a3e7c28e9d3f322d9993a6daf293d9",
   "target": "portable",
-  "buildId": "1.28.2-2026-10-13-e81d0e5dba9a",
+  "buildId": "1.28.2-2026-10-14-cdf5fb5796f0",
   "packageName": "SolarSitePrecheck_v1.28.2_release_light.zip",
   "zipUrl": "https://raw.githubusercontent.com/Sonikim1743/Solar-site-precheck/main/release/latest/SolarSitePrecheck_v1.28.2_release_light.zip",
-  "sha256": "e81d0e5dba9ad75f3d8bdbf40e996667db007bc15d27d095012f1ca5d80edab4",
-  "etag": "e81d0e5dba9ad75f",
-  "bundleName": "index-10S0EM18.js",
+  "sha256": "cdf5fb5796f039ea0ad409dfb113cc270e31ff7ad33b3f092c49c72e6718e8f2",
+  "etag": "cdf5fb5796f039ea",
+  "bundleName": "index-DUoREfzz.js",
   "minRequiredRuntime": "1.2",
-  "notes": "4段×4〜8列の参考配置、10/15/20°比較、架台選択・フェンス、地番と地図操作を更新。配置は画面内の参考です。既存runtime/node.exeを保持してください。",
-  "sizeBytes": 15065892
+  "notes": "地図参考領域から3D・一括解析・PDFへ接続。A3横1枚2図、標高ラベル、面積加重勾配、正南比較、15°・前後空き3.3mを追加。原本全筆は未確認。既存runtime/node.exeを保持してください。",
+  "sizeBytes": 15352134
 }
