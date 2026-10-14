@@ -118,9 +118,11 @@ function localSvgValue(value) {
   })
 }
 
+export const isInlineTerrainImage = href => /^data:image\/(?:png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(href || '')
+
 function snapshotSvg(svg, widthMm, checkDeadline, drawingOnly = false) {
   checkDeadline()
-  if (svg.querySelector('foreignObject, script, use, iframe, style') || [...svg.querySelectorAll('image')].some(image => !/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(image.getAttribute('href') || ''))) fail('図の形式に対応していません。')
+  if (svg.querySelector('foreignObject, script, use, iframe, style') || [...svg.querySelectorAll('image')].some(image => !isInlineTerrainImage(image.getAttribute('href')))) fail('図の形式に対応していません。')
   const clone = svg.cloneNode(true)
   const originals = [svg, ...svg.querySelectorAll('*')], copies = [clone, ...clone.querySelectorAll('*')]
   originals.forEach((node, index) => {
@@ -317,7 +319,7 @@ function pageDrawing(ctx, model, images) {
     drawText(ctx, label, x+3, y+1.4, 60, { size: 3.05, weight: 700, maxLines: 1 })
     drawText(ctx, value, x+69, y+1.4, 129, { size: 3.3, maxLines: 1 })
   }))
-  drawText(ctx,`出典：国土地理院 DEM・標準地図${model.mapReference?' / AMX公開地図2024 https://source.coop/smartmaps/amx-2024-04':' / 範囲・地番資料は報告書の出典参照'} 。${sheet.fenceOn?'一点鎖線＝仮フェンス（1.2m）。':''}`,11,276,397,{size:2.65,maxLines:1})
+  drawText(ctx,`出典：国土地理院 DEM・標準地図・航空写真${model.mapReference?' / AMX公開地図2024 https://source.coop/smartmaps/amx-2024-04':' / 範囲・地番資料は報告書の出典参照'} 。${sheet.fenceOn?'一点鎖線＝仮フェンス（1.2m）。':''}`,11,276,397,{size:2.65,maxLines:1})
   drawText(ctx,`${model.mapReference?'地図表示境界の参考領域・原本全筆未確認。':'地図上の参考図形・測量筆界未確認。'}セル${model.gridStep}m・4点平均の勾配を交差面積で集計。四区分＋未確認＝100%。境界外約10m以上は表示のみ。`,11,281,397,{size:2.65,maxLines:1})
   const missing=[model.contextStatus!=='ready'?'周辺地図の一部または全部が未取得。':'',model.noParcelMetadata?'地番資料なし・地番未取得。':'',model.missingParcels?`地番未記載 ${model.missingParcels}区域。`:'',model.unplacedParcels?`図上に収まらない地番：${model.unplacedParcels}。`:''].join('')
   drawText(ctx,`${missing}参考図・施工可否未確認。配置方位は北0°時計回り、モジュール傾斜は水平から。取得日は標高の測量日ではありません。`,11,286,397,{size:2.65,maxLines:1,ellipsis:true})
@@ -431,7 +433,12 @@ export async function exportTerrainAreaPdf({ report, element, drawingOnly = fals
   const images = []
   let canvas
   try {
-    if (drawingOnly) await boundedWait(new Promise(resolve => { const poll = () => { if (controller.signal.aborted || !element?.isConnected || element.querySelector('.terrain-drawing-export-source')?.dataset.contextStatus !== 'loading') resolve(); else setTimeout(poll, 50) }; poll() }), controller.signal, '周辺地図の取得が完了しませんでした。再試行してください。')
+    if (drawingOnly) {
+      const pair=element?.querySelector('.terrain-drawing-export-source')
+      if(pair&&pair.dataset.contextStatus!=='loading'&&pair.dataset.contextStatus!=='ready')pair.dispatchEvent(new Event('terrain-drawing-context-retry'))
+      await boundedWait(new Promise(resolve => { const poll = () => { if (controller.signal.aborted || !element?.isConnected || element.querySelector('.terrain-drawing-export-source')?.dataset.contextStatus !== 'loading') resolve(); else setTimeout(poll, 50) }; poll() }), controller.signal, '航空写真の取得が完了しませんでした。再試行してください。')
+      if(pair?.dataset.contextStatus!=='ready')fail('航空写真または周辺地図を取得できませんでした。前回のPDFは保持しています。通信を確認して再試行してください。')
+    }
     // Capture matching text, computed SVG styles and geometry as one snapshot.
     const model = modelFromElement(report, element, checkDeadline)
     if (drawingOnly) {
@@ -440,6 +447,8 @@ export async function exportTerrainAreaPdf({ report, element, drawingOnly = fals
       if(!pair)fail('単独配置図の2つの図面が表示されていません。')
       const plans = [...pair.querySelectorAll('svg')]
       if(plans.length!==2 || plans[0].dataset.viewport!==plans[1].dataset.viewport || plans.some(p=>p.dataset.geometryKey!==report.terrainArea.geometryKey) || plans[1].querySelector('[data-layout-racks]')) fail('2つの図の範囲・縮尺・配置が一致しません。')
+      const photos=[...plans[1].querySelectorAll('image')]
+      if(pair.dataset.photoContextStatus!=='ready'||plans[1].dataset.contextLayer!=='seamlessphoto'||!photos.length||photos.some(image=>image.getAttribute('data-context-layer')!=='seamlessphoto'||!/^data:image\/jpeg;base64,/.test(image.getAttribute('href')||'')))fail('右図の周辺航空写真が準備できていません。再試行してください。')
       model.snapshots = plans.map(plan=>snapshotSvg(plan, 198, checkDeadline, true))
       model.drawingDistribution = terrainSlopeDistribution(report.terrainArea)
       model.gridStep = report.terrainArea.grid.step

@@ -1,11 +1,17 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createTerrainPdfBytes, exportTerrainAreaPdf, terrainPdfFileName } from '../src/utils/terrainPdf.js'
+import { createTerrainPdfBytes, exportTerrainAreaPdf, terrainPdfFileName, isInlineTerrainImage } from '../src/utils/terrainPdf.js'
 
 // Real RGB JPEG encoding of a synthetic 2×1 solid-green image. No site imagery.
 const JPEG = '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoHBwYIDAoMDAsKCwsNDhIQDQ4RDgsLEBYQERMUFRUVDA8XGBYUGBIUFRT/2wBDAQMEBAUEBQkFBQkUDQsNFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBT/wAARCAABAAIDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD50ooorU/Gj//Z'
 const page = () => ({ bytes: Uint8Array.from(Buffer.from(JPEG, 'base64')), width: 2, height: 1 })
 const asLatin1 = bytes => Buffer.from(bytes).toString('latin1')
+
+test('drawing snapshots allow inline aerial JPEG and PNG while rejecting remote, SVG and active data URLs',()=>{
+ assert.equal(isInlineTerrainImage(`data:image/jpeg;base64,${JPEG}`),true)
+ assert.equal(isInlineTerrainImage('data:image/png;base64,AA=='),true)
+ for(const href of ['https://example.com/photo.jpg','data:image/svg+xml;base64,AA==','data:text/html;base64,AA==','data:image/jpeg;base64,AA==\" onload=bad','javascript:bad'])assert.equal(isInlineTerrainImage(href),false)
+})
 
 test('PDF writer creates exactly two A3 landscape pages with JPEG XObjects and no active content', () => {
   const bytes = createTerrainPdfBytes([page(), page()])

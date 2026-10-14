@@ -49,6 +49,8 @@ const browser=await chromium.launch({executablePath:process.env.SOLAR_BROWSER_EX
 page.setDefaultTimeout(30000)
 page.on('pageerror',e=>errors.push(e.message))
 page.on('response',r=>{if(r.url().includes('MojMap_amx_2024.pmtiles'))ranges.push({status:r.status(),range:r.request().headers().range,bytes:r.headers()['content-length']})})
+const expectAerial=process.env.SOLAR_EXPECT_AERIAL==='1',photoResponses=[]
+page.on('response',r=>{if(r.url().includes('/xyz/seamlessphoto/'))photoResponses.push({url:r.url(),status:r.status(),type:r.headers()['content-type'],cors:r.headers()['access-control-allow-origin']})})
 const center=sample.candidates[0].point
 // Place the location marker away from the selected geometry's interior click.
 const position={lat:center.lat+.0003,lon:center.lon-.0004}
@@ -99,7 +101,19 @@ try{
  await page.locator('.regional-parcel-selection').getByRole('button',{name:sample.candidates[0].number+' ×',exact:true}).click();assert.match(await selection.textContent(),/選択中 2区域 \/ 適用済み 3区域/)
  await page.getByRole('button',{name:'選択を中止',exact:true}).click();assert.match(await selection.textContent(),/選択中 3区域 \/ 適用済み 3区域/)
  await page.setViewportSize({width:390,height:844});await page.locator('.regional-parcel-selection').scrollIntoViewIfNeeded();await page.screenshot({path:path.join(out,'mobile-selection.png')});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1))
- await page.getByRole('button',{name:'基本値でまとめて解析',exact:true}).click();await page.locator('.simple-batch-complete').waitFor({timeout:180000})
+ if(expectAerial)await page.evaluate(()=>{
+  window.__drawingEvidence=[]
+  const observer=new MutationObserver(()=>{const p=document.querySelector('.simple-export-source .terrain-drawing-export-source');if(p?.dataset.contextStatus!=='ready'||window.__drawingEvidence.length)return;window.__drawingEvidence.push({photoStatus:p.dataset.photoContextStatus,views:[...p.querySelectorAll('svg')].map(s=>({kind:s.dataset.drawingView,layer:s.dataset.contextLayer,viewport:s.dataset.viewport,images:[...s.querySelectorAll('image')].map(i=>({layer:i.dataset.contextLayer,mime:i.getAttribute('href').split(';')[0]})),labels:[...s.querySelectorAll('[data-contour-level]')].map(l=>({text:l.textContent,size:getComputedStyle(l).fontSize,weight:getComputedStyle(l).fontWeight,fill:getComputedStyle(l).fill}))}))})})
+  observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['data-context-status']});window.__drawingObserver=observer
+ })
+ if(process.env.SOLAR_TEST_PHOTO_FAILURE==='1'){
+  const blocked='https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/**',abort=route=>route.abort('failed')
+  await page.route(blocked,abort);await page.getByRole('button',{name:'基本値でまとめて解析',exact:true}).click()
+  await page.waitForFunction(()=>[...document.querySelectorAll('.simple-batch [role="alert"]')].some(n=>n.textContent.includes('航空写真')),{},{timeout:180000})
+  assert.equal(await page.locator('.simple-batch-complete').count(),0,'missing aerial photo cannot produce a completed PDF')
+  await page.unroute(blocked,abort);await page.getByRole('button',{name:'同じ範囲を再解析',exact:true}).click()
+ }else await page.getByRole('button',{name:'基本値でまとめて解析',exact:true}).click()
+ await page.locator('.simple-batch-complete').waitFor({timeout:180000})
  console.log('Map reference phase: simple batch completed')
  assert.equal(await page.locator('.simple-batch-complete').getAttribute('data-simple-result-key'),expected)
  const links=page.locator('.simple-batch-downloads a[download]');assert.equal(await links.count(),2)
@@ -107,6 +121,8 @@ try{
  await page.locator('.simple-batch-complete').screenshot({path:path.join(out,'simple-complete.png')})
  const before=await links.evaluateAll(ns=>ns.map(n=>n.href));await page.getByRole('button',{name:'同じ範囲を再解析',exact:true}).click();await page.getByRole('button',{name:'一括解析を中止',exact:true}).click();assert.deepEqual(await links.evaluateAll(ns=>ns.map(n=>n.href)),before)
  assert.deepEqual(errors,[]);assert.ok(ranges.every(r=>r.status===206),'PMTiles uses bounded Range requests')
+ const drawingEvidence=expectAerial?await page.evaluate(()=>{window.__drawingObserver.disconnect();return window.__drawingEvidence}):[]
+ if(expectAerial){const evidence=drawingEvidence[0];assert.ok(evidence);assert.equal(evidence.photoStatus,'ready');assert.equal(evidence.views[0].layer,'std');assert.equal(evidence.views[1].layer,'seamlessphoto');assert.equal(evidence.views[0].viewport,evidence.views[1].viewport);assert.ok(evidence.views[1].images.length>0&&evidence.views[1].images.every(i=>i.layer==='seamlessphoto'&&i.mime==='data:image/jpeg'));assert.ok(evidence.views[1].labels.length>0&&evidence.views[1].labels.every(l=>l.size==='18px'&&l.weight==='700'));await fs.writeFile(path.join(out,'aerial-evidence.json'),JSON.stringify({base,drawingEvidence,photoResponses},null,2))}
  await fs.writeFile(path.join(out,'check.json'),JSON.stringify({at:new Date().toISOString(),base,sample,expected,review,ranges,errors,checks:['actual map-vector click outside original prepared region','reference draft/cancel preserves applied selection','same map geometry to 3D and simple batch','390px without page overflow','two actual PDF downloads','cancel retains completed PDFs']},null,2))
  console.log('Actual Windows map-reference flow passed')
 }catch(e){await fs.writeFile(path.join(out,'failure.txt'),e.stack+'\n'+await page.locator('body').innerText({timeout:5000}).catch(()=>'(body unavailable)'));await page.screenshot({path:path.join(out,'failure.png'),fullPage:true,timeout:5000}).catch(()=>{});throw e}finally{await browser.close()}
