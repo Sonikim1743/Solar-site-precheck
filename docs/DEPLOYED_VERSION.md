@@ -1,4 +1,27 @@
-# 公開・配布版の状態 — v1.28.2 / 2026-10-13
+# 公開・配布版の状態 — v1.28.2 / 2026-10-14
+
+利用者が承認した既存サイト更新として、検証済みパッケージを既存Cloudflare Pagesのproductionへ配布しました。地図参考領域から3D・一括解析・2種類のPDFへ接続し、A3横1枚2図、等高線標高ラベル、面積加重の勾配分布、正南固定比較、15°・前後空き3.3mを追加しました。自宅Macの未保存バイトの回収ではなく、履歴からの再実装です。
+
+- 運用URL：https://solar-site-precheck.pages.dev/
+- 配布URL：https://939a74b3.solar-site-precheck.pages.dev/
+- Production ID：`939a74b3-7620-43f1-b895-89eecda6584a` / branch `main`
+- ソース：`45e305c4e6a3e7c28e9d3f322d9993a6daf293d9` / パッケージ保存：`efd619a5ffb97ae6eff92cd5c0a7207e7b7f1837`
+- 版：1.28.2 / Build 2026-10-14 / 公開JS：`index-CqpSJyZ2.js`
+- Cloudflare ZIP：14,622,927 bytes / SHA-256 `bc3ec65b22e20c18a8aeadb15666d2a816dd3bb787b26facaeb932d12352ed4d`
+- Windows ZIP：15,352,134 bytes / SHA-256 `cdf5fb5796f039ea0ad409dfb113cc270e31ff7ad33b3f092c49c72e6718e8f2` / JS `index-DUoREfzz.js`
+- [ソースmain CI 38513831347](https://github.com/Sonikim1743/Solar-site-precheck/actions/runs/38513831347)、[配布物main CI 38514351820](https://github.com/Sonikim1743/Solar-site-precheck/actions/runs/38514351820)：success。
+
+公式npmのWrangler 4.150.0を、利用者の別承認後に会社PCのリポジトリ外へローカルインストールしました。既存認証を公式whoamiで確認して再利用し、新ログイン・OAuth許可操作・キー発行は行っていません。パッケージルートからWranglerがWorkerをコンパイルし、52資産とFunctions bundleを配布しました。大域的なインストール設定・会社のセキュリティ設定・Git Providerは変更していません。
+
+クリーンなソースから全体テスト491/491、両ターゲットのビルド、CSP、資産、Functionsのedge依存、全ZIP項目ハッシュと配布メタデータが成功。GitHubから再取得したCloudflare ZIPも同じSHA-256でした。運用URLから52公開distファイルを実取得し、全件がmanifestと一致、未照合・不一致は0件（2026-10-14 05:39:28 UTC / 14:39:28 JST）。_headersはHTTPファイル対象外として実CSPを確認。API等6件で、main HTML、操作PDF、power-grid不正入力400 JSON、NEDO正常200・異常400、inheritance-pdf GET 405が成功しました。PDF APIのPOSTは未実行です。
+
+実運用URLの独立Edgeセッションで、公開3区域7005-7・7023-4・7025-2を実クリックし、選択取消・再適用、同じgeometry keyの3D、内部代表点から一括解析、配置図1ページ・報告書4ページの実保存、390px幅、再解析取消後の前回PDF保持を確認しました。実案件の結果とは区別します。公開JSと実PDFの標高ラベルも確認済み。Mac/Safari実機・実タッチ・ユーザーの現在の3地番の操作は未確認です。
+
+隣接表示境界の一部の組合せは投影後の接触する中抜きが検証に通らず、確定前に停止して前回の結果を保持します。修復・凸包・拡張は行いません。原本全筆の保証と全国原本整備は今回の完成範囲に含めません。詳細は `MAP_REFERENCE_DRAWING_2026_10_14_JA.md`。旧production `8d946c82-89f9-4e6d-99a6-0ffa283c0295` と10/13のZIPを復旧用に保持しています。配布後の確認文書はソースコミット・配布物とは別です。
+
+---
+
+# 以前の公開・配布版の状態 — v1.28.2 / 2026-10-13
 
 利用者のGitHub・オンライン版更新依頼に基づき、[PR #6](https://github.com/Sonikim1743/Solar-site-precheck/pull/6)をmainへ反映し、既存Cloudflare Pagesに公開しました。公開画面は **Version 1.28.2 / Build 2026-10-13**。実寸の参考配置、勾配条件比較、架台の選択・復元、配置を囲む仮フェンス、地番・地図切替と説明ウィンドウを更新しています。
 

@@ -1,6 +1,6 @@
 # 配布パッケージ v1.28.2 / 2026-10-14
 
-今回の配布候補は1.28.2 / Build 2026-10-14です。main反映・ZIP作成・本番配布はそれぞれ実結果で確認します。最終確認済みの本番はBuild 2026-10-13で、過去の公開IDとハッシュは [公開記録](https://github.com/Sonikim1743/Solar-site-precheck/blob/main/docs/DEPLOYED_VERSION.md) に保持しています。今回の検証・制約・配布状態は [引き継ぎ](MAP_REFERENCE_DRAWING_2026_10_14_JA.md) を参照してください。
+公開・配布版は1.28.2 / Build 2026-10-14です。main反映・検証ZIP作成・Functionsを含むproduction配布と運用URLの実検証が完了しました。Production IDは `939a74b3-7620-43f1-b895-89eecda6584a`、公開JSは `index-CqpSJyZ2.js`。ソース・ハッシュ・実検証範囲と旧版復旧先は [公開記録](https://github.com/Sonikim1743/Solar-site-precheck/blob/main/docs/DEPLOYED_VERSION.md)、制約は [引き継ぎ](MAP_REFERENCE_DRAWING_2026_10_14_JA.md) を参照してください。
 
 ## 今回の使い方と変更
 
