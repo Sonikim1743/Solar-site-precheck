@@ -2,15 +2,15 @@
   "app": "Solar Site Precheck",
   "version": "1.28.2",
   "buildDate": "2026-10-14",
-  "sourceCommit": "ed00926b015f54fc42613c59c09a9814341b30cb",
+  "sourceCommit": "a84abadd80e6c1cf08742d4f82c4b8ac9bad86f6",
   "target": "portable",
-  "buildId": "1.28.2-2026-10-14-d74f0d4b579c",
+  "buildId": "1.28.2-2026-10-14-e2fcee8d4a91",
   "packageName": "SolarSitePrecheck_v1.28.2_release_light.zip",
   "zipUrl": "https://raw.githubusercontent.com/Sonikim1743/Solar-site-precheck/main/release/latest/SolarSitePrecheck_v1.28.2_release_light.zip",
-  "sha256": "d74f0d4b579c91d81efc85bfc1c0ff6ab570b4ba5d84ffef5d9f2fbdd8dd2ecf",
-  "etag": "d74f0d4b579c91d8",
-  "bundleName": "index--yU3qG4H.js",
+  "sha256": "e2fcee8d4a91aaeb1a8963ea9435cfb025ca818550c5dee26084e34a1524f026",
+  "etag": "e2fcee8d4a91aaeb",
+  "bundleName": "index-OEW7Ymtg.js",
   "minRequiredRuntime": "1.2",
   "notes": "地図参考領域から3D・一括解析・PDFへ接続。A3横1枚2図、標高ラベル、面積加重勾配、正南比較、15°・前後空き3.3mを追加。原本全筆は未確認。既存runtime/node.exeを保持してください。",
-  "sizeBytes": 15353096
+  "sizeBytes": 15355221
 }
