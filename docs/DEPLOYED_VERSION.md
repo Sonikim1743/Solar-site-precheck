@@ -1,3 +1,21 @@
+# 公開・配布版 — 上部の名前入力欄を削除 / 2026-10-15
+
+承認済みのUI整理の残りとして、地図直上の「発電所名」入力1行と専用CSS3行だけを削除しました。保存済みの名前、詳細の候補地名編集、記録の保存・復元は維持。新しい名前や初期値は追加せず、単独PDFの名前なし上部も変更していません。
+
+- 運用URL：https://solar-site-precheck.pages.dev/
+- Production ID：`2534ccf1-4f40-429b-92c3-670f13ddf606` / branch `main`
+- ソース：`0399ff8532e47113502cbb85aeba0db59132963d` / 配布物main反映：`48a5a42034ee91ce372640bf58f8015e00a03979`
+- 版：1.28.2 / Build 2026-10-15 / 公開JS：`index-DpAGKBg5.js`
+- Cloudflare ZIP：14,629,299 bytes / SHA-256 `15841715f52d68f03ee0b823b8c56dd5ba3ae4ba476f6bf3f73e23ad8b4378f3`
+- Windows ZIP：15,358,522 bytes / SHA-256 `9572603d8ed58012676bdb2bf54ea5ab08c4ad01ff0cfbfda44080dfc3cfa007`
+- [main CI 38696124913](https://github.com/Sonikim1743/Solar-site-precheck/actions/runs/38696124913)：success。
+
+名前の保存・旧schema・PDFの関連32/32、公式配布手順の全体523/523が成功。両ターゲットのビルド・CSP・資産・ZIP照合が通過しました。運用の公開dist **50/50ファイル**がmanifestと一致、不一致0件（2026-10-15T07:04:30.994Z）。実配信JSで上部入力の不在と詳細編集の残存、CSSで専用スタイルの不在も確認しました。
+
+既存の公式Wranglerと既存認証で配布し、アクセス・認証・セキュリティ設定は変更していません。ブラウザーを追加起動せず、ユーザーの既存画面は再読込していません。実プリンター・ブラウザーUI操作は未確認です。前のproduction `3315e400-a557-4de5-ada6-b6e881551e76` と過去の検証記録は保持します。
+
+---
+
 # 公開・配布版 — 固定縮尺・案内整理 / 2026-10-15
 
 利用者のGitHub・公開サイト更新承認に基づき、検証済みソースと配布物をmainへ反映し、既存productionを更新しました。
