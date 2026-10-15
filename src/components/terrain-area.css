@@ -313,7 +313,7 @@
 .terrain-area-stage { position:relative; min-width:0; }
 .terrain-area-stage>svg { position:relative; }
 .terrain-area-model--navigation { display:grid; grid-template-columns:minmax(0,1fr) 212px; gap:8px; }
-.terrain-area-model--navigation .terrain-area-stage { grid-column:1; grid-row:1; }
+.terrain-area-model--navigation .terrain-area-stage { grid-column:1; grid-row:1; align-self:start; }
 .terrain-view-navigation { grid-column:2; grid-row:1; align-self:start; display:grid; grid-template-columns:44px 160px; gap:8px; margin-top:22px; }
 .terrain-navigation-tools { display:flex; flex-direction:column; gap:8px; padding-top:28px; }
 .terrain-navigation-tools button { box-sizing:border-box; width:44px; height:44px; padding:6px; border:1px solid #c8d6cd; border-radius:7px; background:#fff; cursor:pointer; }
