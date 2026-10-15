@@ -3,7 +3,7 @@ import path from 'node:path'
 import { createRequire } from 'node:module'
 import assert from 'node:assert/strict'
 
-const repo = process.cwd()
+const repo = process.cwd().split(path.sep).join('/')
 const out = path.resolve(process.env.SOLAR_VERIFICATION_DIR || 'outputs/terrain-stage-regression')
 await fs.mkdir(out,{recursive:true})
 if(!process.env.SOLAR_PLAYWRIGHT_MODULE || !process.env.SOLAR_BROWSER_EXE) throw Error('Set existing SOLAR_PLAYWRIGHT_MODULE and SOLAR_BROWSER_EXE; no installation is performed')
