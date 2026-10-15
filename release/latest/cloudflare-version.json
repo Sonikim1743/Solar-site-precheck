@@ -1,16 +1,16 @@
 {
   "app": "Solar Site Precheck",
   "version": "1.28.2",
-  "buildDate": "2026-10-14",
-  "sourceCommit": "a84abadd80e6c1cf08742d4f82c4b8ac9bad86f6",
+  "buildDate": "2026-10-15",
+  "sourceCommit": "4d743b04c3da324e3d3eb79f76d4d09589364a55",
   "target": "cloudflare",
-  "buildId": "1.28.2-2026-10-14-2b99db23b324",
-  "packageName": "SolarSitePrecheck_v1.28.2_2026-10-14_cloudflare.zip",
-  "zipUrl": "https://raw.githubusercontent.com/Sonikim1743/Solar-site-precheck/main/release/latest/SolarSitePrecheck_v1.28.2_2026-10-14_cloudflare.zip",
-  "sha256": "2b99db23b324c04bf3c23c28108b6637771e18abdf455ce6d1e8aedf2be6e40f",
-  "etag": "2b99db23b324c04b",
-  "bundleName": "index-C6JlUbKJ.js",
+  "buildId": "1.28.2-2026-10-15-21022762aa4e",
+  "packageName": "SolarSitePrecheck_v1.28.2_2026-10-15_cloudflare.zip",
+  "zipUrl": "https://raw.githubusercontent.com/Sonikim1743/Solar-site-precheck/main/release/latest/SolarSitePrecheck_v1.28.2_2026-10-15_cloudflare.zip",
+  "sha256": "21022762aa4ed93c2fad88300941da373e5f354798bf91caf2351a683d3e1a4e",
+  "etag": "21022762aa4ed93c",
+  "bundleName": "index-BvnoYC3m.js",
   "minRequiredRuntime": "1.2",
-  "notes": "地図参考領域から3D・一括解析・PDFへ接続。A3横1枚2図、標高ラベル、面積加重勾配、正南比較、15°・前後空き3.3mを追加。原本全筆は未確認。dist・functions・sharedの展開先ルートから配布してください。",
-  "sizeBytes": 14625970
+  "notes": "配置図の固定縮尺・案内整理・描画最適化。A3横100%印刷。境界・施工可否は未確認。dist・functions・sharedを含むルートから配布。",
+  "sizeBytes": 14629423
 }
