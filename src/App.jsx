@@ -23,6 +23,7 @@ import HorizonGraphPreview from './components/HorizonGraphPreview.jsx'
 import TerrainSectionPreview from './components/TerrainSectionPreview.jsx'
 import TerrainAreaPanel from './components/TerrainAreaPanel.jsx'
 import TerrainAreaReport from './components/TerrainAreaReport.jsx'
+import TerrainDrawingScaleControl from './components/TerrainDrawingScaleControl.jsx'
 import SelectedParcel3D, { selectedParcelUnionReview } from './components/SelectedParcel3D.jsx'
 import { REGIONAL_PARCEL_SOURCE } from './services/regionalParcels.js'
 import { MAP_PARCEL_SOURCE } from './utils/mapParcelSelection.js'
@@ -661,6 +662,7 @@ export default function App() {
   const [recordDownload, setRecordDownload] = useState(null)
   const [terrainPdfDownload, setTerrainPdfDownload] = useState(null)
   const [terrainPdfStatus, setTerrainPdfStatus] = useState({ loading: false, message: '', error: false })
+  const [terrainDrawingScale, setTerrainDrawingScale] = useState(1000)
   const terrainAreaJob = useRef({ id: 0, controller: null, key: '' })
   const terrainAreaKeyRef = useRef(terrainAreaKey)
   terrainAreaKeyRef.current = terrainAreaKey
@@ -2862,9 +2864,9 @@ export default function App() {
   // PDF validity follows the fields used by the terrain sheets. Unrelated
   // checks and render state must not discard a completed download.
   const terrainPdfReport = useMemo(() => ({
-    terrainArea: currentTerrainArea, terrainPreview: terrainReportPreview, parcelReview, position, siteName,
+    terrainArea: currentTerrainArea, terrainPreview: terrainReportPreview, parcelReview, position, siteName, drawingScale:terrainDrawingScale,
     placeLabel: selectedPlaceLabel, fieldMemo, appVersion: APP_VERSION,
-  }), [currentTerrainArea, terrainReportPreview, parcelReview, position, siteName, selectedPlaceLabel, fieldMemo])
+  }), [currentTerrainArea, terrainReportPreview, parcelReview, position, siteName, selectedPlaceLabel, fieldMemo,terrainDrawingScale])
   const terrainPdfReportRef = useRef(terrainPdfReport)
   terrainPdfReportRef.current = terrainPdfReport
   const terrainPdfJob = useRef(0)
@@ -2896,7 +2898,7 @@ export default function App() {
     try {
       const { exportTerrainAreaPdf } = await import('./utils/terrainPdf.js')
       if (!isCurrent()) return
-      const { blob, fileName, pageCount } = await exportTerrainAreaPdf({ report: sourceReport, element: document.getElementById('terrain-area-report'), drawingOnly })
+      const { blob, fileName, pageCount } = await exportTerrainAreaPdf({ report: sourceReport, element: document.getElementById('terrain-area-report'), drawingOnly, drawingScale:terrainDrawingScale })
       if (!isCurrent()) return
       const url = await new Promise((resolve, reject) => {
         const reader = new FileReader()
@@ -2907,7 +2909,7 @@ export default function App() {
       if (!isCurrent()) return
       setTerrainPdfDownload({ url, previewUrl: URL.createObjectURL(blob), fileName, pageCount })
       const link = document.createElement('a'); link.href = url; link.download = fileName; link.click()
-      setTerrainPdfStatus({ loading: false, error: false, message: `${drawingOnly ? '配置図PDF：' : '地形レポートPDF：'}A3横・${pageCount}ページのPDFを作成しました。画像として保存するため文字の選択・CAD編集はできません。配置はJSON記録に保存されません。` })
+      setTerrainPdfStatus({ loading: false, error: false, message: `${drawingOnly ? '配置図PDF：' : '地形レポートPDF：'}A3横・${pageCount}ページを作成しました。画像PDF・CAD編集不可。配置条件はJSON未保存。` })
     } catch (error) {
       if (!isCurrent()) return
       setTerrainPdfStatus({ loading: false, error: true, message: error.message || 'PDFを作成できませんでした。もう一度お試しください。' })
@@ -3681,7 +3683,7 @@ export default function App() {
               {terrainSectionOpen && <TerrainSectionPreview analysis={terrainSection} />}
             </div>
             <SelectedParcel3D review={parcelReview} referenceCount={publicParcelReferences.length} request={regional3DRequest} onAcquired={setSelectedParcelTerrain} />
-            <SimpleReviewPanel visible={simpleDesign} review={parcelReview.parcels.some(p=>p.role==='target'&&[REGIONAL_PARCEL_SOURCE,MAP_PARCEL_SOURCE].includes(p.source.fileName))?selectedParcelUnionReview(parcelReview):parcelReview} referenceCount={publicParcelReferences.length} siteName={siteName} appVersion={APP_VERSION} terrainArea={selectedParcelTerrain} state={simpleWorkflow} onChange={setSimpleWorkflow} onRepresentativeChange={setSimpleRepresentative} onDraw={() => openReviewSection('site-select', 'boundary')} />
+            <SimpleReviewPanel visible={simpleDesign} review={parcelReview.parcels.some(p=>p.role==='target'&&[REGIONAL_PARCEL_SOURCE,MAP_PARCEL_SOURCE].includes(p.source.fileName))?selectedParcelUnionReview(parcelReview):parcelReview} referenceCount={publicParcelReferences.length} siteName={siteName} appVersion={APP_VERSION} terrainArea={selectedParcelTerrain} drawingScale={terrainDrawingScale} onDrawingScaleChange={setTerrainDrawingScale} state={simpleWorkflow} onChange={setSimpleWorkflow} onRepresentativeChange={setSimpleRepresentative} onDraw={() => openReviewSection('site-select', 'boundary')} />
             <details id="terrain-area" className="terrain-area-disclosure" open={terrainAreaOpen} onToggle={event => setTerrainAreaOpen(event.currentTarget.open)}>
               <summary><strong>検討範囲の等高線・勾配・3D</strong><span>{terrainAreaOpen ? '閉じる' : '開く'}</span></summary>
               <TerrainAreaPanel geometry={parcelMetrics.geometry} metrics={parcelMetrics} analysis={currentTerrainArea} status={terrainAreaStatus} progress={terrainAreaProgress} error={terrainAreaError} position={position} onAnalyze={handleTerrainAreaAnalysis} onCancel={cancelTerrainAreaAnalysis} onClear={() => { cancelTerrainAreaWork(); setTerrainArea(null); setTerrainAreaStatus('idle'); setTerrainAreaError(''); setReportView('summary') }} onDrawBoundary={() => openReviewSection('site-select', 'boundary')} onOpenReport={openTerrainAreaReport} onOpenDrawing={() => { openTerrainAreaReport(); setTerrainDrawingRequested(true) }} parcels={parcelReview.parcels} publicParcels={publicParcelSnapshot.features} publicParcelsLimited={publicParcelSnapshot.truncated || publicParcelSnapshot.status === 'partial'} preview={terrainPreview} onPreviewChange={setTerrainPreview} />
@@ -4149,6 +4151,7 @@ export default function App() {
             {reportView !== 'terrain' && <>
             <div className="report-readiness no-print"><div><strong>出力前に確認する内容</strong><p>発電量：{generation ? '計算済み' : '未計算'} ／ 地平線：{terrain?.samples?.length ? '分析済み' : '未分析'} ／ NEDO積雪：{confirmedSnowStation ? '確認済み' : '未取得'} ／ 系統設備：{powerGrid.data ? '取得済み（接続可否は未確認）' : '未取得'}</p><p>未取得の項目は未確認として出力します。設備確認メモは系統画面で保存すると検討記録とレポートに追加されます。</p></div><div className="report-readiness__actions"><button type="button" className="secondary-button" disabled={!position} onClick={() => openReviewSection('solar-generation')}>発電量を確認</button><button type="button" className="secondary-button" onClick={() => { openReviewSection('site-details'); const analysis = document.getElementById('simple-analysis'); if (analysis) analysis.open = true }}>地形・積雪を確認</button></div></div>
             </>}
+            {reportView === 'terrain' && terrainPreview.layout?.analysisReference === currentTerrainArea && <TerrainDrawingScaleControl value={terrainDrawingScale} onChange={setTerrainDrawingScale} grid={currentTerrainArea?.grid} disabled={terrainPdfStatus.loading}/>}
             <div className="action-row no-print">
               <button type="button" className="secondary-button" onClick={downloadCsv}>チェックCSV出力</button>
               <button type="button" className="secondary-button" disabled={!position} onClick={saveReviewRecord}>検討記録を保存</button>
@@ -4206,7 +4209,7 @@ export default function App() {
                 </label>
               </div>
             </details>}
-            {reportView === 'terrain' && currentTerrainArea ? <TerrainAreaReport report={report} /> : <ReportPreview report={report} />}
+            {reportView === 'terrain' && currentTerrainArea ? <TerrainAreaReport report={report} drawingScale={terrainDrawingScale} /> : <ReportPreview report={report} />}
             </div>
           </details>
         </section>

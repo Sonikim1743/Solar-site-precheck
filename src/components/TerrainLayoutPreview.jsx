@@ -4,6 +4,7 @@ import { normalizeTerrainLayoutOptions } from '../utils/terrainLayout.js'
 import { selectedTerrainLayout } from '../utils/terrainLayoutSelection.js'
 import TerrainHelpDialog from './TerrainHelpDialog.jsx'
 import { terrainLayoutErrorGuidance, terrainLayoutResultMatchesOptions } from '../utils/terrainLayoutError.js'
+import { TERRAIN_LAYOUT_SAVE } from '../utils/terrainLayoutReport.js'
 export { selectedTerrainLayout } from '../utils/terrainLayoutSelection.js'
 
 const number = (value, digits = 1) => Number.isFinite(value) ? value.toLocaleString('ja-JP', { maximumFractionDigits: digits }) : '—'
@@ -119,7 +120,7 @@ export default function TerrainLayoutPreview({ analysis, preview, onChange, parc
       <span className="terrain-layout-format">4段 × {columns} · モジュール{options.tiltDeg}°{layout && ` · 適用方位${number(layout.options.azimuthDeg)}°`}</span>
       <button type="button" className="terrain-layout-parcel-toggle" aria-pressed={Boolean(preview?.labels)} disabled={!parcelCount} onClick={() => onChangeRef.current(previous => ({ ...previous, labels: !previous.labels }))}>3D地番 {preview?.labels ? 'ON' : 'OFF'}</button>
       <TerrainHelpDialog title="参考配置の使い方・条件">
-        <h4>操作</h4><p>青い架台をクリックで除外し、点線をクリックで戻します。増やす・減らすは図の下で操作できます。再配置すると個別の除外選択を初期化します。</p>
+        <h4>操作</h4><p>架台をクリックで除外、点線で復元。図の下で増減できます。再配置すると個別除外を初期化します。</p>
         <h4>実寸と対象範囲</h4>
         <p>1架台：幅 {number(widthFor(options.minColumns), 3)}{options.maxColumns !== options.minColumns ? `〜${number(widthFor(options.maxColumns), 3)}` : ''}m × 水平奥行 {number(rackDepth, 3)}m（パネル面の奥行 {number(rackLength, 3)}m）。前後の空き{number(options.rowGapM)}mを加えた行ピッチは{number(rackDepth+options.rowGapM,3)}m。4段固定・横置きの実寸を地形と同じメートル座標で配置します。初期値はモジュール15°・前後の空き3.3mで、日影を保証する離隔ではありません。</p>
         <p>JKM720N-66HL5-BDVの外形2.384 × 1.303m、モジュール間20mm、地表から最低0.8mの仮条件。地形のセル4点平均の局所勾配が{options.slopeLimitDeg}°未満で、架台全体と空きが有効範囲に収まるものだけを数えます。欠測と除外は使いません。15°・20°の選択は比較用で、施工可否の判定ではありません。</p>
@@ -127,7 +128,7 @@ export default function TerrainLayoutPreview({ analysis, preview, onChange, parc
         <h4>容量の目安</h4><p>DC＝枚数×720W。AC＝DC÷1.5を標準刻みで丸めた参考値（100kW以下は10kW、超えると50kW）。連系・機器・日影・基礎・造成・施工可否は未判定。高さ2倍は表示だけで、枚数と容量は変わりません。</p>
         {layout?.dcKw > 0 && <p>AC参考帯：{number(layout.acRangeKw?.[0], 0)}〜{number(layout.acRangeKw?.[1], 0)}kW。{layout.acTargetKw < 10 && '換算が10kW未満のため表示は下限10kWです。'}</p>}
         <h4>最適配置と仮フェンス</h4><p>最適配置は基準方位±30°を7.5°刻み・開始位置も比較する参考探索です。最大32案・8秒で、最大枚数を保証しません。</p><p>仮フェンスは選択中の架台全体を囲み、端の空きと同じ距離を外側に取る高さ1.2mの参考表示です。離れた架台の間も一緒に囲みます。有効範囲の外と欠測はつなぎません。実測境界・施工線ではありません。</p>
-        <h4>保存と地番</h4><p>参考配置の条件・結果はこの画面内の検討用で、適用済み配置（個別除外を反映）と計算済み15° / 20°比較は地形PDFに含みます。チェック時は使用架台を囲む仮フェンスもPDFに含みます。単独配置図には選択資料の実地番を表示し、未適用の入力は含みません。JSON検討記録には条件・結果・個別除外・仮フェンスを保存しません。再読込・他PCでは再計算が必要です。</p><p>地番は公開資料または読み込んだ筆の実データがある場合に表示し、住所から推測しません。</p>
+        <h4>保存と地番</h4><p>{TERRAIN_LAYOUT_SAVE}</p><p>地番は公開資料・読み込んだ筆の実データだけを表示し、住所から推測しません。</p>
         {layout?.warnings?.length > 0 && <ul>{layout.warnings.map((warning, index) => <li key={index}>{typeof warning === 'string' ? warning : warning.message}</li>)}</ul>}
       </TerrainHelpDialog>
     </div>

@@ -19,5 +19,5 @@ export function terrainLayoutReportConditions(layout) {
   const o = layout.options
   return `${layout.stats?.autoSearch?.mode==='south-fixed'?'真南180°固定・探索候補内最多 / ':''}4段 × ${o.minColumns === o.maxColumns ? o.minColumns : `${o.minColumns}〜${o.maxColumns}`}列 / JKM720N-66HL5-BDV 2.384 × 1.303m・720W / パネル傾斜 ${n(o.tiltDeg)}°（地形勾配とは別） / 方位 ${terrainAzimuthLabel(o.azimuthDeg)}（北0°・時計回り） / 左右 ${n(o.rackGapM)}m・前後 ${n(o.rowGapM)}m・端 ${n(o.setbackM)}m / モジュール間 ${n(o.moduleGapM, 3)}m / 最低地上高 ${n(o.minClearanceM)}m / 開始位置 ${n(o.scanOffsetUM, 2)}, ${n(o.scanOffsetVM, 2)}m。`
 }
-export const TERRAIN_LAYOUT_LIMIT = '参考設計。境界・地盤・基礎・接道・搬入・排水・樹木建物・日影・連系・施工可否は未確認。欠測・除外を配置対象にしません。最大枚数は保証しません。ACは機器選定値ではなく、DC÷1.5を100kW以下10kW刻み／超過50kW刻み、下限10kWで丸めた目安です。'
-export const TERRAIN_LAYOUT_SAVE = '地形レポートPDFは適用済みの配置・数量・条件と計算済み比較を含みます。チェック時は使用架台を囲む仮フェンスも出力します。未適用入力はPDFに含みません。単独配置図の右図には選択資料の実地番を表示します（未記載・重なりは注記）。別の「配置図PDF」は現在の適用配置をA3横1枚の図面として出力します。JSON検討記録には配置条件・結果・個別除外・仮フェンスを保存しません。再読込・他PCでは再計算が必要です。'
+export const TERRAIN_LAYOUT_LIMIT = '参考配置。境界・地盤・基礎・接道・搬入・排水・樹木建物・日影・連系・施工可否は未確認。欠測・除外は使わず、最多枚数は未保証。ACはDC÷1.5を標準刻みで丸めた目安（下限10kW）で、機器選定値ではありません。'
+export const TERRAIN_LAYOUT_SAVE = '地形PDFは適用済み配置・数量・条件・計算済み比較を保存。仮フェンスはON時のみ。配置図PDFはA3横1枚で、縮尺を選べます。実資料の地番を表示し、未記載・重なりは注記。未適用入力とJSONへの配置保存は対象外。再読込・他PCでは再計算が必要です。'

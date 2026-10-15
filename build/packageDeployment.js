@@ -110,7 +110,7 @@ for (const target of ['cloudflare', 'portable']) {
     buildId: `${version}-${buildDate}-${packageHash.slice(0, 12)}`, packageName,
     zipUrl: `https://raw.githubusercontent.com/Sonikim1743/Solar-site-precheck/main/release/latest/${packageName}`,
     sha256: packageHash, etag: packageHash.slice(0, 16), bundleName, minRequiredRuntime: '1.2',
-    notes: target === 'portable' ? '地図参考領域から3D・一括解析・PDFへ接続。A3横1枚2図、標高ラベル、面積加重勾配、正南比較、15°・前後空き3.3mを追加。原本全筆は未確認。既存runtime/node.exeを保持してください。' : '地図参考領域から3D・一括解析・PDFへ接続。A3横1枚2図、標高ラベル、面積加重勾配、正南比較、15°・前後空き3.3mを追加。原本全筆は未確認。dist・functions・sharedの展開先ルートから配布してください。',
+    notes: target === 'portable' ? '配置図の固定縮尺・案内整理・描画最適化。A3横100%印刷。境界・施工可否は未確認。既存runtime/node.exeは保持。' : '配置図の固定縮尺・案内整理・描画最適化。A3横100%印刷。境界・施工可否は未確認。dist・functions・sharedを含むルートから配布。',
     sizeBytes: archive.length,
   }
   await writeFile(join(output, `${target}-metadata.json`), JSON.stringify(metadata, null, 2) + '\n')

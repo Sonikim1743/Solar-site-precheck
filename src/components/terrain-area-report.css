@@ -1,4 +1,9 @@
 .terrain-report-selector { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px; }
+.terrain-drawing-scale { display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; margin:10px 0; font-size:13px; }
+.terrain-drawing-scale label { display:flex; flex-wrap:wrap; align-items:center; gap:8px; font-weight:700; }
+.terrain-drawing-scale select { max-width:100%; min-height:38px; border:1px solid #c9dcd1; border-radius:6px; padding:6px; background:#fff; color:#245645; }
+.terrain-drawing-scale small { flex:1 1 260px; color:#50695c; }
+.terrain-drawing-scale p { width:100%; margin:0; color:#a33220; }
 .terrain-report-selector button { padding:9px 15px; border:1px solid #c9dcd1; border-radius:7px; background:#fff; color:#245645; cursor:pointer; }
 .terrain-report-selector button[aria-pressed="true"] { background:#17664f; border-color:#17664f; color:white; }
 .terrain-map-legend { display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin:10px 0; color:#5e7569; font-size:11px; }

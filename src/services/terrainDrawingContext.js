@@ -1,5 +1,5 @@
 import proj4 from 'proj4'
-import { terrainDrawingViewport, TERRAIN_DRAWING_PHOTO_EXTENT } from '../utils/terrainDrawingViewport.js'
+import { terrainDrawingPrintViewports, normalizeTerrainDrawingScale } from '../utils/terrainDrawingViewport.js'
 
 const cache=new WeakMap()
 const toTile=([lon,lat],z)=>[(lon+180)/360*2**z,(1-Math.asinh(Math.tan(lat*Math.PI/180))/Math.PI)/2*2**z]
@@ -8,12 +8,13 @@ const dataUrl=blob=>new Promise((resolve,reject)=>{const reader=new FileReader()
 
 // Small bounded requests to the existing public GSI basemap. The map context
 // supplies roads/labels, never elevations or an enlarged calculation boundary.
-export function loadTerrainDrawingContext(analysis,kind='map') {
+export function loadTerrainDrawingContext(analysis,kind='map',{drawingScale='auto'}={}) {
   if(!['map','photo'].includes(kind))throw Error('周辺画像の種類が不正です。')
+  const scale=normalizeTerrainDrawingScale(drawingScale),key=`${kind}:${scale}`
   const cached=cache.get(analysis)||new Map()
-  if(cached.has(kind))return cached.get(kind)
+  if(cached.has(key))return cached.get(key)
   const task=(async()=>{
-    const g=analysis.grid,v=terrainDrawingViewport(g,10,kind==='photo'?TERRAIN_DRAWING_PHOTO_EXTENT:1),projection=proj4('EPSG:4326',`+proj=aeqd +lat_0=${g.origin.lat} +lon_0=${g.origin.lon} +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs`)
+    const g=analysis.grid,v=terrainDrawingPrintViewports(g,scale)[kind==='photo'?1:0],projection=proj4('EPSG:4326',`+proj=aeqd +lat_0=${g.origin.lat} +lon_0=${g.origin.lon} +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs`)
     const corners=[[v.west,v.south],[v.east,v.south],[v.east,v.north],[v.west,v.north]].map(p=>projection.inverse(p))
     if(!corners.flat().every(Number.isFinite))throw Error('周辺地図の投影座標が不正です。')
     let z=18,b
@@ -31,6 +32,6 @@ export function loadTerrainDrawingContext(analysis,kind='map') {
       const results=await Promise.allSettled(requests),tiles=results.filter(r=>r.status==='fulfilled').map(r=>r.value)
       return {tiles,status:tiles.length===requests.length?'ready':tiles.length?'partial':'unavailable',viewport:[v.west,v.south,v.east,v.north]}
     }finally{clearTimeout(timer);controller.abort()}
-  })().catch(()=>({tiles:[],status:'unavailable'})).then(result=>{if(result.status!=='ready'&&cached.get(kind)===task)cached.delete(kind);return result})
-  cached.set(kind,task);cache.set(analysis,cached);return task
+  })().catch(()=>({tiles:[],status:'unavailable'})).then(result=>{if(result.status!=='ready'&&cached.get(key)===task)cached.delete(key);return result})
+  cached.set(key,task);cache.set(analysis,cached);return task
 }

@@ -7,7 +7,7 @@ import { isMapParcel } from './mapParcelSelection.js'
 import { terrainGeometryKey } from './terrainArea.js'
 import { measureParcelReview } from './parcelReview.js'
 import { terrainSlopeDistribution, formatTerrainSlopeArea, TERRAIN_SLOPE_COLORS } from './terrainSlopeDistribution.js'
-import { terrainDrawingViewport, terrainDrawingScaleBar, TERRAIN_DRAWING_PHOTO_EXTENT } from './terrainDrawingViewport.js'
+import { terrainDrawingPrintViewports, terrainDrawingPrintScaleBar, normalizeTerrainDrawingScale, TERRAIN_DRAWING_PRINT_WIDTH_MM } from './terrainDrawingViewport.js'
 import { terrainAzimuthLabel } from './terrainAzimuthLabel.js'
 
 const PAGE_MM = [420, 297]
@@ -145,6 +145,10 @@ function snapshotSvg(svg, widthMm, checkDeadline, drawingOnly = false) {
   clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
   clone.setAttribute('width', String(Math.ceil(widthMm * PX_PER_MM)))
   clone.setAttribute('height', String(Math.ceil(widthMm * PX_PER_MM * ratio)))
+  // Ceil-rounded raster dimensions differ slightly from the viewBox ratio.
+  // Stretch only this intermediate raster; the exact mm insertion below
+  // cancels both axes independently instead of adding a letterbox scale error.
+  if(drawingOnly)clone.setAttribute('preserveAspectRatio','none')
   return { xml: new XMLSerializer().serializeToString(clone), ratio }
 }
 
@@ -276,7 +280,7 @@ function pageLayout(ctx, model, images, sheet, index) {
 
 }
 
-function pageDrawing(ctx, model, images) {
+export function drawTerrainDrawingPdfPage(ctx, model, images) {
   ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, ...PAGE_MM)
   ctx.strokeStyle = '#222'; ctx.lineWidth = .3; ctx.strokeRect(6, 5, 408, 286)
   const sheet = model.layoutSheets[0], layout = sheet.layouts[0], o = layout.options, d = model.drawingDistribution
@@ -285,10 +289,11 @@ function pageDrawing(ctx, model, images) {
   for(let i=0;i<2;i++){
     const x=i?214:8
     drawText(ctx,i?'地形・勾配・地番（矢印：地形上の想定排水方向）':'参考モジュール配置',x+3,7,192,{size:3.5,weight:700,maxLines:1})
-    ctx.drawImage(images[i],x,12,198,198*model.snapshots[i].ratio)
+    ctx.drawImage(images[i],x,12,TERRAIN_DRAWING_PRINT_WIDTH_MM,TERRAIN_DRAWING_PRINT_WIDTH_MM*model.snapshots[i].ratio)
   }
   drawText(ctx,`${model.elevationLabel} · 北上`,11,196,193,{size:3,maxLines:1})
   drawText(ctx,`検討対象面積 ${numeric(d.totalAreaM2,0)} m²`,11,202,193,{size:3,maxLines:1})
+  drawText(ctx,model.drawingScale==='auto'?'自動縮尺・各図の目盛で確認（左右別縮尺）':`両図 1:${model.drawingScale.toLocaleString('ja-JP')} / 50m = ${50000/model.drawingScale}mm / A3横100%印刷`,11,207,193,{size:2.6,maxLines:1})
   const legend=[...d.bins.map((b,i)=>({label:b.max===null?'20°以上':`${b.min}–${b.max}°未満`,percent:b.percent,color:TERRAIN_SLOPE_COLORS[i]})),{label:'未確認 / NoData',percent:d.unknownPercent,color:'#eef0ed'}]
   legend.forEach((b,i)=>{
     const x=217+i*32
@@ -324,7 +329,7 @@ function pageDrawing(ctx, model, images) {
     drawText(ctx, value, x+69, y+1.4, 129, { size: 3.3, maxLines: 1 })
   }))
   drawText(ctx,`出典：国土地理院 DEM・標準地図・航空写真${model.mapReference?' / AMX公開地図2024 https://source.coop/smartmaps/amx-2024-04':' / 範囲・地番資料は報告書の出典参照'} 。${sheet.fenceOn?'一点鎖線＝仮フェンス（1.2m）。':''}`,11,276,397,{size:2.65,maxLines:1})
-  drawText(ctx,`${model.mapReference?'地図表示境界の参考領域・原本全筆未確認。':'地図上の参考図形・測量筆界未確認。'}セル${model.gridStep}m・4点平均勾配の交差面積。五区分＋未確認＝100%。境界外は表示のみ。標高は範囲内DEMの推定値・資料の標高基準。高低差＝最高−最低。`,11,281,397,{size:2.65,maxLines:1})
+  drawText(ctx,`平面距離の参考図（斜面距離・測量図ではありません）。「用紙に合わせる」・別用紙への拡大縮小で縮尺が変わります。セル${model.gridStep}m・4点平均勾配の交差面積。五区分＋未確認＝100%。標高は範囲内DEMの推定値。`,11,281,397,{size:2.65,maxLines:1})
   const missing=[model.contextStatus!=='ready'?'周辺地図の一部または全部が未取得。':'',model.noParcelMetadata?'地番資料なし・地番未取得。':'',model.missingParcels?`地番未記載 ${model.missingParcels}区域。`:'',model.unplacedParcels?`図上に収まらない地番：${model.unplacedParcels}。`:''].join('')
   drawText(ctx,`${missing}参考図・施工可否未確認。矢印はDEM高→低の参考方向で、現地の排水計画ではありません。モジュール傾斜は水平から。取得日は標高の測量日ではありません。`,11,286,397,{size:2.65,maxLines:1,ellipsis:true})
 }
@@ -422,8 +427,9 @@ function modelFromElement(report, element, checkDeadline) {
   }
 }
 
-export async function exportTerrainAreaPdf({ report, element, drawingOnly = false }) {
+export async function exportTerrainAreaPdf({ report, element, drawingOnly = false, drawingScale = 1000 }) {
   if (typeof document === 'undefined' || typeof XMLSerializer === 'undefined') fail('ブラウザーで地形図面を開いてください。')
+  const requestedScale=drawingOnly?normalizeTerrainDrawingScale(drawingScale):null
   const controller = new AbortController()
   const timeoutError = new Error('地形PDFの作成が30秒以内に完了しませんでした。図面を開き直して再試行してください。')
   const deadline = Date.now() + 30000
@@ -438,7 +444,10 @@ export async function exportTerrainAreaPdf({ report, element, drawingOnly = fals
   let canvas
   try {
     if (drawingOnly) {
+      terrainDrawingPrintViewports(report.terrainArea.grid,requestedScale)
       const pair=element?.querySelector('.terrain-drawing-export-source')
+      if(pair?.dataset.drawingScale!==String(requestedScale))fail('配置図の縮尺が更新されました。選んだ縮尺の図面が準備できてから再試行してください。')
+      if(pair?.dataset.scaleError)fail(pair.dataset.scaleError)
       if(pair&&pair.dataset.contextStatus!=='loading'&&pair.dataset.contextStatus!=='ready')pair.dispatchEvent(new Event('terrain-drawing-context-retry'))
       await boundedWait(new Promise(resolve => { const poll = () => { if (controller.signal.aborted || !element?.isConnected || element.querySelector('.terrain-drawing-export-source')?.dataset.contextStatus !== 'loading') resolve(); else setTimeout(poll, 50) }; poll() }), controller.signal, '航空写真の取得が完了しませんでした。再試行してください。')
       if(pair?.dataset.contextStatus!=='ready')fail('航空写真または周辺地図を取得できませんでした。前回のPDFは保持しています。通信を確認して再試行してください。')
@@ -451,11 +460,12 @@ export async function exportTerrainAreaPdf({ report, element, drawingOnly = fals
       if(!pair)fail('単独配置図の2つの図面が表示されていません。')
       const plans = [...pair.querySelectorAll('svg')]
       if(plans.length!==2 || plans.some(p=>p.dataset.geometryKey!==report.terrainArea.geometryKey) || plans[1].querySelector('[data-layout-racks]')) fail('2つの図の対象範囲・配置を確認できません。')
-      const expectedViews=[terrainDrawingViewport(report.terrainArea.grid),terrainDrawingViewport(report.terrainArea.grid,10,TERRAIN_DRAWING_PHOTO_EXTENT)]
-      if(plans.some((p,i)=>{const v=expectedViews[i],bar=terrainDrawingScaleBar(v,expectedViews[0]),m=Number(p.dataset.scaleM),px=Number(p.dataset.scalePx);return p.dataset.viewport!==JSON.stringify([v.west,v.south,v.east,v.north])||!Number.isFinite(m)||!Number.isFinite(px)||m<=0||px<=0||Math.abs(m-bar.meters)>1e-7||Math.abs(px-bar.pixelLength)>1e-7})) fail('各図の表示範囲と縮尺目盛が一致しません。')
+      const expectedViews=terrainDrawingPrintViewports(report.terrainArea.grid,requestedScale)
+      if(plans.some((p,i)=>{const v=expectedViews[i],bar=terrainDrawingPrintScaleBar(v,requestedScale,expectedViews[0]),m=Number(p.dataset.scaleM),px=Number(p.dataset.scalePx);return p.dataset.drawingScale!==String(requestedScale)||p.dataset.viewport!==JSON.stringify([v.west,v.south,v.east,v.north])||!Number.isFinite(m)||!Number.isFinite(px)||m<=0||px<=0||Math.abs(m-bar.meters)>1e-7||Math.abs(px-bar.pixelLength)>1e-7||(requestedScale!=='auto'&&Math.abs(px*TERRAIN_DRAWING_PRINT_WIDTH_MM/800-50000/requestedScale)>1e-7)})) fail('各図の表示範囲と印刷縮尺が一致しません。')
       const photos=[...plans[1].querySelectorAll('image')]
       if(pair.dataset.photoContextStatus!=='ready'||plans[1].dataset.contextLayer!=='seamlessphoto'||!photos.length||photos.some(image=>image.getAttribute('data-context-layer')!=='seamlessphoto'||!/^data:image\/jpeg;base64,/.test(image.getAttribute('href')||'')))fail('右図の周辺航空写真が準備できていません。再試行してください。')
-      model.snapshots = plans.map(plan=>snapshotSvg(plan, 198, checkDeadline, true))
+      model.snapshots = plans.map(plan=>snapshotSvg(plan, TERRAIN_DRAWING_PRINT_WIDTH_MM, checkDeadline, true))
+      model.drawingScale = requestedScale
       model.drawingDistribution = terrainSlopeDistribution(report.terrainArea)
       model.gridStep = report.terrainArea.grid.step
       model.mapReference = report.parcelReview.parcels.some(isMapParcel)
@@ -476,9 +486,12 @@ export async function exportTerrainAreaPdf({ report, element, drawingOnly = fals
     canvas.width = Math.round(PAGE_MM[0] * PX_PER_MM); canvas.height = Math.round(PAGE_MM[1] * PX_PER_MM)
     const ctx = canvas.getContext('2d', { alpha: false })
     if (!ctx) fail('この環境ではPDF用の描画ができません。')
-    ctx.scale(PX_PER_MM, PX_PER_MM)
+    // Integer raster dimensions must map back to exact physical A3 millimetres.
+    // Keep the existing report path unchanged; only the ruler drawing uses this.
+    if(drawingOnly)ctx.scale(canvas.width/PAGE_MM[0],canvas.height/PAGE_MM[1])
+    else ctx.scale(PX_PER_MM, PX_PER_MM)
     const pages = []
-    for (const draw of (drawingOnly ? [pageDrawing] : [pageOne, pageTwo, ...model.layoutSheets.filter(sheet => sheet.comparison).map((sheet, index) => (ctx, model, images) => pageLayout(ctx, model, images, sheet, index)), ...(model.simpleRows.length ? [pageSimpleResults] : []), pageNotes])) {
+    for (const draw of (drawingOnly ? [drawTerrainDrawingPdfPage] : [pageOne, pageTwo, ...model.layoutSheets.filter(sheet => sheet.comparison).map((sheet, index) => (ctx, model, images) => pageLayout(ctx, model, images, sheet, index)), ...(model.simpleRows.length ? [pageSimpleResults] : []), pageNotes])) {
       checkDeadline()
       draw(ctx, model, images)
       checkDeadline()

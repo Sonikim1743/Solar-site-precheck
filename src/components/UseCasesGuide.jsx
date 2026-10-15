@@ -28,6 +28,11 @@ export default function UseCasesGuide({ onExample, onReport }) {
     <summary id="use-cases-title"><span>使い方・活用例</span><small>保存・共有・練習例</small></summary>
     <div className="use-cases-guide__body">
       <div className="use-cases-guide__intro"><p>候補地の条件・参考結果・未確認事項を、次の確認や打合せに使うための案内です。</p><button type="button" className="secondary-button" onClick={() => leaveGuide(onReport)}>レポートに戻る</button></div>
+      <details className="use-cases-guide__topic"><summary>最近の更新</summary><div><ul>
+        <li>配置図：左右同じ固定縮尺。初期値1:1000（50m＝50mm）、A3横100%で印刷。</li>
+        <li>地形：5°区分の勾配色・敷地標高・DEM高→低の参考排水方向。</li>
+        <li>配置：入力方位と比較案を同期。説明を短くし、図面の重複計算を削減。</li>
+      </ul><p>参考境界・DEMの推定値です。施工可否・現地の排水計画は未確認。</p></div></details>
       <section className="use-cases-guide__outputs" aria-labelledby="use-cases-outputs-title">
         <h3 id="use-cases-outputs-title">保存した資料の使い道</h3>
         <dl>
@@ -36,7 +41,7 @@ export default function UseCasesGuide({ onExample, onReport }) {
           <div><dt>Solar Pro用地平線CSV</dt><dd>DEMから作成した参考地平線を入力準備に使用。<small>地平線分析後のデータ保存</small></dd></div>
           <div><dt>設備確認メモ</dt><dd>設備番号・資料の日付・照合状況を記録。<small>系統画面で設備を選んで保存。追加後は検討記録を再保存</small></dd></div>
         </dl>
-        <p className="use-cases-guide__note">これらの基本機能は無料です。以前保存したファイルは自動更新されません。設備メモの追加や条件変更後は、もう一度「検討記録を保存」してください。</p>
+        <p className="use-cases-guide__note">基本機能は無料。保存ファイルは自動更新されないため、条件・メモの変更後は検討記録を保存し直してください。</p>
       </section>
       <details className="use-cases-guide__topic"><summary>練習例で確認する</summary><div>
         <p className="use-cases-guide__example-label">架空の相談例・仮条件。実際の発電量、接続可否、販売実績を示す例ではありません。</p>
@@ -51,7 +56,7 @@ export default function UseCasesGuide({ onExample, onReport }) {
         <p>発電量を金額へ換算するには、売電・自家消費の量、適用単価、制御条件、工事費・運用費などの確認が必要です。この画面の発電量だけで売上や利益は決まりません。</p>
       </div></details>
       <details className="use-cases-guide__topic"><summary>実務資料パッケージの企画について</summary><div>
-        <p><strong>企画中・販売未開始</strong></p><p>入力条件シート、確認記録シート、説明用テンプレート、記入例をまとめた編集可能な資料を検討しています。基本計算と基本レポートは引き続き無料で使う方針です。</p><p>収録内容・形式・価格・提供時期は未定です。利用人数・業務で使える範囲、編集・再配布、更新・問い合わせ対応、提供・取消条件は販売前に明示します。</p><p>Solar Pro本体、個別案件の設計、接続申込み代行はこの資料企画に含めていません。</p>
+        <p><strong>企画中・販売未開始。</strong> 入力・確認記録と説明用テンプレートを検討中です。内容・価格・時期・利用条件は未定。基本機能は無料で、Solar Pro本体・個別設計・接続申込み代行は含みません。</p>
       </div></details>
     </div>
   </details>
