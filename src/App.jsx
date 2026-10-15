@@ -3452,7 +3452,6 @@ export default function App() {
 
         <div className="workflow">
           <section className="panel map-panel" id="site-select">
-            <label className="site-report-name no-print"><span>発電所名</span><input aria-label="発電所名" value={siteName} onChange={event => { setSiteNameTouched(true); setSiteName(event.target.value) }} placeholder={selectedPlaceLabel || '未入力時は地名を使用'} /></label>
             <div className="section-heading site-map-header">
 
               <div>
