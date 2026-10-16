@@ -2,7 +2,7 @@ import { terrainReportTitleLines } from '../utils/terrainReportTitle.js'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import polygonClipping from 'polygon-clipping'
 import { terrainPointToLocal, pointInTerrainBoundary } from '../utils/terrainArea.js'
-import { createTerrainProjection, dragTerrainView, normalizeTerrainView, orbitTerrainView, zoomTerrainView, terrainFaceVisible, stepTerrainView } from '../utils/terrainView.js'
+import { createTerrainProjection, dragTerrainView, normalizeTerrainView, zoomTerrainView, terrainFaceVisible, stepTerrainView, panTerrainOffset, stepTerrainOffset } from '../utils/terrainView.js'
 import { terrainElevationLabel } from '../utils/terrainElevationLabel.js'
 import { buildTerrainSolid } from '../utils/terrainSolid.js'
 import { TERRAIN_SLOPE_LABELS, terrainSlopeIndex } from '../utils/terrainSlopeClasses.js'
@@ -268,12 +268,17 @@ export function TerrainArea3D({ analysis, position, reportMode = false, compactR
   const initialView = normalizeTerrainView({ azimuth, pitch: 32 })
   const [view, setView] = useState(initialView)
   const [viewMode, setViewMode] = useState('rotate')
+  const [pan, setPan] = useState({ x: 0, y: 0 })
+  const fixed = canRotate && viewMode === 'fixed'
   const [displayHeightScale, setDisplayHeightScale] = useState(heightScale === 2 ? 2 : 1)
   const verticalScale = canRotate ? displayHeightScale : heightScale === 2 ? 2 : 1
   const modelHeight = canRotate ? 440 : H
-  const canvasRef = useRef(null), modelRef = useRef(null), dragRef = useRef(null), frameRef = useRef(null), pendingView = useRef(null), navigationFrame = useRef(null)
+  const canvasRef = useRef(null), modelRef = useRef(null), dragRef = useRef(null), frameRef = useRef(null), pendingView = useRef(null), pendingPan = useRef(null), navigationFrame = useRef(null)
   const latestView = useRef(view)
+  const latestPan = useRef(pan)
   latestView.current = view
+  latestPan.current = pan
+  const applyPan = next => { latestPan.current = next; setPan(next) }
   const releaseDrag = () => {
     const drag = dragRef.current
     dragRef.current = null
@@ -285,9 +290,10 @@ export function TerrainArea3D({ analysis, position, reportMode = false, compactR
     frameRef.current = null
     navigationFrame.current = null
     pendingView.current = null
+    pendingPan.current = null
   }
   useEffect(() => {
-    releaseDrag(); discardFrame(); setView(normalizeTerrainView({ azimuth, pitch: 32 })); setDisplayHeightScale(heightScale === 2 ? 2 : 1)
+    releaseDrag(); discardFrame(); setView(normalizeTerrainView({ azimuth, pitch: 32 })); applyPan({ x: 0, y: 0 }); setViewMode('rotate'); setDisplayHeightScale(heightScale === 2 ? 2 : 1)
   }, [analysis, azimuth, canRotate, heightScale])
   useEffect(() => () => { releaseDrag(); discardFrame() }, [])
   const camera = canRotate ? view : initialView
@@ -339,7 +345,7 @@ export function TerrainArea3D({ analysis, position, reportMode = false, compactR
     if (!mesh) return null
     const modules = (!reportMode || reportLayout) && layout ? layout.racks.flatMap(rack => rack.modules.map(module => ({ rings: [module.corners], centroid: module.corners.reduce((sum, point) => sum.map((value, axis) => value + point[axis] / 4), [0,0,0]), normal: surfaceNormal(module.corners), kind: 'module', color: '#315e89' }))) : []
     const maximum = [...(!reportMode && layoutCandidates ? layoutCandidates.racks.flatMap(rack => rack.corners) : modules.flatMap(face => face.rings[0])), ...((!reportMode || reportLayout) && fence ? fence.posts.map(post => post.top) : [])].reduce((max, point) => Math.max(max, point[2]), mesh.maximum)
-    const projection = createTerrainProjection({ bounds: mesh.bounds, base: mesh.base, maxElevation: maximum, ...camera, heightScale: verticalScale })
+    const projection = createTerrainProjection({ bounds: mesh.bounds, base: mesh.base, maxElevation: maximum, ...camera, heightScale: verticalScale, panX: canRotate ? pan.x : 0, panY: canRotate ? pan.y : 0 })
     const faces = [...mesh.floorFaces, ...mesh.walls, ...mesh.faces, ...modules].map((face, index) => {
       let color = face.color
       if (face.kind === 'floor') color = '#b2bcb4'
@@ -354,7 +360,7 @@ export function TerrainArea3D({ analysis, position, reportMode = false, compactR
       return { ...face, color, index, visible: terrainFaceVisible(face.normal, camera, verticalScale), depth: projection.transform(face.centroid)[2] }
     }).sort((a,b) => a.depth - b.depth)
     return { ...mesh, ...projection, faces, faceCount: mesh.faces.length, outlinePaths: mesh.outlines.map(points => pathOf(points, projection.project)) }
-  }, [mesh, camera.azimuth, camera.pitch, camera.zoom, verticalScale, layout, layoutCandidates, fence, reportMode, reportLayout])
+  }, [mesh, camera.azimuth, camera.pitch, camera.zoom, pan.x, pan.y, canRotate, verticalScale, layout, layoutCandidates, fence, reportMode, reportLayout])
   const projectedFence = useMemo(() => {
     if ((reportMode && !reportLayout) || !fence || !drawing) return null
     const visible = createTerrainOverlayVisibility(drawing.faces.filter(face => face.kind !== 'module'), drawing)
@@ -411,17 +417,18 @@ export function TerrainArea3D({ analysis, position, reportMode = false, compactR
     context.restore()
   }, [drawing, canRotate, modelHeight])
 
-  const queueView = next => {
-    pendingView.current = next
+  const queueFrame = () => {
     if (frameRef.current !== null) return
-    frameRef.current = requestAnimationFrame(() => { frameRef.current = null; const nextView = pendingView.current; pendingView.current = null; if (nextView) { latestView.current = nextView; setView(nextView) } })
+    frameRef.current = requestAnimationFrame(() => { frameRef.current = null; const nextView = pendingView.current, nextPan = pendingPan.current; pendingView.current = null; pendingPan.current = null; if (nextView) { latestView.current = nextView; setView(nextView) } if (nextPan) applyPan(nextPan) })
   }
+  const queueView = next => { pendingView.current = next; queueFrame() }
+  const queuePan = next => { pendingPan.current = next; queueFrame() }
   const pointerDown = event => {
     if (!canRotate || dragRef.current || (event.pointerType === 'mouse' && event.button !== 0)) return
     const rect = modelRef.current?.getBoundingClientRect()
     if (!rect?.width || !rect.height) return
     discardFrame()
-    dragRef.current = { id: event.pointerId, element: event.currentTarget, x: event.clientX, y: event.clientY, view: latestView.current, mode: viewMode, width: rect.width, height: rect.height, left: rect.left, top: rect.top, moved: false }
+    dragRef.current = { id: event.pointerId, element: event.currentTarget, x: event.clientX, y: event.clientY, view: latestView.current, pan: latestPan.current, mode: viewMode, width: rect.width, height: rect.height, left: rect.left, top: rect.top, moved: false }
     event.currentTarget.setPointerCapture(event.pointerId)
     event.currentTarget.ownerSVGElement?.focus({ preventScroll: true })
   }
@@ -431,14 +438,16 @@ export function TerrainArea3D({ analysis, position, reportMode = false, compactR
     if (Math.hypot(event.clientX - drag.x, event.clientY - drag.y) > 5) drag.moved = true
     if (!drag.moved) return
     const dx = (event.clientX - drag.x) / drag.width, dy = (event.clientY - drag.y) / drag.height
-    queueView(drag.mode === 'orbit' ? orbitTerrainView(drag.view, dx, dy) : dragTerrainView(drag.view, dx, dy))
+    if (drag.mode === 'fixed') queuePan(panTerrainOffset(drag.pan, dx * 750, dy * 395))
+    else queueView(dragTerrainView(drag.view, dx, dy))
   }
   const pointerEnd = event => {
     if (dragRef.current?.id !== event.pointerId) return
     const drag = dragRef.current
-    const next = pendingView.current
+    const next = pendingView.current, nextPan = pendingPan.current
     releaseDrag(); discardFrame()
     if (next) { latestView.current = next; setView(next) }
+    if (nextPan) applyPan(nextPan)
     if (event.type === 'pointerup' && !drag.moved && Math.hypot(event.clientX - drag.x, event.clientY - drag.y) <= 5 && onToggleRack) {
       const screen = [event.clientX - drag.left, event.clientY - drag.top]
       const cssRacks = projectedRacks.map(rack => ({ ...rack, polygon: rack.polygon.map(([x,y]) => [(x-25)/750*drag.width, (y-35)/395*drag.height]) }))
@@ -449,14 +458,19 @@ export function TerrainArea3D({ analysis, position, reportMode = false, compactR
   const keyDown = event => {
     if (!canRotate || !['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','+','=','-'].includes(event.key)) return
     event.preventDefault(); releaseDrag(); discardFrame()
+    if (event.key === 'Home') { resetView(); return }
+    if (fixed && event.key.startsWith('Arrow')) { applyPan(stepTerrainOffset(latestPan.current, event.key)); return }
     const current = latestView.current
-    const next = event.key === 'Home' ? initialView : ['+','=','-'].includes(event.key) ? zoomTerrainView(current, event.key === '-' ? 1/1.2 : 1.2) : stepTerrainView(current,viewMode,event.key)
+    const next = ['+','=','-'].includes(event.key) ? zoomTerrainView(current, event.key === '-' ? 1/1.2 : 1.2) : stepTerrainView(current,'orbit',event.key)
     latestView.current = next; setView(next)
   }
-  const moveView = (mode,key) => { releaseDrag(); discardFrame(); setViewMode(mode); const next=stepTerrainView(latestView.current,mode,key); latestView.current=next; setView(next) }
-  const resetView = () => { releaseDrag(); discardFrame(); latestView.current = initialView; setView(initialView) }
+  const moveView = key => { releaseDrag(); discardFrame(); if (fixed) { applyPan(stepTerrainOffset(latestPan.current,key)); return } const next=stepTerrainView(latestView.current,'orbit',key); latestView.current=next; setView(next) }
+  const rotateView = key => { if (fixed) return; releaseDrag(); discardFrame(); const next=stepTerrainView(latestView.current,'rotate',key); latestView.current=next; setView(next) }
+  const resetView = () => { releaseDrag(); discardFrame(); setViewMode('rotate'); applyPan({ x: 0, y: 0 }); latestView.current = initialView; setView(initialView) }
   const selectDirection = direction => {
+    if (fixed) return
     releaseDrag(); discardFrame()
+    applyPan({ x: 0, y: 0 })
     const from = latestView.current, to = terrainNavigationTarget(direction, from, initialView)
     const apply = next => { latestView.current = next; setView(next) }
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { apply(to); return }
@@ -499,16 +513,16 @@ export function TerrainArea3D({ analysis, position, reportMode = false, compactR
   const north = project([(bounds.west + bounds.east) / 2, bounds.north, base]), south = project([(bounds.west + bounds.east) / 2, bounds.south, base]), east = project([bounds.east, (bounds.south + bounds.north) / 2, base]), west = project([bounds.west, (bounds.south + bounds.north) / 2, base])
   return <figure className={`terrain-area-figure${reportMode ? ' terrain-area-figure--report' : ''}${canRotate ? ' terrain-area-figure--interactive' : ''}`}>
     <div className={`terrain-area-model${canRotate ? ' terrain-area-model--navigation' : ''}`}>
-    {canRotate && <TerrainViewNavigation view={camera} onSelect={selectDirection} controls={<>
-      <div className="terrain-area-camera-modes" role="group" aria-label="ドラッグの操作"><button type="button" aria-pressed={viewMode==='rotate'} onClick={()=>changeViewMode('rotate')}>回転</button><button type="button" aria-pressed={viewMode==='orbit'} onClick={()=>changeViewMode('orbit')}>視点の移動</button></div>
-      <div className="terrain-navigation-rotate" role="group" aria-label="左右に回転"><button type="button" aria-label="地形を左へ回転" title="左へ回転" onClick={()=>moveView('rotate','ArrowLeft')}>↶ 左</button><button type="button" aria-label="地形を右へ回転" title="右へ回転" onClick={()=>moveView('rotate','ArrowRight')}>右 ↷</button></div>
-      <div role="group" aria-label="中心を固定して視点を移動">{[['ArrowLeft','←','視点を左へ回す'],['ArrowUp','↑','見下ろしを増やす'],['ArrowDown','↓','見下ろしを減らす'],['ArrowRight','→','視点を右へ回す']].map(([key,label,name])=><button key={key} type="button" aria-label={name} title={name} onClick={()=>moveView('orbit',key)}>{label}</button>)}</div>
-      <div className="terrain-area-camera-zoom" role="group" aria-label="3Dの拡大縮小"><button type="button" aria-label="3Dを縮小" disabled={camera.zoom<=.65} onClick={()=>zoomView(1/1.2)}>−</button><span>{camera.zoom.toFixed(1)}×</span><button type="button" aria-label="3Dを拡大" disabled={camera.zoom>=2.5} onClick={()=>zoomView(1.2)}>＋</button><button type="button" className="terrain-navigation-home" aria-label="最初の視点に戻す" title="最初の視点" onClick={resetView}><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 11 9-8 9 8v10h-6v-7H9v7H3Z" /></svg></button></div>
+    {canRotate && <TerrainViewNavigation view={camera} onSelect={selectDirection} locked={fixed} controls={<>
+      <div className="terrain-area-camera-modes" role="group" aria-label="3Dの操作モード"><button type="button" aria-pressed={!fixed} onClick={()=>changeViewMode('rotate')}>回転</button><button type="button" aria-pressed={fixed} title="角度を固定。矢印・ドラッグで平行移動。ホームで固定解除。" aria-describedby={`${id}-controls`} onClick={()=>changeViewMode(fixed ? 'rotate' : 'fixed')}>視点固定</button></div>
+      <div className="terrain-navigation-rotate" role="group" aria-label="左右に回転"><button type="button" aria-label="地形を左へ回転" disabled={fixed} title={fixed ? '視点固定中' : '左へ回転'} onClick={()=>rotateView('ArrowLeft')}>↶ 左</button><button type="button" aria-label="地形を右へ回転" disabled={fixed} title={fixed ? '視点固定中' : '右へ回転'} onClick={()=>rotateView('ArrowRight')}>右 ↷</button></div>
+      <div role="group" aria-label={fixed ? '角度を固定して画面を移動' : '中心を固定して視点を移動'}>{[['ArrowLeft','←','視点を左へ回す','画面を左へ移動'],['ArrowUp','↑','見下ろしを増やす','画面を上へ移動'],['ArrowDown','↓','見下ろしを減らす','画面を下へ移動'],['ArrowRight','→','視点を右へ回す','画面を右へ移動']].map(([key,label,name,panName])=><button key={key} type="button" aria-label={fixed ? panName : name} title={fixed ? panName : name} onClick={()=>moveView(key)}>{label}</button>)}</div>
+      <div className="terrain-area-camera-zoom" role="group" aria-label="3Dの拡大縮小"><button type="button" aria-label="3Dを縮小" disabled={camera.zoom<=.65} onClick={()=>zoomView(1/1.2)}>−</button><span>{camera.zoom.toFixed(1)}×</span><button type="button" aria-label="3Dを拡大" disabled={camera.zoom>=2.5} onClick={()=>zoomView(1.2)}>＋</button><button type="button" className="terrain-navigation-home" aria-label="最初の視点に戻す" title="最初の視点（固定解除・移動リセット）" onClick={resetView}><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 11 9-8 9 8v10h-6v-7H9v7H3Z" /></svg></button></div>
       <div className="terrain-navigation-height" role="group" aria-label="3Dの高さ表示"><button type="button" aria-pressed={verticalScale === 2} aria-describedby={`${id}-height`} onClick={() => changeHeightScale(verticalScale === 2 ? 1 : 2)}>高さ2倍</button><span aria-hidden="true">{verticalScale === 2 ? '1:2' : '1:1'}</span></div>
     </>} />}
     <div className="terrain-area-stage">
     {canRotate && <canvas ref={canvasRef} aria-hidden="true" className="terrain-area-surface" />}
-    <svg viewBox={`0 0 ${W} ${modelHeight}`} data-height-scale={verticalScale} data-view-azimuth={camera.azimuth} data-view-pitch={camera.pitch} data-view-zoom={camera.zoom} data-layout-modules={(!reportMode || reportLayout) && layout ? layout.moduleCount : 0} role={canRotate ? 'group' : 'img'} tabIndex={canRotate ? 0 : undefined} aria-roledescription={canRotate ? '地形の周囲を回って見られる立体図' : undefined} aria-labelledby={`${id}-title ${id}-desc`} aria-describedby={canRotate ? `${id}-controls` : undefined} onKeyDown={keyDown}>
+    <svg viewBox={`0 0 ${W} ${modelHeight}`} data-height-scale={verticalScale} data-view-azimuth={camera.azimuth} data-view-pitch={camera.pitch} data-view-zoom={camera.zoom} data-view-fixed={fixed} data-view-pan-x={canRotate ? pan.x : 0} data-view-pan-y={canRotate ? pan.y : 0} data-layout-modules={(!reportMode || reportLayout) && layout ? layout.moduleCount : 0} role={canRotate ? 'group' : 'img'} tabIndex={canRotate ? 0 : undefined} aria-roledescription={canRotate ? '地形の周囲を回って見られる立体図' : undefined} aria-labelledby={`${id}-title ${id}-desc`} aria-describedby={canRotate ? `${id}-controls` : undefined} onKeyDown={keyDown}>
       <title id={`${id}-title`}>参考範囲の実DEM地形3D</title>
       <desc id={`${id}-desc`}>等高線図と同じ標高データ・参考範囲を用いた立体図。{verticalScale === 2 ? '横1：縦2の高さ強調表示。標高・勾配の数値と色は実DEMのままです。' : '高さ強調なし、縦横同尺度。'}黄色線は地表に沿う対象範囲。側面・底面は表示用で、地層・土量を示しません。樹木、建物、擁壁、造成後の形状は含みません。欠測や除外の部分を面で埋めません。</desc>
       {!canRotate && <rect width={W} height={H} fill="#fbfcfa" />}
@@ -537,7 +551,7 @@ export function TerrainArea3D({ analysis, position, reportMode = false, compactR
     </div>
     </div>
     {projectedParcels && <ParcelLabelNote {...projectedParcels} />}
-    {canRotate && <><p className="parcel-sr-only" id={`${id}-height`}>{verticalScale === 2 ? 'オン：横1：縦2の強調表示。' : 'オフ：縦横同尺度（1:1）。'}標高・勾配の数値と色は変わりません。</p><p className="parcel-sr-only" id={`${id}-controls`}>{viewMode === 'orbit' ? '地形の中心を固定。左右で周囲を回り、上へドラッグで見下ろす。' : 'ドラッグで回転。'}ホイールで拡大・縮小。矢印キーも使えます。</p></>}
+    {canRotate && <><p className="parcel-sr-only" id={`${id}-height`}>{verticalScale === 2 ? 'オン：横1：縦2の強調表示。' : 'オフ：縦横同尺度（1:1）。'}標高・勾配の数値と色は変わりません。</p><p className="parcel-sr-only" role="status" id={`${id}-controls`}>{fixed ? '視点固定中。角度を保ち、矢印・ドラッグで画面を平行移動。方位選択と回転は停止。ホームで固定解除・初期位置へ戻ります。' : 'ドラッグで回転。'}ホイールで拡大・縮小。矢印キーも使えます。</p></>}
     {canRotate && rackControls}
     {canRotate && <SlopeDistribution analysis={analysis} />}
     {(!canRotate || !drawing.faceCount) && <figcaption>{compactReport ? `実DEM地形 · 1:1 · ${noteRef}（最終ページ）` : <>{drawing.faceCount ? '地表面と黄色線は同じDEM。樹木・建物・造成後の形状は含みません。側面・底面は表示用で、地層・土量を示しません。' : '連続した地表面を描ける標高点が不足しています。'} {!canRotate ? '面積は有効範囲と勾配取得率からの概算。' : ''} {analysis.summary?.coveragePercent < 100 ? '未取得部分の面は表示していません。' : ''}</>}</figcaption>}

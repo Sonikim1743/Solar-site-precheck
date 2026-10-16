@@ -310,7 +310,7 @@ test('interactive camera controls group movement under the cube with one zoom an
   const modes=html.match(/<div class="terrain-area-camera-modes"[\s\S]*?<\/div>/)?.[0]||''
   assert.equal((modes.match(/<button\b/g)||[]).length,2)
   assert.match(modes,/>回転<\/button>/)
-  assert.match(modes,/>視点の移動<\/button>/)
+  assert.match(modes,/>視点固定<\/button>/)
   assert.match(html,/terrain-navigation-controls/)
   for(const label of ['地形を左へ回転','地形を右へ回転','視点を左へ回す','見下ろしを増やす','見下ろしを減らす','視点を右へ回す','3Dを縮小','3Dを拡大','最初の視点に戻す']) {
     assert.equal(html.split(`aria-label="${label}"`).length-1,1,label)

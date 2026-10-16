@@ -45,6 +45,19 @@ export function zoomTerrainView(view, factor) {
   return normalizeTerrainView({ ...camera, zoom: clamp(camera.zoom * factor, .65, 2.5) })
 }
 
+// Logical SVG pixels, shared by raster, boundaries and rack hit targets.
+// Limit travel so Home always offers a predictable recovery from a close view.
+export function panTerrainOffset(offset = {}, deltaX = 0, deltaY = 0) {
+  return {
+    x: clamp((finite(offset?.x) ? offset.x : 0) + (finite(deltaX) ? deltaX : 0), -600, 600),
+    y: clamp((finite(offset?.y) ? offset.y : 0) + (finite(deltaY) ? deltaY : 0), -320, 320),
+  }
+}
+
+export function stepTerrainOffset(offset, key) {
+  return panTerrainOffset(offset, key === 'ArrowLeft' ? -30 : key === 'ArrowRight' ? 30 : 0, key === 'ArrowUp' ? -30 : key === 'ArrowDown' ? 30 : 0)
+}
+
 // Positive camera depth points toward the observer. Keep unknown surface
 // normals visible; illustrative walls and the bottom have outward normals.
 export function terrainFaceVisible(normal, view = {}, heightScale = 1) {
@@ -62,7 +75,7 @@ export function terrainFaceVisible(normal, view = {}, heightScale = 1) {
   return facing > 1e-10 * length
 }
 
-export function createTerrainProjection({ bounds, base, maxElevation, azimuth, pitch, zoom, heightScale = 1 }) {
+export function createTerrainProjection({ bounds, base, maxElevation, azimuth, pitch, zoom, heightScale = 1, panX = 0, panY = 0 }) {
   const camera = normalizeTerrainView({ azimuth, pitch, zoom })
   const displayHeightScale = normalizeHeightScale(heightScale)
   const yaw = camera.azimuth * Math.PI / 180, tilt = camera.pitch * Math.PI / 180
@@ -80,6 +93,7 @@ export function createTerrainProjection({ bounds, base, maxElevation, azimuth, p
   const us = box.map(p => p[0]), vs = box.map(p => p[1])
   const minU = Math.min(...us), maxU = Math.max(...us), minV = Math.min(...vs), maxV = Math.max(...vs)
   const scale = Math.min(675 / Math.max(1, maxU - minU), 335 / Math.max(1, maxV - minV)) * camera.zoom
-  const project = point => { const [u, v] = transform(point); return [400 + (u - (minU + maxU) / 2) * scale, 225 + (v - (minV + maxV) / 2) * scale] }
+  const offset = panTerrainOffset({ x: panX, y: panY })
+  const project = point => { const [u, v] = transform(point); return [400 + (u - (minU + maxU) / 2) * scale + offset.x, 225 + (v - (minV + maxV) / 2) * scale + offset.y] }
   return { ...camera, heightScale: displayHeightScale, transform, project, scale }
 }

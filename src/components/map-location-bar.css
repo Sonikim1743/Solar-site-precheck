@@ -3,11 +3,11 @@
 .map-point-title { display:flex; align-items:baseline; gap:8px; min-width:0; height:24px; line-height:24px; }
 .map-point-title>span { flex:none; color:var(--muted); font-size:12px; }
 .map-point-title>strong { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14px; font-weight:600; }
-.map-point-meta { display:grid; grid-template-columns:minmax(0,max-content) 86px 52px; align-items:center; gap:14px; min-height:44px; }
+.map-point-meta { display:grid; grid-template-columns:minmax(0,max-content) 118px 52px; align-items:center; gap:14px; min-height:44px; }
 .map-point-coordinates { display:flex; flex-wrap:wrap; gap:0 12px; min-width:0; color:#466357; font-size:13px; font-variant-numeric:tabular-nums; }
 .map-point-coordinates>span { white-space:nowrap; }
 .map-location-bar button,.map-location-actions a { box-sizing:border-box; min-height:44px; border:1px solid #c6d6cc; border-radius:7px; background:#fff; color:#2e483c; font:inherit; font-size:13px; font-weight:500; line-height:1.4; }
-.map-location-bar .map-point-elevation { display:grid; justify-items:start; align-content:center; min-width:86px; padding:0 6px; border:0; background:none; }
+.map-location-bar .map-point-elevation { display:flex; align-items:center; gap:5px; min-width:0; padding:0; border:0; background:none; white-space:nowrap; }
 .map-point-elevation>span { color:var(--muted); font-size:11px; }
 .map-point-elevation>strong { font-size:14px; font-weight:600; white-space:nowrap; }
 .map-location-bar .map-point-elevation:disabled { opacity:1; cursor:default; }
@@ -35,7 +35,7 @@
   .map-location-actions { grid-template-columns:minmax(0,1.6fr) minmax(0,1fr) minmax(0,.7fr); }
 }
 @media(max-width:640px) {
-  .map-point-meta { grid-template-columns:minmax(0,1fr) 76px 48px; gap:6px; }
+  .map-point-meta { grid-template-columns:minmax(0,1fr) 104px 48px; gap:6px; }
   .map-point-coordinates { display:grid; gap:0; font-size:12px; line-height:20px; }
   .map-location-bar .map-point-elevation { min-width:0; padding:0; }
   .map-point-elevation>strong { font-size:13px; }

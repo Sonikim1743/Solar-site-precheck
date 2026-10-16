@@ -1,12 +1,26 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createTerrainProjection, dragTerrainView, elevateTerrainView, orbitTerrainView, normalizeTerrainView, terrainFaceVisible, zoomTerrainView, stepTerrainView } from '../src/utils/terrainView.js'
+import { createTerrainProjection, dragTerrainView, elevateTerrainView, orbitTerrainView, normalizeTerrainView, terrainFaceVisible, zoomTerrainView, stepTerrainView, panTerrainOffset, stepTerrainOffset } from '../src/utils/terrainView.js'
 import { buildTerrainSolid } from '../src/utils/terrainSolid.js'
 
 const settings = { bounds: { west: -50, south: -40, east: 50, north: 40 }, base: 300, maxElevation: 360 }
 const distance = (a, b) => Math.hypot(...a.map((v, i) => v - b[i]))
 const frame = { zoom: 1 }
 const close = (actual, expected, tolerance = 1e-10) => assert.ok(Math.abs(actual - expected) < tolerance, `${actual} != ${expected}`)
+
+test('screen panning translates every projected point equally while preserving angles, metres, depth and zoom',()=>{
+ const camera={azimuth:71,pitch:48,zoom:2},a=createTerrainProjection({...settings,...camera}),offset=panTerrainOffset({x:10,y:20},45,-35),b=createTerrainProjection({...settings,...camera,panX:offset.x,panY:offset.y})
+ assert.deepEqual(offset,{x:55,y:-15});assert.equal(b.scale,a.scale)
+ for(const p of [[0,0,300],[30,20,350],[-45,-35,330]]){assert.deepEqual(a.transform(p),b.transform(p));const old=a.project(p),next=b.project(p);close(next[0]-old[0],55);close(next[1]-old[1],-15)}
+ assert.equal(b.azimuth,camera.azimuth);assert.equal(b.pitch,camera.pitch);assert.equal(b.zoom,camera.zoom)
+})
+
+test('four pan keys are reversible and bounded, and zoom leaves the offset independent of camera orientation',()=>{
+ let offset={x:0,y:0};for(const key of ['ArrowLeft','ArrowUp','ArrowRight','ArrowDown'])offset=stepTerrainOffset(offset,key);assert.deepEqual(offset,{x:0,y:0})
+ assert.deepEqual(panTerrainOffset({x:590,y:-310},100,-100),{x:600,y:-320});assert.deepEqual(panTerrainOffset({x:NaN,y:Infinity},NaN,Infinity),{x:0,y:0})
+ const camera={azimuth:35,pitch:32,zoom:1};const zoomed=zoomTerrainView(camera,2);assert.equal(zoomed.azimuth,camera.azimuth);assert.equal(zoomed.pitch,camera.pitch)
+ const a=createTerrainProjection({...settings,...zoomed}),b=createTerrainProjection({...settings,...zoomed,panX:40,panY:50});for(const p of [[0,0,310],[10,20,350]]){close(b.project(p)[0]-a.project(p)[0],40);close(b.project(p)[1]-a.project(p)[1],50)}
+})
 
 test('cube controls and keyboard use bounded steps of the existing camera, preserving zoom',()=>{
   const view={azimuth:355,pitch:88,zoom:1.8},before={...view}

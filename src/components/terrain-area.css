@@ -325,6 +325,8 @@
 .terrain-navigation-compass .terrain-compass-south { fill:#66786f; }
 .terrain-area-figure .terrain-navigation-cube { width:144px; height:144px; justify-self:center; overflow:visible; }
 .terrain-navigation-cube [role="button"] { cursor:pointer; }
+.terrain-navigation-cube [aria-disabled="true"] { opacity:.45; cursor:default; pointer-events:none; }
+.terrain-navigation-tools button:disabled { opacity:.45; cursor:default; }
 .terrain-navigation-cube polygon { fill:#fff; stroke:#84998b; stroke-width:1.5; stroke-linejoin:round; }
 .terrain-navigation-cube [role="button"]:hover polygon { fill:#eaf3ed; }
 .terrain-area-figure .terrain-navigation-cube text { fill:#284736; font-size:18px; font-weight:650; pointer-events:none; }
