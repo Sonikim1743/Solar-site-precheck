@@ -2,15 +2,15 @@
   "app": "Solar Site Precheck",
   "version": "1.28.2",
   "buildDate": "2026-10-16",
-  "sourceCommit": "bce94ccf4b3962f4a3fd5e61c6945476b4ae2dd1",
+  "sourceCommit": "ec28dd6e105a52e5f5a3d7ae6cfe9eda9c851932",
   "target": "portable",
-  "buildId": "1.28.2-2026-10-16-64aedb83bf1a",
+  "buildId": "1.28.2-2026-10-16-96fd71981059",
   "packageName": "SolarSitePrecheck_v1.28.2_release_light.zip",
   "zipUrl": "https://raw.githubusercontent.com/Sonikim1743/Solar-site-precheck/main/release/latest/SolarSitePrecheck_v1.28.2_release_light.zip",
-  "sha256": "64aedb83bf1ae970e13e0e29bc09da5a0f3d4ccb2ce9e1257a5f55475b97f279",
-  "etag": "64aedb83bf1ae970",
-  "bundleName": "index-DatSufMl.js",
+  "sha256": "96fd719810596f6d601250e8286507af3592fcffae5699ffa8b4914b500be414",
+  "etag": "96fd719810596f6d",
+  "bundleName": "index-DkKl24lB.js",
   "minRequiredRuntime": "1.2",
   "notes": "配置図の固定縮尺・案内整理・描画最適化。A3横100%印刷。境界・施工可否は未確認。既存runtime/node.exeは保持。",
-  "sizeBytes": 15368965
+  "sizeBytes": 15369800
 }
