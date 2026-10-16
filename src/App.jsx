@@ -3680,7 +3680,7 @@ export default function App() {
               )}
               {terrainSectionOpen && <TerrainSectionPreview analysis={terrainSection} />}
             </div>
-            <SelectedParcel3D review={parcelReview} referenceCount={publicParcelReferences.length} request={regional3DRequest} onAcquired={setSelectedParcelTerrain} />
+            <SelectedParcel3D review={parcelReview} referenceCount={publicParcelReferences.length} request={regional3DRequest} onAcquired={setSelectedParcelTerrain} initialAnalysis={selectedParcelTerrain} />
             <SimpleReviewPanel visible={simpleDesign} review={parcelReview.parcels.some(p=>p.role==='target'&&[REGIONAL_PARCEL_SOURCE,MAP_PARCEL_SOURCE].includes(p.source.fileName))?selectedParcelUnionReview(parcelReview):parcelReview} referenceCount={publicParcelReferences.length} siteName={siteName} appVersion={APP_VERSION} terrainArea={selectedParcelTerrain} drawingScale={terrainDrawingScale} onDrawingScaleChange={setTerrainDrawingScale} state={simpleWorkflow} onChange={setSimpleWorkflow} onRepresentativeChange={setSimpleRepresentative} onDraw={() => openReviewSection('site-select', 'boundary')} />
             <details id="terrain-area" className="terrain-area-disclosure" open={terrainAreaOpen} onToggle={event => setTerrainAreaOpen(event.currentTarget.open)}>
               <summary><strong>検討範囲の等高線・勾配・3D</strong><span>{terrainAreaOpen ? '閉じる' : '開く'}</span></summary>

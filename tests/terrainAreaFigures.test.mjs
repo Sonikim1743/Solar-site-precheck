@@ -4,12 +4,13 @@ import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createServer } from 'vite'
 import react from '@vitejs/plugin-react'
-import { createEmptyParcelReview, measureParcelReview } from '../src/utils/parcelReview.js'
+import { createEmptyParcelReview, measureParcelReview, setReviewParcel } from '../src/utils/parcelReview.js'
+import { MAP_PARCEL_SOURCE } from '../src/utils/mapParcelSelection.js'
 import { createTerrainPlan, normalizeTerrainArea, terrainTilePoint } from '../src/utils/terrainArea.js'
 
 // Every coordinate, elevation and source entry below is synthetic. No site
 // records or downloaded DEM/parcel data are used by these rendering tests.
-let viteServer, TerrainArea3D, TerrainAreaReport, TerrainDrawingPair
+let viteServer, TerrainArea3D, TerrainAreaReport, TerrainDrawingPair, SelectedParcel3D
 before(async () => {
   viteServer = await createServer({
     configFile: false, root: process.cwd(), plugins: [react()],
@@ -17,6 +18,7 @@ before(async () => {
     appType: 'custom', logLevel: 'error', optimizeDeps: { disabled: true },
   })
   TerrainArea3D = (await viteServer.ssrLoadModule('/src/components/TerrainAreaFigures.jsx')).TerrainArea3D
+  SelectedParcel3D = (await viteServer.ssrLoadModule('/src/components/SelectedParcel3D.jsx')).default
   TerrainAreaReport = (await viteServer.ssrLoadModule('/src/components/TerrainAreaReport.jsx')).default
   TerrainDrawingPair = (await viteServer.ssrLoadModule('/src/components/TerrainDrawingPair.jsx')).default
 }, { timeout: 30_000 })
@@ -254,6 +256,20 @@ function reportFixture() {
   return {terrainArea,parcelReview,position:{lat:35.0002,lon:135.0002},siteName:'合成地形・描画回帰用',appVersion:'test'}
 }
 
+test('returning to a selected-parcel view reuses only the matching acquired terrain and keeps stale results executable',()=>{
+  const {terrainArea,parcelReview}=reportFixture()
+  const review=setReviewParcel(createEmptyParcelReview(),{type:'Feature',id:'synthetic-map',properties:{},geometry:parcelReview.boundary},'target',{fileName:MAP_PARCEL_SOURCE,importedAt:'2026-10-01T00:00:00.000Z'})
+  const render=initialAnalysis=>renderToStaticMarkup(React.createElement(SelectedParcel3D,{review,initialAnalysis}))
+  const current=render(terrainArea)
+  assert.match(current,/<canvas/)
+  assert.doesNotMatch(current,/>参考領域1区域を3Dで見る<\/button>/)
+  assert.match(current,/<dialog[^>]+>[\s\S]*適用済みの参考領域 1区域/)
+  assert.match(current,/>標高を再取得<\/button>/)
+  const stale=render({...terrainArea,geometryKey:'different-selection'})
+  assert.doesNotMatch(stale,/<canvas|data-selected-parcel-geometry-key=/)
+  assert.match(stale,/>参考領域1区域を3Dで見る<\/button>/)
+})
+
 test('the Japanese report keeps two terrain sheets plus consolidated annotations with fixed views, source limits and unchanged real statistics',()=>{
   const report=reportFixture(), original=structuredClone(report)
   const html=renderToStaticMarkup(React.createElement(TerrainAreaReport,{report}))
@@ -311,16 +327,21 @@ test('height emphasis and slope shares use real summary values without modifying
   assert.deepEqual(analysis,original)
   const interactive=render3D(analysis,{interactive:true,reportMode:false})
   assert.match(interactive,/3Dの高さ表示/)
-  assert.match(interactive,/実寸 1:1/)
-  assert.match(interactive,/高さ2倍 1:2/)
+  assert.doesNotMatch(interactive,/実寸 1:1/)
+  assert.equal((interactive.match(/>高さ2倍<\/button>/g)||[]).length,1)
+  assert.match(interactive,/aria-pressed="false" aria-describedby="[^"]+-height">高さ2倍/)
+  assert.match(interactive,/オフ：縦横同尺度（1:1）/)
   assert.match(interactive,/<caption>セル勾配/)
   assert.match(interactive,/セルと範囲の交差面積/)
   assert.match(interactive,/有効範囲 約400 m²（除外後）/)
   assert.match(interactive,/約400 m²/)
   assert.match(interactive,/>0 m²</)
+  assert.doesNotMatch(interactive,/class="terrain-area-missing-status"/)
+  assert.match(interactive,/<dialog[^>]+>[\s\S]*未確認 \/ NoData 0.0%[\s\S]*セルと範囲の交差面積/)
   const partial=render3D(localFixture({missing:true}),{interactive:true,reportMode:false})
   assert.match(partial,/未確認 \/ NoData 25.0%/)
   assert.match(partial,/約100 m²/)
+  assert.match(partial,/class="terrain-area-missing-status" role="status">未確認 25.0%/)
   const missing=render3D(localFixture({allMissing:true}),{interactive:true,reportMode:false})
   assert.match(missing,/3D表示に必要な標高がありません/)
   assert.doesNotMatch(missing,/80.7%/)

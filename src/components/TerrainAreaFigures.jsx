@@ -12,6 +12,7 @@ import { createTerrainOverlayVisibility, visibleTerrainLineParts } from '../util
 import { layoutTerrainLabels } from '../utils/terrainLabelLayout.js'
 import { hitTestTerrainRack } from '../utils/terrainRackHitTest.js'
 import TerrainViewNavigation from './TerrainViewNavigation.jsx'
+import TerrainHelpDialog from './TerrainHelpDialog.jsx'
 import { interpolateTerrainNavigation, terrainNavigationTarget } from '../utils/terrainNavigation.js'
 import './terrain-area.css'
 
@@ -74,13 +75,17 @@ function Legend({ y = 469, analysis }) {
 
 function SlopeDistribution({ analysis }) {
   const distribution = terrainSlopeDistribution(analysis)
+  const unknown = distribution.unknownPercent > 0
+  const unknownLabel = unknown && distribution.unknownPercent < .1 ? '0.1%未満' : `${distribution.unknownPercent.toFixed(1)}%`
   return <div className="terrain-area-slope-distribution">
-    <table><caption>セル勾配 <span>範囲面積比・推定面積</span><span className="terrain-area-distribution-total">有効範囲 {formatTerrainSlopeArea(distribution.totalAreaM2)}（除外後）</span></caption>
+    <table><caption>セル勾配 <span className="terrain-area-distribution-info">範囲面積比・推定面積 <TerrainHelpDialog title="勾配の範囲面積比・推定面積" symbol="i">
+      <p className="terrain-area-distribution-unknown">未確認 / NoData {unknownLabel} · {formatTerrainSlopeArea(distribution.unknownAreaM2)} / 勾配確認 {distribution.coveragePercent.toFixed(1)}%</p>
+      <p>穴・除外後の全図形面積が分母。セルと範囲の交差面積を集計し、五区分と未確認の合計100%。格子解像度に依存する推定値で、施工可否の基準ではありません。</p>
+      <p>地表面と黄色線は同じDEM。樹木・建物・造成後の形状は含みません。側面・底面は表示用で、地層・土量を示しません。欠測や除外の部分を面で埋めません。</p>
+    </TerrainHelpDialog></span>{unknown && <small className="terrain-area-missing-status" role="status">未確認 {unknownLabel}</small>}<span className="terrain-area-distribution-total">有効範囲 {formatTerrainSlopeArea(distribution.totalAreaM2)}（除外後）</span></caption>
       <thead><tr>{LABELS.map((label, index) => <th key={label} scope="col"><i style={{ background: COLORS[index] }} />{label}</th>)}</tr></thead>
       <tbody><tr>{LABELS.map((label, index) => <td key={label}><span>{slopeShare(analysis, index)}</span><small>{formatTerrainSlopeArea(distribution.bins[index].areaM2)}</small></td>)}</tr></tbody>
     </table>
-    <p className="terrain-area-distribution-unknown">未確認 / NoData {distribution.unknownPercent.toFixed(1)}% · {formatTerrainSlopeArea(distribution.unknownAreaM2)} / 勾配確認 {distribution.coveragePercent.toFixed(1)}%</p>
-    <p>穴・除外後の全図形面積が分母。セルと範囲の交差面積を集計し、五区分と未確認の合計100%。格子解像度に依存する推定値で、施工可否の基準ではありません。</p>
   </div>
 }
 
@@ -499,6 +504,7 @@ export function TerrainArea3D({ analysis, position, reportMode = false, compactR
       <div className="terrain-navigation-rotate" role="group" aria-label="左右に回転"><button type="button" aria-label="地形を左へ回転" title="左へ回転" onClick={()=>moveView('rotate','ArrowLeft')}>↶ 左</button><button type="button" aria-label="地形を右へ回転" title="右へ回転" onClick={()=>moveView('rotate','ArrowRight')}>右 ↷</button></div>
       <div role="group" aria-label="中心を固定して視点を移動">{[['ArrowLeft','←','視点を左へ回す'],['ArrowUp','↑','見下ろしを増やす'],['ArrowDown','↓','見下ろしを減らす'],['ArrowRight','→','視点を右へ回す']].map(([key,label,name])=><button key={key} type="button" aria-label={name} title={name} onClick={()=>moveView('orbit',key)}>{label}</button>)}</div>
       <div className="terrain-area-camera-zoom" role="group" aria-label="3Dの拡大縮小"><button type="button" aria-label="3Dを縮小" disabled={camera.zoom<=.65} onClick={()=>zoomView(1/1.2)}>−</button><span>{camera.zoom.toFixed(1)}×</span><button type="button" aria-label="3Dを拡大" disabled={camera.zoom>=2.5} onClick={()=>zoomView(1.2)}>＋</button><button type="button" className="terrain-navigation-home" aria-label="最初の視点に戻す" title="最初の視点" onClick={resetView}><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="m3 11 9-8 9 8v10h-6v-7H9v7H3Z" /></svg></button></div>
+      <div className="terrain-navigation-height" role="group" aria-label="3Dの高さ表示"><button type="button" aria-pressed={verticalScale === 2} aria-describedby={`${id}-height`} onClick={() => changeHeightScale(verticalScale === 2 ? 1 : 2)}>高さ2倍</button><span aria-hidden="true">{verticalScale === 2 ? '1:2' : '1:1'}</span></div>
     </>} />}
     <div className="terrain-area-stage">
     {canRotate && <canvas ref={canvasRef} aria-hidden="true" className="terrain-area-surface" />}
@@ -531,15 +537,9 @@ export function TerrainArea3D({ analysis, position, reportMode = false, compactR
     </div>
     </div>
     {projectedParcels && <ParcelLabelNote {...projectedParcels} />}
-    {canRotate && <div className="terrain-area-rotation-controls terrain-area-compact-toolbar" role="region" aria-label="高さの表示設定" tabIndex="0">    {canRotate && <div className="terrain-area-height-controls" role="group" aria-label="3Dの高さ表示">
-      <span>高さ表示</span><button type="button" aria-pressed={verticalScale === 1} onClick={() => changeHeightScale(1)}>実寸 1:1</button><button type="button" aria-pressed={verticalScale === 2} onClick={() => changeHeightScale(2)}>高さ2倍 1:2</button>
-      <p className="parcel-sr-only">{verticalScale === 2 ? '横1：縦2の強調表示。標高・勾配の数値は変わりません。' : '縦横同尺度。実際の高低差のバランスを確認。'}</p>
-    </div>}
-
-      <p className="parcel-sr-only" id={`${id}-controls`}>{viewMode === 'orbit' ? '地形の中心を固定。左右で周囲を回り、上へドラッグで見下ろす。' : 'ドラッグで回転。'}ホイールで拡大・縮小。矢印キーも使えます。</p>
-    </div>}
+    {canRotate && <><p className="parcel-sr-only" id={`${id}-height`}>{verticalScale === 2 ? 'オン：横1：縦2の強調表示。' : 'オフ：縦横同尺度（1:1）。'}標高・勾配の数値と色は変わりません。</p><p className="parcel-sr-only" id={`${id}-controls`}>{viewMode === 'orbit' ? '地形の中心を固定。左右で周囲を回り、上へドラッグで見下ろす。' : 'ドラッグで回転。'}ホイールで拡大・縮小。矢印キーも使えます。</p></>}
     {canRotate && rackControls}
     {canRotate && <SlopeDistribution analysis={analysis} />}
-    <figcaption>{compactReport ? `実DEM地形 · 1:1 · ${noteRef}（最終ページ）` : <>{drawing.faceCount ? '地表面と黄色線は同じDEM。樹木・建物・造成後の形状は含みません。側面・底面は表示用で、地層・土量を示しません。' : '連続した地表面を描ける標高点が不足しています。'} {!canRotate ? '面積は有効範囲と勾配取得率からの概算。' : ''} {analysis.summary?.coveragePercent < 100 ? '未取得部分の面は表示していません。' : ''}</>}</figcaption>
+    {(!canRotate || !drawing.faceCount) && <figcaption>{compactReport ? `実DEM地形 · 1:1 · ${noteRef}（最終ページ）` : <>{drawing.faceCount ? '地表面と黄色線は同じDEM。樹木・建物・造成後の形状は含みません。側面・底面は表示用で、地層・土量を示しません。' : '連続した地表面を描ける標高点が不足しています。'} {!canRotate ? '面積は有効範囲と勾配取得率からの概算。' : ''} {analysis.summary?.coveragePercent < 100 ? '未取得部分の面は表示していません。' : ''}</>}</figcaption>}
   </figure>
 }
