@@ -5,7 +5,8 @@ import { TERRAIN_SLOPE_COLORS, TERRAIN_SLOPE_LABELS } from '../utils/terrainSlop
 import MapRegionLabel, { getMapRegionLabel } from './MapRegionLabel.jsx'
 import MapPlaceNamesOverlay from './MapPlaceNamesOverlay.jsx'
 import PublicParcelOverlay, { PublicParcelOverlayStatus } from './PublicParcelOverlay.jsx'
-import { MAP_PARCEL_SOURCE, MAP_PARCEL_NOTICE } from '../utils/mapParcelSelection.js'
+import MapParcelNotice, { isMapParcelJoinNotice } from './MapParcelNotice.jsx'
+import { MAP_PARCEL_SOURCE } from '../utils/mapParcelSelection.js'
 import L from 'leaflet'
 import { Circle, CircleMarker, GeoJSON, MapContainer, Marker, Polygon, Polyline, Popup, Rectangle, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet'
 import MapDistanceScale from './MapDistanceScale.jsx'
@@ -97,6 +98,17 @@ function MapController({ position, viewport, onViewportChange, resetRequest }) {
 
   useEffect(() => {
     remember()
+  }, [map])
+
+  useEffect(() => {
+    if (typeof ResizeObserver === 'undefined') return
+    let frame = 0
+    const observer = new ResizeObserver(() => {
+      window.cancelAnimationFrame(frame)
+      frame = window.requestAnimationFrame(() => map.invalidateSize({ animate: false, pan: true, debounceMoveend: true }))
+    })
+    observer.observe(map.getContainer())
+    return () => { observer.disconnect(); window.cancelAnimationFrame(frame) }
   }, [map])
 
   return null
@@ -744,6 +756,12 @@ export default function MapPanel({
   useEffect(()=>()=>{mapPickJob.current++},[])
   const [baseMap, setBaseMap] = useState('photo')
   const [showPlaceNames, setShowPlaceNames] = useState(true)
+  const displayOptionsRef = useRef(null)
+  useEffect(() => {
+    const closeOutside = event => { if (!displayOptionsRef.current?.contains(event.target) && displayOptionsRef.current) displayOptionsRef.current.open = false }
+    document.addEventListener('pointerdown', closeOutside)
+    return () => document.removeEventListener('pointerdown', closeOutside)
+  }, [])
   const [publicParcelStatus, setPublicParcelStatus] = useState({ state: 'off', message: '' })
   const [placeNameStatus, setPlaceNameStatus] = useState(null)
   useEffect(() => setShowTerrainArea(true), [terrainArea?.geometryKey, terrainArea?.fetchedAt])
@@ -897,7 +915,7 @@ export default function MapPanel({
       <MapRegionLabel position={position} placeInfo={placeInfo} />
       <div className="map-display-controls" aria-label="地図の表示切替">
         <button type="button" className="map-base-toggle" aria-label={`${baseMap === 'photo' ? '等高線地図' : '航空写真'}へ切り替える`} aria-pressed={baseMap === 'std'} title={baseMap === 'photo' ? '等高線のある国土地理院標準地図へ切り替え' : '航空写真へ切り替え'} onClick={() => setBaseMap(value => value === 'photo' ? 'std' : 'photo')}>{baseMap === 'photo' ? '等高線地図' : '航空写真'}</button>
-        <details className="map-display-options"><summary aria-label="地図の表示設定" title="地名の表示設定">⋯</summary><div><label title="重ねて表示する地名の設定。標準地図に含まれる文字は残ります。"><input type="checkbox" checked={showPlaceNames} onChange={event => setShowPlaceNames(event.target.checked)}/>地名を表示</label></div></details>
+        <details ref={displayOptionsRef} className="map-display-options" onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus() } }}><summary aria-label="地図の表示設定" title="地名の表示設定">⋯</summary><div><button type="button" className="map-place-names-toggle" aria-label="地名を表示" aria-pressed={showPlaceNames} title="重ねて表示する地名の設定。標準地図に含まれる文字は残ります。" onClick={() => setShowPlaceNames(value => !value)}>地名 <span aria-hidden="true">{showPlaceNames ? 'ON' : 'OFF'}</span></button></div></details>
       </div>
       <div className="map-draw-controls" role="group" aria-label="地番表示・範囲の作図">
         <button type="button" className={parcelMode === 'boundary' ? 'is-active' : ''} aria-pressed={parcelMode === 'boundary'} onClick={() => onParcelModeChange?.(parcelMode === 'boundary' ? 'point' : 'boundary')} disabled={!onParcelModeChange}>範囲を描く</button>
@@ -935,9 +953,8 @@ export default function MapPanel({
       {regionalDraft.map(f=><button key={f.id} type="button" disabled={mapPickBusy} onClick={()=>toggleRegional(f)}>{f.properties['地番']} ×</button>)}
       <button type="button" className="regional-parcel-complete" disabled={mapPickBusy||isDrawing||(!regionalDraft.length&&!confirmedRegional.length)} onClick={()=>{if(onConfirmRegionalParcels?.(regionalDraft)){setRegionalDirty(false);setRegionalMessage('表示境界を参考領域として適用しました。下の3D・シンプル解析に同じ選択形状を使います。');setRegionalCandidates([])}}}>選択完了 → 3D</button>
       <button type="button" onClick={()=>{mapPickJob.current++;setMapPickBusy(false);setRegionalDirty(false);setRegionalDraft(confirmedDraft());setRegionalCandidates([]);setRegionalMessage('未適用の選択変更を中止しました。適用済み領域と結果は保持しています。')}}>選択を中止</button>
-      {isDrawing?<p role="status">作図中です。範囲を「確定」または「取消」した後、地番を選択してください。</p>:!regionalDraft.length&&!confirmedRegional.length&&<p role="status">地図を拡大し、表示された地番の内側を押して選択してください（ズーム16以上）。</p>}
-      <p className="map-parcel-scope">{MAP_PARCEL_NOTICE} 選択境界を地図上の黄色線で確認してから適用してください。</p>
-      {mapPickBusy&&<p role="status">選択境界を取得中…</p>}{regionalMessage&&<p role="status">{regionalMessage}</p>}{regionalConfirmError&&<p role="alert">{regionalConfirmError}</p>}
+      <MapParcelNotice message={regionalMessage} drawing={isDrawing} />
+      {mapPickBusy&&<p role="status">選択境界を取得中…</p>}{regionalMessage&&!isMapParcelJoinNotice(regionalMessage)&&<p role="status">{regionalMessage}</p>}{regionalConfirmError&&<p role="alert">{regionalConfirmError}</p>}
       {regionalDraft.some(f=>f.properties.__selectionLimited)&&<p role="alert">連続境界を確認できない区域があります。表示境界の欠落があり得ます。プレビューした範囲だけを参考領域に使います。</p>}
       <details><summary>選択・出典の扱い</summary><p>現在の地図と同じAMX公開2024 PMTilesを使用。同じID・地番・地図名の隣接タイル断片のみ結合し、穴・分離領域を保持します。別の区域を地番文字だけで結合しません。未収録・量子化・離れた部分の欠落を元の境界として保証しません。別途の原本ファイル準備は不要です。既存の手描き範囲・除外・他資料の対象は保存したまま、選択区域の3Dとシンプル解析は対象の合併形状を使います。</p></details>
       {regionalCandidates.length>0&&<div role="group" aria-label="重なる地図境界の候補"><p>表示境界が重なっています。選択する地番を確認してください。</p>{regionalCandidates.map((c,i)=><button key={i} type="button" disabled={mapPickBusy} onClick={()=>beginMapPick(c)}>{c.number} / {c.mapName}</button>)}</div>}

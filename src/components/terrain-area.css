@@ -11,8 +11,8 @@
 .terrain-layout-bar .terrain-layout-toggle[aria-pressed="true"] { background:#235741; border-color:#235741; color:#fff; }
 .terrain-layout-utility { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:6px; }
 .terrain-layout-format { color:#64786f; font-size:13px; }
-.terrain-layout-utility .terrain-layout-parcel-toggle { margin-left:auto; }
-.terrain-layout-utility .terrain-layout-parcel-toggle[aria-pressed="true"] { background:#e0f1ef; border-color:#229da4; color:#165f65; }
+.terrain-layout-view-options { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:8px; max-width:100%; margin-left:auto; }
+.terrain-layout-utility :is(.terrain-layout-parcel-toggle,.terrain-layout-fence-toggle)[aria-pressed="true"] { background:#e0f1ef; border-color:#229da4; color:#165f65; }
 .terrain-layout-bar button:disabled,.terrain-layout-utility button:disabled { opacity:.5; cursor:default; }
 .terrain-layout-bar button:focus-visible,.terrain-layout-conditions summary:focus-visible { outline:3px solid #4f9676; outline-offset:3px; }
 .terrain-layout-instruction { flex:1 1 250px; color:#476653; font-size:14px; line-height:1.55; }
@@ -24,7 +24,6 @@
 .terrain-layout-setback-field>div { display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; margin-top:5px; }
 .terrain-layout-fields .terrain-layout-setback-field label { flex-wrap:nowrap; }
 .terrain-layout-fields .terrain-layout-setback-field label input[type="number"] { width:70px; }
-.terrain-layout-fields .terrain-layout-fence-toggle input[type="checkbox"] { width:16px; height:16px; min-height:0; padding:0; accent-color:#235741; }
 .terrain-area-fence { fill:none; stroke:#476f65; stroke-width:1.2; }
 .terrain-layout-error>div { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
 .terrain-layout-error button { min-height:36px; padding:6px 10px; border:1px solid #d1b879; border-radius:6px; background:#fff; color:#785922; font:inherit; cursor:pointer; }
@@ -86,7 +85,8 @@
   .terrain-layout-count-controls>span { min-width:0; text-align:center; font-size:14px; }
   .terrain-layout-count-controls p { flex-basis:100%; margin:0; font-size:12px; }
   .terrain-layout-instruction { order:3; flex-basis:100%; }
-  .terrain-layout-parcel-toggle { margin-left:auto; }
+  .terrain-layout-view-options { gap:6px; }
+  .terrain-layout-view-options>button:not(.terrain-help-button) { padding-inline:8px; font-size:12px; }
   .terrain-layout-totals { gap:7px; }
   .terrain-layout-totals dd { font-size:20px; }
   .terrain-layout-totals small { font-size:12px; }

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mergeMapParcelFragments, resolveMapParcelSelection, MAP_PARCEL_SOURCE } from '../src/utils/mapParcelSelection.js'
+import { mergeMapParcelFragments, resolveMapParcelSelection, MAP_PARCEL_SOURCE, MAP_PARCEL_JOIN_NOTICE } from '../src/utils/mapParcelSelection.js'
 import { pointInGeometry, geometryBounds } from '../src/services/parcelGeometry.js'
 const seed={z:16,x:57344,y:25900}
 const ring=(x,y,w,h=w)=>[{x,y},{x:x+w,y},{x:x+w,y:y+h},{x,y:y+h},{x,y}]
@@ -21,6 +21,7 @@ test('same map id across a tile seam is unioned once, retaining a hole and detac
  assert.equal(requests.length,2);assert.equal(result.properties.__geometryScope,'map-reference-tile-union')
  assert.equal(result.properties.__parcelSourceName,MAP_PARCEL_SOURCE)
  assert.equal(result.properties.__sourceYear,2024)
+ assert.equal(result.properties.__selectionWarning,MAP_PARCEL_JOIN_NOTICE)
 })
 test('same number with a different id or map is never used to extend the chosen shape',async()=>{
  const picked=f([ring(200,100,56,80)]),other=f([ring(0,100,60,80)],8),wrongMap=f([ring(0,100,80,80)],7,'合成-1','別図')

@@ -130,7 +130,9 @@ export default function TerrainLayoutPreview({ analysis, preview, onChange, parc
     <div className="terrain-layout-utility">
       <button type="button" aria-expanded={conditionsOpen} aria-controls={conditionsId} onClick={() => setConditionsOpen(value => !value)}><span aria-hidden="true">{conditionsOpen ? '▾' : '▸'}</span> 配置条件</button>
       <span className="terrain-layout-format">4段 × {columns} · モジュール{options.tiltDeg}°{layout && ` · 適用方位${number(layout.options.azimuthDeg)}°`}</span>
+      <div className="terrain-layout-view-options" role="group" aria-label="地形図の表示">
       <button type="button" className="terrain-layout-parcel-toggle" aria-pressed={Boolean(preview?.labels)} disabled={!parcelCount} onClick={() => onChangeRef.current(previous => ({ ...previous, labels: !previous.labels }))}>3D地番 {preview?.labels ? 'ON' : 'OFF'}</button>
+      <button type="button" className="terrain-layout-fence-toggle" aria-label="配置を囲むフェンス" aria-pressed={Boolean(preview?.fence)} title="選択中の架台を囲む参考フェンスを表示・非表示" onClick={() => onChangeRef.current(previous => ({ ...previous, fence: !previous.fence }))}>フェンス {preview?.fence ? 'ON' : 'OFF'}</button>
       <TerrainHelpDialog title="参考配置の使い方・条件">
         <h4>操作</h4><p>架台をクリックで除外、点線で復元。図の下で増減できます。再配置すると個別除外を初期化します。</p>
         <h4>実寸と対象範囲</h4>
@@ -143,6 +145,7 @@ export default function TerrainLayoutPreview({ analysis, preview, onChange, parc
         <h4>保存と地番</h4><p>{TERRAIN_LAYOUT_SAVE}</p><p>地番は公開資料・読み込んだ筆の実データだけを表示し、住所から推測しません。</p>
         {layout?.warnings?.length > 0 && <ul>{layout.warnings.map((warning, index) => <li key={index}>{typeof warning === 'string' ? warning : warning.message}</li>)}</ul>}
       </TerrainHelpDialog>
+      </div>
     </div>
     {draftChanged && <p className="terrain-layout-footnote" role="status">条件は未適用です。図は前回の結果です。PDFは現在の条件で再計算してから出力してください。</p>}
     {preview?.comparison?.analysisReference === analysis && <div className="terrain-layout-comparison"><p>地形の局所勾配のみ変更。パネル傾斜・方位・開始位置・間隔・範囲は同一。個別除外なしの自動案です。</p><table><thead><tr><th>地形勾配</th><th>架台</th><th>枚数</th><th>DC kW</th><th>表示</th></tr></thead><tbody>{preview.comparison.layouts.map(result => <tr key={result.options.slopeLimitDeg}><th>{result.options.slopeLimitDeg}°未満</th><td>{result.rackCount}</td><td>{result.moduleCount}</td><td>{number(result.dcKw)}</td><td><button type="button" disabled={busy||comparisonDraftChanged} onClick={() => { if(comparisonDraftChanged)return; onChangeRef.current(previous => ({ ...previous, options: result.options, appliedOptions: result.options, layoutMode: 'manual', appliedMode: 'manual', layout: { ...result, analysisKey: key, analysisReference: analysis }, disabledRackIds: [], activeRackCount: null, enabled: true })); onShow3D?.() }}>この案を見る</button></td></tr>)}</tbody></table><p>{comparisonDraftChanged && <span role="status">条件を変更しました。比較を再計算してから適用してください。 </span>}差（20° − 15°）：{preview.comparison.layouts[1].rackCount - preview.comparison.layouts[0].rackCount}架台 / {preview.comparison.layouts[1].moduleCount - preview.comparison.layouts[0].moduleCount}枚 / {number(preview.comparison.layouts[1].dcKw - preview.comparison.layouts[0].dcKw)} kW。案の切替・再計算成功時は個別除外を初期化します。</p></div>}
@@ -166,7 +169,7 @@ export default function TerrainLayoutPreview({ analysis, preview, onChange, parc
         <p className="terrain-layout-angle-note">方位は低い辺側へ向くパネル正面。再計算では入力方位を固定し、「方位も最適化して適用（±30°）」だけが方位も探索します。モジュール傾斜はパネル面の上下角。地形勾配の除外基準・3D視点とは独立です。</p>
         <label>架台左右の空き<input type="number" min="0" max="30" step="0.5" value={options.rackGapM} onChange={event => changeOptions({ rackGapM: event.target.value === '' ? '' : Number(event.target.value) })} /><span>m</span></label>
         <label>アレイ間前後の空き<input type="number" min="0" max="30" step="0.1" value={options.rowGapM} onChange={event => changeOptions({ rowGapM: event.target.value === '' ? '' : Number(event.target.value) })} /><span>m</span></label>
-        <div className="terrain-layout-setback-field"><span>範囲・対象勾配の端からの空き</span><div><label><input aria-label="範囲・対象勾配の端からの空き" type="number" min="0" max="30" step="0.5" value={options.setbackM} onChange={event => changeOptions({ setbackM: event.target.value === '' ? '' : Number(event.target.value) })} /><span>m</span></label><label className="terrain-layout-fence-toggle"><input type="checkbox" checked={Boolean(preview?.fence)} onChange={event => { const checked = event.target.checked; onChangeRef.current(previous => ({ ...previous, fence: checked })) }} />配置を囲むフェンス</label></div></div>
+        <div className="terrain-layout-setback-field"><span>範囲・対象勾配の端からの空き</span><div><label><input aria-label="範囲・対象勾配の端からの空き" type="number" min="0" max="30" step="0.5" value={options.setbackM} onChange={event => changeOptions({ setbackM: event.target.value === '' ? '' : Number(event.target.value) })} /><span>m</span></label></div></div>
       </div>
       <button type="button" className="terrain-area-quiet-button" disabled={busy} onClick={() => calculate()}>この条件で再計算</button>
       <button type="button" className="terrain-area-quiet-button" onClick={()=>changeOptions(normalizeTerrainLayoutOptions())}>基本値を入力（15° / 前後3.3m）</button>

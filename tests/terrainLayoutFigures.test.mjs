@@ -7,18 +7,32 @@ import react from '@vitejs/plugin-react'
 import { buildTerrainLayout } from '../src/utils/terrainLayout.js'
 import { terrainLayoutErrorGuidance } from '../src/utils/terrainLayoutError.js'
 
-let server, figures, selectedTerrainLayout, errorNotice
+let server, figures, selectedTerrainLayout, errorNotice, layoutPreview
 before(async () => {
   server = await createServer({ configFile:false, root:process.cwd(), plugins:[react()], server:{middlewareMode:true,hmr:false,ws:false,watch:null}, appType:'custom',logLevel:'error',optimizeDeps:{disabled:true} })
   figures = await server.ssrLoadModule('/src/components/TerrainAreaFigures.jsx')
   selectedTerrainLayout = (await server.ssrLoadModule('/src/components/TerrainLayoutPreview.jsx')).selectedTerrainLayout
   errorNotice = (await server.ssrLoadModule('/src/components/TerrainLayoutPreview.jsx')).TerrainLayoutErrorNotice
+  layoutPreview = (await server.ssrLoadModule('/src/components/TerrainLayoutPreview.jsx')).default
 }, { timeout:30000 })
 after(async () => { await server?.close() })
 const fixture = () => {
   const width=13,height=13,step=5,xMin=-5,yMin=-5
   return {geometryKey:'synthetic-render',fetchedAt:'2026-10-13T00:00:00.000Z',contours:[],grid:{width,height,step,xMin,yMin,origin:{lat:35,lon:135},boundary:[[[[0,0],[50,0],[50,50],[0,50],[0,0]]]],inside:Array(width*height).fill(true),elevations:Array(width*height).fill(100),slopes:Array(width*height).fill(0)},summary:{minElevation:100,maxElevation:100,polygonAreaM2:2500,heightRange:0,medianSlope:0,coveragePercent:100,slopeCoveragePercent:100,slopeBins:[{min:0,max:10,percent:100},{min:10,max:20,percent:0},{min:20,max:30,percent:0},{min:30,max:90,percent:0}]}}
 }
+
+test('fence visibility is a single pressed-state control beside 3D parcel labels, outside collapsed conditions', () => {
+  for (const fence of [false, true]) {
+    const html = renderToStaticMarkup(React.createElement(layoutPreview, { analysis: fixture(), preview: { options: {}, fence }, onChange: () => {}, parcelCount: 1 }))
+    const control = html.match(/<button[^>]*aria-label="配置を囲むフェンス"[^>]*>[\s\S]*?<\/button>/)?.[0]
+    assert.ok(control); assert.match(control, new RegExp(`aria-pressed="${fence}"`))
+    assert.match(control, new RegExp(`フェンス ${fence ? 'ON' : 'OFF'}`))
+    assert.ok(html.indexOf(control) > html.indexOf('3D地番'))
+    assert.ok(html.indexOf(control) < html.indexOf('class="terrain-layout-conditions"'))
+    assert.equal((html.match(/aria-label="配置を囲むフェンス"/g) || []).length, 1)
+    assert.doesNotMatch(html, /type="checkbox"/)
+  }
+})
 test('quantity adjustment removes and restores the same rigid racks while keeping capacity consistent', () => {
   const pool=buildTerrainLayout(fixture()), original=structuredClone(pool)
   assert.ok(pool.rackCount>1)

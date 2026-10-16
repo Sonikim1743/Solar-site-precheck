@@ -3391,7 +3391,13 @@ export default function App() {
         </div>
         <div className="topbar-actions">
           <nav className="workspace-nav" aria-label="画面切替">
-            <div className="mode-choice" role="group" aria-label="表示モード"><button type="button" aria-pressed={simpleDesign} onClick={() => { if (!simpleDesign) toggleSimpleDesign() }}>シンプル</button><button type="button" aria-pressed={!simpleDesign} onClick={() => { if (simpleDesign) toggleSimpleDesign() }}>詳細</button></div>
+            <div className="mode-choice" data-mode={simpleDesign ? 'simple' : 'detail'} role="group" aria-label="表示モード" onKeyDown={event => {
+              const index = ['ArrowLeft', 'Home'].includes(event.key) ? 0 : ['ArrowRight', 'End'].includes(event.key) ? 1 : -1
+              if (index < 0) return
+              event.preventDefault()
+              const button = event.currentTarget.querySelectorAll('button')[index]
+              button?.focus(); button?.click()
+            }}><button type="button" aria-pressed={simpleDesign} onClick={() => { if (!simpleDesign) toggleSimpleDesign() }}>シンプル</button><button type="button" aria-pressed={!simpleDesign} onClick={() => { if (simpleDesign) toggleSimpleDesign() }}>詳細</button></div>
             <button type="button" aria-current={activePage === 'solar' && !solarManualActive ? 'page' : undefined} onClick={() => switchPage('solar')}>候補地マップ</button>
             <details className="workspace-tools"><summary>ツール</summary>
               <div className="workspace-tools-menu" onClick={event => { if (event.target.closest('button, a')) { event.currentTarget.parentElement.open = false; event.currentTarget.parentElement.querySelector('summary')?.focus() } }}>

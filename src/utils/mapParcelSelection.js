@@ -4,6 +4,7 @@ import { isPublicParcelFeature, publicParcelNumber, PUBLIC_PARCEL_SOURCE } from 
 
 export const MAP_PARCEL_SOURCE = '地図表示境界の参考領域 / AMX公開2024 PMTiles（原本全筆未確認）'
 export const MAP_PARCEL_NOTICE = '地図表示境界の参考領域（公開2024）。タイル化・量子化・省略・欠測・分離部分の未収録があり得るため、原本の全筆・登記・測量境界は保証しません。'
+export const MAP_PARCEL_JOIN_NOTICE = '同じ地図IDの隣接断片を結合しました。離れた未収録部分を含む原本全筆の保証はありません。'
 export const isMapParcel = p => p?.source?.fileName === MAP_PARCEL_SOURCE
 export const mapParcelSignature = f => JSON.stringify([f?.id ?? null, publicParcelNumber(f), ...['地番区域','地図名','座標系'].map(k=>String(f?.props?.[k] || ''))])
 const key = c => `${c.z}/${c.x}/${c.y}`
@@ -58,6 +59,6 @@ export async function resolveMapParcelSelection(picked,seed,getTile,{signal,maxT
  }
  if(!stable&&!fragments.length){const tile=await getTile(seed);fragments.push({tile,feature:picked})}
  const geometry=mergeMapParcelFragments(fragments),id=stable?`map:2024:${picked.id}:${hash(signature)}`:`map:2024:fragment:${key(seed)}:${hash(JSON.stringify(geometry))}`
- const warning=limited?'隣接タイル照会の上限に達した表示境界です。範囲外の欠落があり得ます。プレビューを確認してください。':!stable?'共通IDがないため、クリックした表示断片のみです。画面外の部分は確認できません。':unmatched?'隣接タイルに同じ地図IDがない部分があります。境界の連続は未確認です。プレビューした形だけを参考領域に使います。':'同じ地図IDの隣接断片を結合しました。離れた未収録部分を含む原本全筆の保証はありません。'
+ const warning=limited?'隣接タイル照会の上限に達した表示境界です。範囲外の欠落があり得ます。プレビューを確認してください。':!stable?'共通IDがないため、クリックした表示断片のみです。画面外の部分は確認できません。':unmatched?'隣接タイルに同じ地図IDがない部分があります。境界の連続は未確認です。プレビューした形だけを参考領域に使います。':MAP_PARCEL_JOIN_NOTICE
  return {type:'Feature',id,geometry,properties:{'地番':publicParcelNumber(picked),'地番区域':String(picked.props['地番区域']||''),'地図名':String(picked.props['地図名']||''),'座標系':String(picked.props['座標系']||''),__parcelId:id,__parcelSourceName:MAP_PARCEL_SOURCE,__sourceYear:2024,__geometryScope:'map-reference-tile-union',__mvtId:stable?picked.id:null,__tileKeys:[...visited],__selectionLimited:limited||unmatched>0||!stable,__selectionWarning:warning}}
 }

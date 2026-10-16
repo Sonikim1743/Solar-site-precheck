@@ -19,8 +19,10 @@
 .app .map-panel .map-shell .map-display-options>summary{box-sizing:border-box;width:28px;height:28px;display:flex;align-items:center;justify-content:center;list-style:none;border:1px solid #c6d6cc;border-radius:5px;background:#fff;color:#2e483c;font-size:20px;line-height:1;cursor:pointer;box-shadow:0 1px 4px #183c351c}
 .app .map-panel .map-shell .map-display-options>summary::-webkit-details-marker{display:none}
 .app .map-panel .map-shell .map-display-options>div{position:absolute;top:calc(100% + 20px);right:0;min-width:130px;padding:9px 11px;border:1px solid #c6d6cc;border-radius:6px;background:#fff;box-shadow:0 2px 8px #183c3526;color:#2e483c;font-size:12px}
-.app .map-panel .map-shell .map-display-options label{display:flex;align-items:center;gap:7px;white-space:nowrap;cursor:pointer}
-.app .map-panel .map-shell .map-display-options input{width:16px;height:16px;margin:0;accent-color:#17664f}
+.app .map-panel .map-shell .map-place-names-toggle{display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%;min-height:40px;padding:7px 10px;border:1px solid #c6d6cc;border-radius:6px;background:#fff;color:#2e483c;font:inherit;cursor:pointer}
+.app .map-panel .map-shell .map-place-names-toggle[aria-pressed="true"]{background:#eaf5ee;border-color:#8ebba2;color:#175d43}
+.app .map-panel .map-shell .map-place-names-toggle:focus-visible{outline:3px solid #3d9677;outline-offset:2px}
+@media(max-width:640px),(pointer:coarse){.app .map-panel .map-shell .map-place-names-toggle{min-height:44px}}
 .app .map-panel .map-shell :is(.map-base-toggle,.map-display-options>summary):focus-visible{outline:3px solid #3d9677;outline-offset:2px}
 .app .map-panel .parcel-drawing-toolbar .parcel-drawing-toolbar__buttons button{min-height:34px;padding:6px 9px;font-size:12px;border-radius:6px}
 .app .map-panel .map-shell>.map-region-label{top:10px;min-height:30px;padding:4px 8px}
@@ -48,3 +50,6 @@
 .regional-parcel-selection p { flex-basis: 100%; margin: 4px 0; }
 .regional-parcel-selection [role="group"] { width: 100%; display: flex; flex-wrap: wrap; gap: 8px; }
 .regional-parcel-selection [role="group"] button { max-width: 100%; text-align: left; }
+.regional-parcel-instruction { flex-basis:100%; margin:4px 0; line-height:1.7; }
+.regional-parcel-instruction>.terrain-help-button { width:32px; min-width:32px; min-height:32px; padding:0; margin-left:6px; border-radius:50%; vertical-align:middle; }
+@media(max-width:640px),(pointer:coarse){.regional-parcel-instruction>.terrain-help-button{width:44px;min-width:44px;min-height:44px}.regional-parcel-instruction .terrain-help-dialog>header button{min-height:44px}}

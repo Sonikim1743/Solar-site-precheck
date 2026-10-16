@@ -13,7 +13,7 @@
   .app--simple .brand-mark { background:none; color:var(--green); box-shadow:none; width:30px; height:32px; }
   .app--simple .brand-name { font-size:19px; }
   .app--simple .brand-subtitle { display:none; }
-  .app--simple main { max-width:1160px; padding:0 28px 44px; }
+  .app--simple main { max-width:1440px; padding:0 28px 44px; }
   .app--simple .simple-hero { padding:36px 0 10px; }
   .app--simple .simple-hero .eyebrow { color:var(--green); font-size:12px; letter-spacing:.08em; margin:0 0 8px; }
   .app--simple .simple-hero h1 { font-size:34px; font-weight:600; letter-spacing:-.04em; margin:0 0 10px; }
@@ -39,7 +39,8 @@
   .app--simple .address-search { border-radius:7px; box-shadow:none; background:#fff; }
   .app--simple .address-search button[type=submit] { background:var(--green); color:#fff; border-radius:5px; }
   .app--simple .map-shell { border-radius:8px; border:1px solid var(--line); }
-  .app--simple .map { height:440px; }
+  .app--simple .terrain-area-panel .terrain-area-figure--interactive { max-width:none; }
+  .app--simple .terrain-area-panel .terrain-area-figure--interactive .terrain-area-model { max-width:none; }
   .app--simple .map-analysis-strip { background:#fff; border:0; border-bottom:1px solid var(--line); border-radius:0; padding:16px 0; margin:0; gap:18px; }
   .app--simple .selected-point-mini { background:none; border:0; border-radius:0; flex-wrap:wrap; gap:7px 12px; padding:0; }
   .app--simple .selected-point-mini span { color:var(--muted); font-size:12px; letter-spacing:0; }
@@ -116,7 +117,6 @@
     .app--simple .simple-hero { padding-top:24px; }
     .app--simple .simple-hero h1 { font-size:26px; }
     .app--simple .simple-steps { gap:14px; }
-    .app--simple .map { height:340px; }
     .app--simple .map-analysis-strip { grid-template-columns:1fr; gap:12px; }
     .app--simple .terrain-section-quick { flex-wrap:wrap; min-width:0; }
     .app--simple .simple-analysis-summary small { display:none; }
