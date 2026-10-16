@@ -663,6 +663,7 @@ export default function MapPanel({
   powerGrid,
   capacityMatches,
   googleMapsUrl,
+  locationBar,
 }) {
   const hasTerrainOverlay = !!terrainSection?.lines?.length
   const hasRegionLabel = Boolean(getMapRegionLabel(position, placeInfo))
@@ -871,7 +872,7 @@ export default function MapPanel({
       )}
       {parcelData && <div className="parcel-map-badge">地番レイヤー {parcelData.features.length.toLocaleString()}筆</div>}
     </div>
-      <div className="map-location-control">
+      {locationBar || <div className="map-location-control">
         {googleMapsUrl && <a className="map-google-open" href={googleMapsUrl} target="_blank" rel="noreferrer">Googleマップで開く</a>}
         <div className="map-location-buttons">
         <button type="button" onClick={onUseCurrentLocation} disabled={locationStatus?.status === 'loading'}>
@@ -882,7 +883,7 @@ export default function MapPanel({
         {locationStatus?.message && (
           <small className={locationStatus.status === 'error' ? 'is-error' : ''}>{locationStatus.message}</small>
         )}
-      </div>
+      </div>}
     <PublicParcelOverlayStatus status={publicParcelStatus} />
     {showPublicParcels && <div className="public-parcel-selected regional-parcel-selection" aria-label="地図境界の選択">
       <strong>選択中 {regionalDraft.length}区域 / 適用済み {confirmedRegional.length}区域</strong>

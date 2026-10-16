@@ -1,5 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import MapPanel from './components/MapPanel.jsx'
+import MapLocationBar from './components/MapLocationBar.jsx'
 import ParcelReviewPanel from './components/ParcelReviewPanel.jsx'
 import { createEmptyParcelReview, normalizeParcelReview, setReviewParcel, removeReviewParcel, measureParcelReview, getParcelKey } from './utils/parcelReview.js'
 import { featureInteriorPoint, pointInGeometry, validatePolygonGeometry } from './services/parcelGeometry.js'
@@ -3568,6 +3569,7 @@ export default function App() {
               powerGrid={powerGrid.data}
               capacityMatches={capacityMatches}
               googleMapsUrl={googleMapsUrl}
+              locationBar={<MapLocationBar position={position} placeLabel={selectedPlaceLabel} placeStatus={placeInfo.status} elevation={elevation} googleMapsUrl={googleMapsUrl} onCopy={copySelectedCoordinates} copyStatus={pointActionStatus} onFetchElevation={fetchMissingElevation} onUseCurrentLocation={handleUseCurrentLocation} onResetWorkspace={resetWorkTools} locationStatus={locationStatus} />}
             />
 
             <details className="parcel-settings" id="parcel-review-tools" onToggle={event => {
@@ -3650,19 +3652,7 @@ export default function App() {
               </div>
               </details>
 
-            <div className="map-analysis-strip">
-              {simpleDesign ? <div className="simple-point">
-                <div className="simple-point-title"><span>選択地点</span><strong>{position ? selectedPlaceLabel || (placeInfo.status === 'loading' ? '住所を確認中…' : '座標で確認') : '住所検索または地図で地点を選択'}</strong></div>
-                <div className="simple-point-meta"><span>{position ? selectedSolarProCoordinateText : '緯度・経度 —'}</span><span>標高 <b>{elevation.status === 'success' ? `${elevation.value.toFixed(1)} m` : elevation.status === 'loading' ? '取得中…' : '—'}</b></span></div>
-                <div className="simple-point-actions">{position && <><button type="button" onClick={copySelectedCoordinates}>コピー</button><a href={googleMapsUrl} target="_blank" rel="noreferrer">Google マップ ↗</a></>}{pointActionStatus && <span role="status">{pointActionStatus}</span>}</div>
-              </div> : <div className="selected-point-mini">
-                <div className="selected-point-mini__location"><span>選択地点</span><strong>{position ? selectedPlaceLabel || (placeInfo.status === 'loading' ? '住所を確認中…' : '座標で確認') : '住所検索または地図で地点を選択'}</strong></div>
-                <div className="selected-point-mini__coordinates"><strong>{position ? <><b>{toDegreeMinutes(position.lat, 'lat')}</b><b>{toDegreeMinutes(position.lon, 'lon')}</b></> : '緯度・経度 —'}</strong></div>
-                <div className="selected-point-mini__elevation"><span>標高</span><strong>{elevation.status === 'success' ? `${elevation.value.toFixed(1)} m` : elevation.status === 'loading' ? '取得中…' : elevation.status === 'error' ? '未取得' : '—'}</strong></div>
-                {position && <button type="button" className="mini-copy-button" onClick={copySelectedCoordinates} aria-label="緯度・経度（度・分）をコピー" title={selectedSolarProCoordinateText}>コピー</button>}
-                {pointActionStatus && <em role="status">{pointActionStatus}</em>}
-              </div>}
-              {position && !Number.isFinite(elevation.value) && <button className="secondary-button" disabled={elevation.status === 'loading'} onClick={fetchMissingElevation}>{elevation.status === 'loading' ? '標高を取得中…' : 'この地点の標高を取得'}</button>}
+            <section className="terrain-section-tools" aria-label="地点の地形断面">
               <div className="terrain-section-quick">
                 <div title={`選択地点から東西・南北へ各${terrainSectionRange}m、10m間隔の標高を確認します。`}>
                   <strong>
@@ -3706,7 +3696,7 @@ export default function App() {
                 <p className="inline-message inline-message--error">周辺{terrainSectionRange}mの標高断面を取得できませんでした。時間をおいて再試行してください。</p>
               )}
               {terrainSectionOpen && <TerrainSectionPreview analysis={terrainSection} />}
-            </div>
+            </section>
             <SelectedParcel3D review={parcelReview} referenceCount={publicParcelReferences.length} request={regional3DRequest} onAcquired={setSelectedParcelTerrain} initialAnalysis={selectedParcelTerrain} />
             <SimpleReviewPanel visible={simpleDesign} review={simpleReviewInput} referenceCount={publicParcelReferences.length} siteName={siteName} appVersion={APP_VERSION} terrainArea={simpleTerrainArea} layoutOptions={terrainPreview.options} layoutSettings={sharedLayoutSettings} onLayoutSettingsChange={changeSharedLayoutSettings} layoutPreview={terrainPreview} onApplied={applySimpleLayout} onBusyChange={setSharedLayoutBusy} drawingScale={terrainDrawingScale} onDrawingScaleChange={setTerrainDrawingScale} state={simpleWorkflow} onChange={setSimpleWorkflow} onRepresentativeChange={setSimpleRepresentative} onDraw={() => openReviewSection('site-select', 'boundary')} />
             <details id="terrain-area" className="terrain-area-disclosure" open={terrainAreaOpen} onToggle={event => setTerrainAreaOpen(event.currentTarget.open)}>
