@@ -27,6 +27,7 @@ export default function TerrainAreaReport({ report, id = 'terrain-area-report', 
   try { geometry = measureParcelReview(report.parcelReview).geometry } catch { geometry = null }
   if (!analysis || !geometry || analysis.geometryKey !== terrainGeometryKey(geometry)) return <p className="report-empty-panel">範囲と地形結果が一致しません。現在の範囲で地形を取得してから出力してください。</p>
   const layoutReport = terrainReportLayouts(analysis, report.terrainPreview)
+  if (layoutReport.blocked) return <p className="report-empty-panel" role="alert">配置条件または地形が更新されています。現在の条件で再計算してから出力してください。</p>
   const { summary } = analysis
   const notes = terrainReportNotes(report, layoutReport)
   const distribution = terrainSlopeDistribution(analysis)

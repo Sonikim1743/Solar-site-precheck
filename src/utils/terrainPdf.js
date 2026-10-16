@@ -374,6 +374,7 @@ function modelFromElement(report, element, checkDeadline) {
   const sheets = [...element.querySelectorAll('.terrain-report-sheet')]
   const svgs = [...element.querySelectorAll('.terrain-area-figure svg')].slice(0, 3)
   const layoutReport = terrainReportLayouts(analysis, report.terrainPreview)
+  if (layoutReport.blocked) fail('配置条件または地形が更新されています。現在の条件で再計算してから出力してください。')
   const layoutSheets = [...element.querySelectorAll('.terrain-layout-report')]
   const expectedLayouts = [...(layoutReport.current ? [[layoutReport.current]] : []), ...(layoutReport.comparison ? [layoutReport.comparison.layouts] : [])]
   if (sheets.length !== layoutReport.totalPages || layoutSheets.length !== expectedLayouts.length) fail('配置図面のページ数が更新されました。開き直してください。')

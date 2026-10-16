@@ -67,12 +67,12 @@ test('bearing-only draft edits block old slope and south comparison application'
  await clean()
 })
 
-test('single-character spacing draft preserves the applied rack pool, exclusions, quantities and report snapshot',async()=>{
+test('spacing draft preserves the screen pool and exclusions while blocking stale PDF',async()=>{
  const prior=await setup();await click('▸ 配置条件')
  const input=[...document.querySelectorAll('label')].find(x=>x.textContent.startsWith('架台左右')).querySelector('input')
  await React.act(async()=>{Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set.call(input,'2');input.dispatchEvent(new window.Event('input',{bubbles:true}))})
  assert.equal(state.options.rackGapM,2);assert.equal(state.layout,prior.layout);assert.deepEqual(state.disabledRackIds,prior.disabledRackIds)
- assert.ok(Math.abs(terrainReportLayouts(analysis,state).current.dcKw-(prior.layout.moduleCount-prior.layout.racks[0].moduleCount)*.72)<1e-8)
+ assert.equal(terrainReportLayouts(analysis,state).current,null);assert.equal(terrainReportLayouts(analysis,state).blocked,true)
  await clean()
 })
 

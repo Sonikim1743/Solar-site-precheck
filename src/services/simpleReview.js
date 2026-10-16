@@ -6,15 +6,16 @@ import { thirdMeshCode, isConfirmedSnowStation } from './nedo.js'
 import { normalizeTerrainLayoutOptions } from '../utils/terrainLayout.js'
 import { terrainLayoutResultMatchesOptions } from '../utils/terrainLayoutError.js'
 import { normalizeTerrainArea, terrainGeometryKey } from '../utils/terrainArea.js'
+import { layoutOutputState } from '../utils/layoutOutputState.js'
 const fetchMonsolaWeb = async (...args) => (await import('./nedoWeb.js')).fetchMonsolaWeb(...args)
 
 export function normalizeSimpleLayoutSettings(settings = {}) {
-  return { tiltDeg: [10, 15, 20].includes(settings.tiltDeg) ? settings.tiltDeg : 15, direction: settings.direction === 'optimized' ? 'optimized' : 'south' }
+  return { tiltDeg: Number.isFinite(settings.tiltDeg) && settings.tiltDeg >= 0 && settings.tiltDeg <= 60 ? settings.tiltDeg : 15, direction: ['optimized', 'manual'].includes(settings.direction) ? settings.direction : 'south' }
 }
 export function simpleReviewDefaults(layoutOptions, settings) {
   const selected = normalizeSimpleLayoutSettings(settings)
   return { sectionRangeM: 100, sectionIntervalM: 10, obstructionHeightM: 20, horizonDirections: 8, snowBase: .95,
-    layout: normalizeTerrainLayoutOptions({ ...layoutOptions, tiltDeg: selected.tiltDeg, azimuthDeg: 180 }), layoutSettings: selected }
+    layout: normalizeTerrainLayoutOptions({ ...layoutOptions, tiltDeg: selected.tiltDeg, ...(selected.direction === 'south' ? { azimuthDeg: 180 } : {}) }), layoutSettings: selected }
 }
 const guard = signal => { if (signal?.aborted) throw signal.reason || new DOMException('中止', 'AbortError') }
 export function simpleLayoutWorker(analysis, options, signal, settings) {
@@ -32,12 +33,14 @@ export function simpleLayoutWorker(analysis, options, signal, settings) {
   })
 }
 
-export async function runSimpleReview(reviewInput, { signal, onProgress = () => {}, dependencies = {}, terrainArea: acquiredArea, layoutOptions, layoutSettings } = {}) {
+export async function runSimpleReview(reviewInput, { signal, onProgress = () => {}, dependencies = {}, terrainArea: acquiredArea, layoutOptions, layoutSettings, layoutPreview } = {}) {
   const review = normalizeParcelReview(reviewInput), metrics = measureParcelReview(review)
   if (!metrics.geometry || !(metrics.usableAreaM2 > 0)) throw new Error('先に対象の筆または検討範囲を選んでください。')
   const position = featureInteriorPoint({ geometry: metrics.geometry })
   if (!position) throw new Error('有効範囲の内部代表点を確認できません。範囲を見直してください。')
   const defaults = simpleReviewDefaults(layoutOptions, layoutSettings), steps = [], results = {}
+  const applied = layoutOutputState(acquiredArea, layoutPreview).layout
+  let reusedLayout = false
   const deps = { fetchElevation, section: analyzeTerrainCrossSection, horizon: analyzeSurroundingTerrain, snow: fetchMonsolaWeb, area: analyzeTerrainArea, layout: simpleLayoutWorker, ...dependencies }
   const step = async (name, action, partial = () => false) => {
     guard(signal); onProgress({ name, steps: [...steps], position })
@@ -59,11 +62,12 @@ export async function runSimpleReview(reviewInput, { signal, onProgress = () => 
     return area
   }, v => v?.summary?.coveragePercent < 100 || v?.summary?.slopeCoveragePercent < 100)
   results.layout = results.area ? await step('参考配置', async () => {
-    const layout = await deps.layout(results.area, defaults.layout, signal, defaults.layoutSettings)
-    if (!terrainLayoutResultMatchesOptions(layout, defaults.layout, defaults.layoutSettings.direction === 'optimized') || !Array.isArray(layout.racks) || !layout.racks.every(r=>r && Array.isArray(r.modules)) || layout.rackCount !== layout.racks.length || !Number.isSafeInteger(layout.moduleCount) || layout.moduleCount !== layout.racks.reduce((count,r)=>count+r.modules.length,0) || !Number.isFinite(layout.dcKw) || Math.abs(layout.dcKw-layout.moduleCount*defaults.layout.modulePowerW/1000)>1e-8) throw new Error('参考配置の条件・数量応答が一致しません。再試行してください。')
+    reusedLayout = Boolean(applied && results.area.geometryKey === acquiredArea?.geometryKey && results.area.fetchedAt === acquiredArea.fetchedAt && (terrainLayoutResultMatchesOptions(applied, defaults.layout) || terrainLayoutResultMatchesOptions(applied, defaults.layout, defaults.layoutSettings.direction === 'optimized')))
+    const layout = reusedLayout ? applied : await deps.layout(results.area, defaults.layout, signal, defaults.layoutSettings)
+    if (!(terrainLayoutResultMatchesOptions(layout, defaults.layout) || defaults.layoutSettings.direction === 'optimized' && terrainLayoutResultMatchesOptions(layout, defaults.layout, true)) || !Array.isArray(layout.racks) || !layout.racks.every(r=>r && Array.isArray(r.modules)) || layout.rackCount !== layout.racks.length || !Number.isSafeInteger(layout.moduleCount) || layout.moduleCount !== layout.racks.reduce((count,r)=>count+r.modules.length,0) || !Number.isFinite(layout.dcKw) || Math.abs(layout.dcKw-layout.moduleCount*defaults.layout.modulePowerW/1000)>1e-8) throw new Error('参考配置の条件・数量応答が一致しません。再試行してください。')
     return layout
   }, v => v.rackCount === 0 || v.warnings?.some(w => /上限|途中|時間/.test(typeof w === 'string' ? w : w.message))) : (steps.push({ name: '参考配置', status: 'error', message: '範囲地形なし・未計算' }), null)
   guard(signal)
-  const snapshot = { position, geometryKey: results.area?.geometryKey, defaults, steps, results, acquiredAt: new Date().toISOString(), review, areaM2: metrics.usableAreaM2, status: steps.every(s => s.status === 'success') ? 'complete' : 'review' }
+  const snapshot = { position, geometryKey: results.area?.geometryKey, defaults, steps, results, reusedLayout, acquiredAt: new Date().toISOString(), review, areaM2: metrics.usableAreaM2, status: steps.every(s => s.status === 'success') ? 'complete' : 'review' }
   return snapshot
 }

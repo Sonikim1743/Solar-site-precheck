@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import MapPanel from './components/MapPanel.jsx'
 import ParcelReviewPanel from './components/ParcelReviewPanel.jsx'
 import { createEmptyParcelReview, normalizeParcelReview, setReviewParcel, removeReviewParcel, measureParcelReview, getParcelKey } from './utils/parcelReview.js'
@@ -29,6 +29,8 @@ import SelectedParcel3D, { selectedParcelUnionReview } from './components/Select
 import { REGIONAL_PARCEL_SOURCE } from './services/regionalParcels.js'
 import { MAP_PARCEL_SOURCE } from './utils/mapParcelSelection.js'
 import SimpleReviewPanel, { initialSimpleReview } from './components/SimpleReviewPanel.jsx'
+import { normalizeTerrainLayoutOptions } from './utils/terrainLayout.js'
+import { layoutOutputState, terrainLayoutMode, latestLayoutAnalysis } from './utils/layoutOutputState.js'
 import { analyzeTerrainArea } from './services/terrainArea.js'
 import { normalizeTerrainArea, terrainAreaSnapshot, terrainGeometryKey } from './utils/terrainArea.js'
 import SolarProPreviewButton from './components/SolarProPreviewButton.jsx'
@@ -646,11 +648,14 @@ export default function App() {
   const [selectedParcelTerrain, setSelectedParcelTerrain] = useState(null)
   const [parcelReviewStatus, setParcelReviewStatus] = useState('')
   const parcelMetrics = useMemo(() => measureParcelReview(parcelReview), [parcelReview])
+  const simpleReviewInput = useMemo(() => parcelReview.parcels.some(p => p.role === 'target' && [REGIONAL_PARCEL_SOURCE, MAP_PARCEL_SOURCE].includes(p.source.fileName)) ? selectedParcelUnionReview(parcelReview) : parcelReview, [parcelReview])
+  const simpleGeometryKey = useMemo(() => { const geometry = measureParcelReview(simpleReviewInput).geometry; return geometry ? terrainGeometryKey(geometry) : '' }, [simpleReviewInput])
   const terrainAreaKey = useMemo(() => parcelMetrics.geometry ? terrainGeometryKey(parcelMetrics.geometry) : '', [parcelMetrics.geometry])
   const [terrainArea, setTerrainArea] = useState(() => {
     try { return draftSeed.terrainArea && parcelMetrics.geometry ? normalizeTerrainArea(draftSeed.terrainArea, parcelMetrics.geometry) : null } catch { return null }
   })
   const currentTerrainArea = terrainArea?.geometryKey === terrainAreaKey ? terrainArea : null
+  const simpleTerrainArea = latestLayoutAnalysis(simpleGeometryKey, currentTerrainArea, selectedParcelTerrain)
   const currentTerrainAreaSnapshot = useMemo(() => currentTerrainArea ? terrainAreaSnapshot(currentTerrainArea) : null, [currentTerrainArea])
   const [terrainAreaStatus, setTerrainAreaStatus] = useState(terrainArea ? 'success' : 'idle')
   const [terrainAreaProgress, setTerrainAreaProgress] = useState(null)
@@ -658,6 +663,22 @@ export default function App() {
   const [terrainAreaOpen, setTerrainAreaOpen] = useState(false)
   const [terrainDrawingRequested, setTerrainDrawingRequested] = useState(false)
   const [terrainPreview, setTerrainPreview] = useState({ options: {}, layout: null, enabled: false, labels: false })
+  const sharedLayoutSettings = { tiltDeg: normalizeTerrainLayoutOptions(terrainPreview.options).tiltDeg, direction: terrainLayoutMode(terrainPreview) }
+  const changeSharedLayoutSettings = useCallback(patch => setTerrainPreview(previous => ({ ...previous,
+    options: { ...normalizeTerrainLayoutOptions(previous.options), ...(patch.tiltDeg !== undefined ? { tiltDeg: patch.tiltDeg } : {}), ...(['south', 'optimized'].includes(patch.direction) ? { azimuthDeg: 180 } : {}) },
+    layoutMode: patch.direction || terrainLayoutMode(previous), calculating: false })), [])
+  const setSharedLayoutBusy = useCallback(calculating => setTerrainPreview(previous => previous.calculating === calculating ? previous : { ...previous, calculating }), [])
+  const applySimpleLayout = useCallback(report => {
+    const area = report.terrainArea
+    setSelectedParcelTerrain(area)
+    // Different effective geometries cannot share a rack pool. Keep the other
+    // scope intact and block its output instead of relabelling or copying racks.
+    if (area.geometryKey !== terrainAreaKey) return
+    setTerrainArea(area)
+    setTerrainAreaStatus('success')
+    setTerrainPreview(previous => ({ ...previous, ...report.terrainPreview, simpleReview: false,
+      comparison: report.terrainPreview.comparison || null, southComparison: report.terrainPreview.southComparison || null, calculating: false }))
+  }, [terrainAreaKey])
   const [publicParcelReferences, setPublicParcelReferences] = useState([])
   const [publicParcelSnapshot, setPublicParcelSnapshot] = useState({ features: [], status: 'off' })
   const [reportView, setReportView] = useState('summary')
@@ -2820,12 +2841,17 @@ export default function App() {
     return rows
   }, [inheritanceSingleTransferRows, inheritanceSort])
 
-  // Only applied snapshots invalidate a completed PDF. Draft edits and worker
-  // status retain the previous downloadable result, like the on-screen layout.
-  const terrainReportPreview = useMemo(() => ({ layout: terrainPreview.layout,
+  // Output must match the current request and acquisition. A screen may retain
+  // its previous rack pool for comparison while changed conditions block PDF.
+  const terrainOutputScopeBlocked = Boolean(simpleDesign && (simpleTerrainArea && simpleTerrainArea !== currentTerrainArea || simpleWorkflow.result && simpleWorkflow.result.snapshot.results.area.geometryKey !== currentTerrainArea?.geometryKey))
+  const terrainReportPreview = useMemo(() => ({ layout: terrainPreview.layout, options: terrainPreview.options, appliedOptions: terrainPreview.appliedOptions,
+    layoutMode: terrainPreview.layoutMode, appliedMode: terrainPreview.appliedMode, calculating: terrainPreview.calculating,
+    outputBlocked: terrainOutputScopeBlocked,
     disabledRackIds: terrainPreview.disabledRackIds, activeRackCount: terrainPreview.activeRackCount,
     comparison: terrainPreview.comparison, fence: terrainPreview.fence }), [terrainPreview.layout, terrainPreview.disabledRackIds,
-    terrainPreview.activeRackCount, terrainPreview.comparison, terrainPreview.fence])
+    terrainPreview.activeRackCount, terrainPreview.comparison, terrainPreview.fence, terrainPreview.options, terrainPreview.appliedOptions,
+    terrainPreview.layoutMode, terrainPreview.appliedMode, terrainPreview.calculating, terrainOutputScopeBlocked])
+  const terrainOutputBlocked = layoutOutputState(currentTerrainArea, terrainReportPreview).blocked
 
   const report = useMemo(() => ({
     position,
@@ -2885,6 +2911,7 @@ export default function App() {
   }
 
   async function saveTerrainPdf({ drawingOnly = false } = {}) {
+    if (terrainOutputBlocked) { setTerrainPdfStatus({ loading: false, error: true, message: '配置条件または地形が更新されています。現在の条件で再計算してから出力してください。' }); return }
     const sourceReport = terrainPdfReport
     const sourceKey = currentTerrainArea?.geometryKey
     if (!sourceKey || terrainPdfStatus.loading) return
@@ -3681,10 +3708,10 @@ export default function App() {
               {terrainSectionOpen && <TerrainSectionPreview analysis={terrainSection} />}
             </div>
             <SelectedParcel3D review={parcelReview} referenceCount={publicParcelReferences.length} request={regional3DRequest} onAcquired={setSelectedParcelTerrain} initialAnalysis={selectedParcelTerrain} />
-            <SimpleReviewPanel visible={simpleDesign} review={parcelReview.parcels.some(p=>p.role==='target'&&[REGIONAL_PARCEL_SOURCE,MAP_PARCEL_SOURCE].includes(p.source.fileName))?selectedParcelUnionReview(parcelReview):parcelReview} referenceCount={publicParcelReferences.length} siteName={siteName} appVersion={APP_VERSION} terrainArea={selectedParcelTerrain} layoutOptions={terrainPreview.options} drawingScale={terrainDrawingScale} onDrawingScaleChange={setTerrainDrawingScale} state={simpleWorkflow} onChange={setSimpleWorkflow} onRepresentativeChange={setSimpleRepresentative} onDraw={() => openReviewSection('site-select', 'boundary')} />
+            <SimpleReviewPanel visible={simpleDesign} review={simpleReviewInput} referenceCount={publicParcelReferences.length} siteName={siteName} appVersion={APP_VERSION} terrainArea={simpleTerrainArea} layoutOptions={terrainPreview.options} layoutSettings={sharedLayoutSettings} onLayoutSettingsChange={changeSharedLayoutSettings} layoutPreview={terrainPreview} onApplied={applySimpleLayout} onBusyChange={setSharedLayoutBusy} drawingScale={terrainDrawingScale} onDrawingScaleChange={setTerrainDrawingScale} state={simpleWorkflow} onChange={setSimpleWorkflow} onRepresentativeChange={setSimpleRepresentative} onDraw={() => openReviewSection('site-select', 'boundary')} />
             <details id="terrain-area" className="terrain-area-disclosure" open={terrainAreaOpen} onToggle={event => setTerrainAreaOpen(event.currentTarget.open)}>
               <summary><strong>検討範囲の等高線・勾配・3D</strong><span>{terrainAreaOpen ? '閉じる' : '開く'}</span></summary>
-              <TerrainAreaPanel geometry={parcelMetrics.geometry} metrics={parcelMetrics} analysis={currentTerrainArea} status={terrainAreaStatus} progress={terrainAreaProgress} error={terrainAreaError} position={position} onAnalyze={handleTerrainAreaAnalysis} onCancel={cancelTerrainAreaAnalysis} onClear={() => { cancelTerrainAreaWork(); setTerrainArea(null); setTerrainAreaStatus('idle'); setTerrainAreaError(''); setReportView('summary') }} onDrawBoundary={() => openReviewSection('site-select', 'boundary')} onOpenReport={openTerrainAreaReport} onOpenDrawing={() => { openTerrainAreaReport(); setTerrainDrawingRequested(true) }} parcels={parcelReview.parcels} publicParcels={publicParcelSnapshot.features} publicParcelsLimited={publicParcelSnapshot.truncated || publicParcelSnapshot.status === 'partial'} preview={terrainPreview} onPreviewChange={setTerrainPreview} />
+              <TerrainAreaPanel geometry={parcelMetrics.geometry} metrics={parcelMetrics} analysis={currentTerrainArea} status={terrainAreaStatus} progress={terrainAreaProgress} error={terrainAreaError} position={position} onAnalyze={handleTerrainAreaAnalysis} onCancel={cancelTerrainAreaAnalysis} onClear={() => { cancelTerrainAreaWork(); setTerrainArea(null); setTerrainAreaStatus('idle'); setTerrainAreaError(''); setReportView('summary') }} onDrawBoundary={() => openReviewSection('site-select', 'boundary')} onOpenReport={openTerrainAreaReport} onOpenDrawing={() => { openTerrainAreaReport(); setTerrainDrawingRequested(true) }} parcels={parcelReview.parcels} publicParcels={publicParcelSnapshot.features} publicParcelsLimited={publicParcelSnapshot.truncated || publicParcelSnapshot.status === 'partial'} preview={terrainPreview} onPreviewChange={setTerrainPreview} outputBlocked={terrainOutputBlocked} />
             </details>
             {selectedParcel && (
               <div className="selected-parcel-card">
@@ -4154,9 +4181,10 @@ export default function App() {
               <button type="button" className="secondary-button" onClick={downloadCsv}>チェックCSV出力</button>
               <button type="button" className="secondary-button" disabled={!position} onClick={saveReviewRecord}>検討記録を保存</button>
               <button type="button" className="secondary-button" onClick={() => openReviewSection('use-cases')}>資料の使い方を見る</button>
-              {reportView === 'terrain' && terrainPreview.layout?.analysisReference === currentTerrainArea && <button type="button" className="secondary-button" disabled={terrainPdfStatus.loading || terrainPreview.calculating} onClick={() => saveTerrainPdf({ drawingOnly: true })}>配置図PDF · 1枚</button>}
-              {reportView === 'terrain' && currentTerrainArea ? <button type="button" className="primary-button" disabled={terrainPdfStatus.loading} onClick={saveTerrainPdf}>{terrainPdfStatus.loading ? 'PDFを作成中…' : '地形PDFを保存'}</button> : <button type="button" className="primary-button" onClick={() => window.print()}>PDF印刷</button>}
+              {reportView === 'terrain' && terrainPreview.layout?.analysisReference === currentTerrainArea && <button type="button" className="secondary-button" disabled={terrainPdfStatus.loading || terrainPreview.calculating || terrainOutputBlocked} onClick={() => saveTerrainPdf({ drawingOnly: true })}>配置図PDF · 1枚</button>}
+              {reportView === 'terrain' && currentTerrainArea ? <button type="button" className="primary-button" disabled={terrainPdfStatus.loading || terrainOutputBlocked} onClick={saveTerrainPdf}>{terrainPdfStatus.loading ? 'PDFを作成中…' : '地形PDFを保存'}</button> : <button type="button" className="primary-button" onClick={() => window.print()}>PDF印刷</button>}
             </div>
+            {reportView === 'terrain' && terrainOutputBlocked && <p className="inline-message" role="status">配置条件または地形が更新されています。現在の条件で再計算してから出力してください。</p>}
             {recordStatus.message && <p className="review-records__notice no-print" role={recordStatus.error ? 'alert' : 'status'}>{recordStatus.message} {recordDownload && !recordStatus.error && <a href={recordDownload.url} download={recordDownload.fileName}>記録ファイルをダウンロード</a>}</p>}
             {reportView === 'terrain' && terrainPdfStatus.message && <p className="review-records__notice no-print" role={terrainPdfStatus.error ? 'alert' : 'status'}>{terrainPdfStatus.message} {terrainPdfDownload && !terrainPdfStatus.error && <span className="terrain-pdf-links"><a href={terrainPdfDownload.previewUrl} target="_blank" rel="noopener noreferrer">作成したPDFを開く</a> · <a href={terrainPdfDownload.url} download={terrainPdfDownload.fileName}>PDFファイルを保存</a><small>{terrainPdfDownload.fileName} · application/pdf · {terrainPdfDownload.pageCount}ページ</small></span>}</p>}
             {reportView !== 'terrain' && <details className="solarpro-memo-panel no-print">

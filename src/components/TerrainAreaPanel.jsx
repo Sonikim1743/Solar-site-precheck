@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useState } from 'react'
+import { layoutOutputState } from '../utils/layoutOutputState.js'
 import { TerrainAreaPlan, TerrainArea3D } from './TerrainAreaFigures.jsx'
 import TerrainLayoutPreview, { selectedTerrainLayout, terrainLayoutAnalysisKey } from './TerrainLayoutPreview.jsx'
 import { toggleTerrainRackSelection, adjustTerrainRackSelection } from '../utils/terrainLayoutSelection.js'
@@ -14,7 +15,7 @@ function dateText(value) {
   return value && Number.isFinite(date.getTime()) ? date.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '未記録'
 }
 
-export default function TerrainAreaPanel({ geometry, metrics, analysis, status = 'idle', progress, error, onAnalyze, onCancel, onClear, position, onDrawBoundary, onOpenReport, onOpenDrawing, parcels = [], publicParcels = [], publicParcelsLimited = false, preview, onPreviewChange }) {
+export default function TerrainAreaPanel({ geometry, metrics, analysis, status = 'idle', progress, error, onAnalyze, onCancel, onClear, position, onDrawBoundary, onOpenReport, onOpenDrawing, parcels = [], publicParcels = [], publicParcelsLimited = false, preview, onPreviewChange, outputBlocked = false }) {
   const [view, setView] = useState('plan')
   const id = `terrain-area-${useId().replace(/:/g, '')}`
   const state = typeof status === 'string' ? status : status?.status || 'idle'
@@ -42,7 +43,7 @@ export default function TerrainAreaPanel({ geometry, metrics, analysis, status =
     <h3 id={`${id}-heading`} className="terrain-area-panel-heading">範囲の地形</h3>
     {analysis ? <div className="terrain-area-toolbar">
       <div className="terrain-area-view-switch" role="group" aria-label="地形の見方"><button type="button" aria-pressed={view === 'plan'} className={view === 'plan' ? 'is-active' : ''} onClick={() => setView('plan')}>等高線</button><button type="button" aria-pressed={view === '3d'} className={`terrain-area-3d-button${view === '3d' ? ' is-active' : ''}`} onClick={() => setView('3d')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 22 7.5v9L12 22 2 16.5v-9Z M2 7.5 12 13l10-5.5 M12 13v9" /></svg>3Dで見る</button></div>
-      <div className="terrain-area-result-actions">{preview?.layout?.analysisReference === analysis && <button type="button" className="secondary-button" onClick={onOpenDrawing} disabled={!onOpenDrawing || preview?.calculating}>配置図PDF · 1枚</button>}<button type="button" className="secondary-button" onClick={onOpenReport} disabled={!onOpenReport}>レポート</button><button type="button" className="terrain-area-quiet-button" onClick={onAnalyze} disabled={!onAnalyze || loading}>再取得</button></div>
+      <div className="terrain-area-result-actions">{preview?.layout?.analysisReference === analysis && <button type="button" className="secondary-button" onClick={onOpenDrawing} disabled={!onOpenDrawing || outputBlocked || !layoutOutputState(analysis, preview).current}>配置図PDF · 1枚</button>}<button type="button" className="secondary-button" onClick={onOpenReport} disabled={!onOpenReport}>レポート</button><button type="button" className="terrain-area-quiet-button" onClick={onAnalyze} disabled={!onAnalyze || loading}>再取得</button></div>
     </div> : geometry && !loading ? <div className="terrain-area-toolbar"><p className="terrain-area-scope terrain-area-preview"><span>参考範囲</span><strong>約{number(metrics?.usableAreaM2, 0)} <small>m²</small></strong></p><button type="button" className="secondary-button terrain-area-primary-action" onClick={onAnalyze} disabled={!onAnalyze}>{message ? '再試行' : '地形を確認'}</button></div> : null}
     {!geometry && <div className="terrain-area-empty"><p>地図で範囲を描き、「地形を確認」を押してください。</p><button type="button" className="secondary-button" onClick={onDrawBoundary} disabled={!onDrawBoundary}>範囲を描く</button></div>}
     {loading && <div className="terrain-area-progress" role="status"><div><strong>{progress?.phase === 'calculating' ? '等高線・勾配を計算中…' : '標高を取得中…'}</strong>{Number.isFinite(progress?.completedTiles) && <span>取得 {progress.completedTiles}タイル{Number.isFinite(progress.totalTiles) ? ` / 現在の対象 ${progress.totalTiles}タイル` : ''}</span>}</div><button type="button" className="secondary-button" onClick={onCancel} disabled={!onCancel}>中止</button></div>}
