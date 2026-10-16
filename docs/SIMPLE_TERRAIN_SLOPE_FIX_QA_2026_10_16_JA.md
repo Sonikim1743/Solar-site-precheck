@@ -60,3 +60,7 @@ GSI PNG形式の合成DEM（西側約8°、東側約18°）を実際の取得処
 実Canvasの描画文字と実際に保存した4個のA3横1ページPDFで、地形条件とパネル15°の別表記を確認した。PDFへ直列化したモジュール数も各計算結果と一致。4ページをPopplerで画像化し、低勾配側だけの配置と15–20°側まで含む配置、数値・日本語・参考警告を目視確認した。
 
 条件変更で旧ダウンロードが消えること、実Workerの完了通知を遅らせて15°→20°変更後に渡しても復活しないこと、実JPEGエンコーダーの完了通知を保留中に初期化しても旧PDFが復活しないことを確認。範囲を実マウスで再作図し、モード・発電量画面の往復後も新範囲・地形20°／パネル15°・適用架台を保持し、画面往復だけのWorker再実行はなかった。375／320pxは入力44px以上・横はみ出しなし。pageerror 0、ブラウザー・検証サーバー終了。利用者のタブ・保存資料には触れていない。ローカル証拠は `outputs/slope-release/`、`outputs/built-slope-view/ui-evidence.json` と `rendered/contact.png`。公開照合は `DEPLOYED_VERSION.md` の今回記録を正とする。
+
+パッケージmain `85d05d9f7fa328f115479825534f59db3909df3a` の[CI 38861633569](https://github.com/Sonikim1743/Solar-site-precheck/actions/runs/38861633569) 全段階成功後、同じCloudflareルートをproduction `3243d789-dc88-4590-b494-8b789fe8379a` に配布した。ソース `26b75e5`、公開50/50ファイル・実CSP・GitHub両ZIPのサイズ／SHA-256・API6項目を照合した。
+
+公開実Appでも上記4条件と全回帰を再実行し、672／1440／1152／800枚、15–20°セル上0／768／624／480枚が一致した。ローカル・公開とも各条件の全モジュール3D角点から水平に対する傾斜を独立に算出し、全て15°（誤差1e-7°未満）だった。公開の実A3 PDF4個・4ページを画像化して目視確認し、地形とパネルの別表記・参考警告を維持。pageerror 0・ブラウザー終了。証拠は `outputs/public-slope-release/`、`outputs/public-slope-view/ui-evidence.json`、`panel-corner-proof.json`、`rendered/contact.png`。対象外のNEDO等は合成UI検証では未取得扱いとし、公開API疎通の実検査と分けている。
