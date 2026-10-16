@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { runSimpleReview, simpleReviewDefaults } from '../src/services/simpleReview.js'
 import { terrainReviewSynthetic } from './fixtures/terrainReviewSynthetic.mjs'
 import { normalizeTerrainArea } from '../src/utils/terrainArea.js'
-import { buildTerrainLayout } from '../src/utils/terrainLayout.js'
+import { buildTerrainLayout, buildOptimizedTerrainLayout, buildSouthTerrainLayout } from '../src/utils/terrainLayout.js'
 import { pointInGeometry, featureInteriorPoint } from '../src/services/parcelGeometry.js'
 import { thirdMeshCode } from '../src/services/nedo.js'
 import { simpleReviewReportRows } from '../src/utils/simpleReviewReport.js'
@@ -53,4 +53,28 @@ test('the confirmed parcel 3D acquisition is reused only for the same validated 
  deps.area=async()=>({...s.terrainArea,geometryKey:'wrong-response'})
  const wrong=await runSimpleReview(s.parcelReview,{dependencies:deps})
  assert.equal(wrong.results.area,null);assert.equal(wrong.results.layout,null);assert.equal(wrong.status,'review')
+})
+
+test('six panel-tilt/direction choices preserve spacing and terrain cutoff and record the applied search',async()=>{
+ const s=fixture(),custom={rowGapM:4.2,rackGapM:1.5,slopeLimitDeg:20},original=JSON.stringify(custom)
+ for(const tiltDeg of [10,15,20])for(const direction of ['south','optimized']){
+  const deps=dependencies(s)
+  deps.layout=async(a,o,signal,settings)=>(settings.direction==='south'?buildSouthTerrainLayout:buildOptimizedTerrainLayout)(a,o)
+  const r=await runSimpleReview(s.parcelReview,{dependencies:deps,layoutOptions:custom,layoutSettings:{tiltDeg,direction}}),l=r.results.layout
+  assert.ok(l);assert.equal(l.options.tiltDeg,tiltDeg);assert.equal(l.options.rowGapM,4.2);assert.equal(l.options.slopeLimitDeg,20)
+  assert.equal(l.stats.autoSearch.mode,direction==='south'?'south-fixed':'optimized');assert.ok(l.stats.autoSearch.elapsedMs<10000)
+  if(direction==='south')assert.equal(l.options.azimuthDeg,180)
+  else {assert.ok(l.options.azimuthDeg>=150&&l.options.azimuthDeg<=210);assert.ok(l.stats.autoSearch.trials<=32);assert.ok(l.stats.autoSearch.totalCandidates<=24000)}
+  assert.ok(simpleReviewReportRows(r).some(([k,v])=>k==='配置で実際に適用した値'&&v.includes(`パネル傾斜${tiltDeg}°`)&&v.includes(`方位${l.options.azimuthDeg}°`)))
+ }
+ assert.equal(JSON.stringify(custom),original)
+})
+
+test('wrong tilt, wrong south bearing, and unproven optimized bearing are rejected',async()=>{
+ const s=fixture()
+ for(const [settings,change] of [[{tiltDeg:10},l=>({...l,options:{...l.options,tiltDeg:15}})],[{},l=>({...l,options:{...l.options,azimuthDeg:181}})],[{direction:'optimized'},l=>({...l,options:{...l.options,azimuthDeg:170}})]]){
+  const deps=dependencies(s);deps.layout=async(a,o)=>change(buildTerrainLayout(a,o))
+  const r=await runSimpleReview(s.parcelReview,{dependencies:deps,layoutSettings:settings})
+  assert.equal(r.results.layout,null);assert.equal(r.status,'review')
+ }
 })

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { measureParcelReview } from '../utils/parcelReview.js'
 import { terrainGeometryKey } from '../utils/terrainArea.js'
 import { featureInteriorPoint } from '../services/parcelGeometry.js'
@@ -9,87 +9,131 @@ import { simpleReviewReportRows } from '../utils/simpleReviewReport.js'
 import TerrainAreaReport from './TerrainAreaReport.jsx'
 import TerrainSectionPreview from './TerrainSectionPreview.jsx'
 import HorizonGraphPreview from './HorizonGraphPreview.jsx'
-import './simple-review.css'
 import TerrainDrawingScaleControl from './TerrainDrawingScaleControl.jsx'
 import { terrainDrawingPrintFit } from '../utils/terrainDrawingViewport.js'
+import './simple-review.css'
 
-export const initialSimpleReview = () => ({ status: 'idle', progress: null, pending: null, result: null, error: '' })
+export const initialSimpleReview = () => ({ status: 'idle', progress: null, pending: null, result: null, error: '', layoutSettings: { tiltDeg: 15, direction: 'south' } })
 const release = result => { for (const pdf of result?.pdfs || []) URL.revokeObjectURL(pdf.url) }
-export default function SimpleReviewPanel({ review, referenceCount = 0, siteName, appVersion, terrainArea, state, onChange, onDraw, onRepresentativeChange, visible = true, run = runSimpleReview, exporter, drawingScale=1000, onDrawingScaleChange }) {
+
+export default function SimpleReviewPanel({ review, referenceCount = 0, siteName, appVersion, terrainArea, state, onChange, onDraw, onRepresentativeChange, visible = true, run = runSimpleReview, exporter, drawingScale = 1000, onDrawingScaleChange, layoutOptions }) {
   const job = useRef({ id: 0, controller: null }), latest = useRef(null), source = useRef(null), stateRef = useRef(state)
+  const [settingsOpen, setSettingsOpen] = useState(false), settingsId = useId(), settingsButton = useRef(null)
   stateRef.current = state
   const metrics = useMemo(() => measureParcelReview(review), [review])
   const key = metrics.geometry ? terrainGeometryKey(metrics.geometry) : ''
-  latest.current = key
+  const defaults = simpleReviewDefaults(layoutOptions, state.layoutSettings), selected = defaults.layoutSettings
+  // Geometry alone is insufficient: old PDFs must never represent new conditions.
+  const analysisKey = JSON.stringify([key, defaults.layout, selected.direction])
+  const requestKey = JSON.stringify([analysisKey, drawingScale, siteName, appVersion])
+  latest.current = requestKey
   const representative = useMemo(() => metrics.geometry ? featureInteriorPoint({ geometry: metrics.geometry }) : null, [key])
   useEffect(() => { onRepresentativeChange?.(representative) }, [representative, onRepresentativeChange])
   useEffect(() => {
     job.current.id++; job.current.controller?.abort(); job.current.controller = null
     onChange(previous => {
-      if (previous.result && previous.result.key !== key) release(previous.result)
-      return { ...previous, status: previous.result?.key === key ? previous.result.snapshot.status : 'idle', progress: null, pending: null, result: previous.result?.key === key ? previous.result : null, error: '' }
+      const result = previous.result?.analysisKey === analysisKey ? previous.result : null
+      if (previous.result && !result) release(previous.result)
+      return { ...previous, status: result?.requestKey === requestKey ? result.snapshot.status : 'idle', progress: null, pending: null, result, error: '' }
     })
-    return () => { job.current.id++; job.current.controller?.abort(); onChange(previous => ({ ...previous, pending: null, progress: null, status: previous.status === 'running' || previous.status === 'pdf' ? 'cancelled' : previous.status })) }
-  }, [key, onChange])
-  function cancel() { job.current.id++; job.current.controller?.abort(); onChange(previous => ({ ...previous, status: 'cancelled', pending: null, progress: null, error: '中止しました。同じ範囲の前回結果があれば下に保持しています。' })) }
+    return () => { job.current.id++; job.current.controller?.abort(); job.current.controller = null }
+  }, [requestKey, onChange])
+  // Keep completed results across the simple/detail round trip, but stop in-flight work.
+  useEffect(() => () => onChange(previous => ({ ...previous, pending: null, progress: null, status: ['running', 'pdf'].includes(previous.status) ? 'cancelled' : previous.status })), [onChange])
+  const busy = state.status === 'running' || state.status === 'pdf'
+  const result = state.result?.requestKey === requestKey ? state.result : null
+  const cached = state.result?.analysisKey === analysisKey ? state.result : null
+  function changeSetting(value) {
+    // Abort before React's next effect to reject late worker/PDF replies.
+    job.current.id++; job.current.controller?.abort(); job.current.controller = null
+    onChange(previous => ({ ...previous, layoutSettings: { ...selected, ...value } }))
+  }
+  function cancel() {
+    job.current.id++; job.current.controller?.abort(); job.current.controller = null
+    onChange(previous => ({ ...previous, status: 'cancelled', pending: null, progress: null, error: '中止しました。条件が同じ前回のPDFは保持しています。' }))
+  }
   async function start() {
-    if (!key || !representative) return
-    job.current.controller?.abort(); const controller = new AbortController(), id = ++job.current.id
+    if (!key || !representative || busy || job.current.controller) return
+    const controller = new AbortController(), id = ++job.current.id
     job.current.controller = controller
-    const current = () => job.current.id === id && latest.current === key && !controller.signal.aborted
+    const current = () => job.current.id === id && latest.current === requestKey && !controller.signal.aborted
     onChange(previous => ({ ...previous, status: 'running', pending: null, progress: null, error: '' }))
     try {
-      const snapshot = await run(review, { signal: controller.signal, terrainArea, onProgress: value => current() && onChange(previous => ({ ...previous, progress: value })) })
+      // Only a scale/title change reuses analysis; new placement conditions always recalculate.
+      const snapshot = cached && !result ? cached.snapshot : await run(review, { signal: controller.signal, terrainArea, layoutOptions: defaults.layout, layoutSettings: selected, onProgress: value => current() && onChange(previous => ({ ...previous, progress: value })) })
       if (!current()) return
-      if (!snapshot.results.area || !snapshot.results.layout) { onChange(previous => ({ ...previous, status: 'review', progress: { name: '確認必要', steps: snapshot.steps }, error: '地形または配置を取得できずPDFは未作成です。前回結果は保持しています。' })); return }
+      if (!snapshot.results.area || !snapshot.results.layout) {
+        job.current.controller = null
+        onChange(previous => ({ ...previous, status: 'review', progress: null, error: '地形または配置を取得できません。範囲・通信を確認して再試行してください。' }))
+        return
+      }
       const area = snapshot.results.area, layout = snapshot.results.layout
+      if (!layout.rackCount) {
+        job.current.controller = null
+        onChange(previous => ({ ...previous, status: 'review', progress: null, error: 'この条件で配置できる架台がありません。範囲・地形勾配・間隔を確認してください。' }))
+        return
+      }
       const report = { siteName, appVersion, drawingScale, position: snapshot.position, parcelReview: snapshot.review, terrainArea: area, simpleReview: snapshot,
         terrainPreview: { options: layout.options, appliedOptions: layout.options, enabled: true, fence: false, disabledRackIds: [], simpleReview: true, layout: { ...layout, analysisReference: area, analysisKey: terrainLayoutAnalysisKey(area) } } }
-      onChange(previous => ({ ...previous, status: 'pdf', pending: { report, snapshot, key, id }, progress: { name: '2種類のPDFを作成中', steps: snapshot.steps } }))
-    } catch (error) { if (current()) onChange(previous => ({ ...previous, status: 'error', error: error.message || '解析を開始できません。再試行してください。', pending: null, progress: null })) }
+      onChange(previous => ({ ...previous, status: 'pdf', pending: { report, snapshot, key, analysisKey, requestKey, id }, progress: { name: 'PDFを作成中', steps: snapshot.steps } }))
+    } catch (error) {
+      if (current()) { job.current.controller = null; onChange(previous => ({ ...previous, status: 'error', error: error.message || '解析を開始できません。再試行してください。', pending: null, progress: null })) }
+    }
   }
   useEffect(() => {
     const pending = state.pending
-    if (!pending) return
+    if (!pending || pending.requestKey !== latest.current) return
     let active = true, committed = false
-    const current = () => active && job.current.id === pending.id && latest.current === pending.key && !job.current.controller?.signal.aborted
+    const current = () => active && job.current.id === pending.id && latest.current === pending.requestKey && !job.current.controller?.signal.aborted
     const generated = []
     ;(async () => {
       try {
         const exportPdf = exporter || (await import('../utils/terrainPdf.js')).exportTerrainAreaPdf
-        const drawingFit=terrainDrawingPrintFit(pending.report.terrainArea.grid,pending.report.drawingScale)
+        const drawingFit = terrainDrawingPrintFit(pending.report.terrainArea.grid, pending.report.drawingScale)
         for (const drawingOnly of [true, false]) {
           if (!current()) return
-          if(drawingOnly&&!drawingFit.fits)continue
-          const pdf = await exportPdf({ report: pending.report, element: source.current?.querySelector('.terrain-area-report'), drawingOnly, drawingScale:pending.report.drawingScale })
+          if (drawingOnly && !drawingFit.fits) continue
+          const pdf = await exportPdf({ report: pending.report, element: source.current?.querySelector('.terrain-area-report'), drawingOnly, drawingScale: pending.report.drawingScale, signal: job.current.controller.signal })
           if (!current()) return
-          generated.push({ ...pdf, kind: drawingOnly ? '配置図PDF · 1枚' : '地形・解析レポートPDF', url: URL.createObjectURL(pdf.blob) })
+          generated.push({ ...pdf, kind: drawingOnly ? '配置図PDF · 1枚' : '地形・解析レポートPDF', drawingOnly, url: URL.createObjectURL(pdf.blob) })
         }
         if (!current()) return
         release(stateRef.current.result)
-        committed = true
-        onChange(previous => ({ ...previous, pending: null, progress: null, error: '', status: pending.snapshot.status, result: { key: pending.key, snapshot: pending.snapshot, report: pending.report, pdfs: generated, drawingWarning:drawingFit.reason } }))
-      } catch (error) { if (current()) onChange(previous => ({ ...previous, pending: null, progress: null, status: 'error', error: `PDFは未完成です。${error.message} 前回結果は保持しています。` })) }
-      finally { if (!committed) for (const pdf of generated) URL.revokeObjectURL(pdf.url) }
+        committed = true; job.current.controller = null
+        onChange(previous => ({ ...previous, pending: null, progress: null, error: '', status: pending.snapshot.status, result: { key: pending.key, analysisKey: pending.analysisKey, requestKey: pending.requestKey, snapshot: pending.snapshot, report: pending.report, pdfs: generated, drawingWarning: drawingFit.reason } }))
+      } catch (error) {
+        if (current()) { job.current.controller = null; onChange(previous => ({ ...previous, pending: null, progress: null, status: 'error', error: `PDFは未完成です。${error.message} 条件が同じ前回のPDFは保持しています。` })) }
+      } finally { if (!committed) for (const pdf of generated) URL.revokeObjectURL(pdf.url) }
     })()
     return () => { active = false }
   }, [state.pending, exporter, onChange])
-  const busy = state.status === 'running' || state.status === 'pdf', result = state.result?.key === key ? state.result : null
-  function remakePdfs(){
-    if(!result||busy)return
-    const id=++job.current.id;job.current.controller=new AbortController()
-    onChange(previous=>({...previous,status:'pdf',error:'',pending:{report:{...result.report,drawingScale},snapshot:result.snapshot,key,id},progress:{name:'保存済みの解析結果からPDFを再作成',steps:result.snapshot.steps}}))
-  }
+  const directionLabel = selected.direction === 'south' ? '真南' : '最適（参考）'
   return <section className="simple-batch" hidden={!visible} aria-labelledby="simple-batch-title">
-    <div className="simple-batch-heading"><div><h2 id="simple-batch-title">範囲からまとめて解析</h2><p>内部代表点 → 断面・地平線・NEDO → 地形・参考配置 → 2種類のPDF</p></div></div>
-    {!key ? <p role="status">{referenceCount ? '地番の表示境界がまだ参考領域に適用されていません。' : '解析する有効範囲がありません。'} {referenceCount ? '地図の「地番選択」で境界を選び、「選択完了」で適用してください。' : '地図で角を点打ちして範囲を確定してください。'}</p> : <p>有効範囲 {Math.round(metrics.usableAreaM2).toLocaleString('ja-JP')} m² · 内部代表点 {representative ? `${toDegreeMinutes(representative.lat,'lat',3)} / ${toDegreeMinutes(representative.lon,'lon',3)}` : '確認できません'}</p>}
-    <div className="simple-batch-actions"><button type="button" onClick={start} disabled={!key || !representative || busy}>{result || ['error','review','cancelled'].includes(state.status) ? '同じ範囲を再解析' : '基本値でまとめて解析'}</button>{busy ? <button type="button" onClick={cancel}>一括解析を中止</button> : <button type="button" onClick={onDraw}>{referenceCount ? '範囲を手動指定（任意）' : '地図で範囲を確定'}</button>}</div>
-    <TerrainDrawingScaleControl value={drawingScale} onChange={onDrawingScaleChange} grid={terrainArea?.grid} disabled={busy||!onDrawingScaleChange}/>
-    {busy && <p role="status">{state.progress?.name || '開始中…'} <progress aria-label="一括解析の進捗" value={state.progress?.steps?.length || 0} max={7}/></p>}
+    <div className="simple-batch-heading"><h2 id="simple-batch-title">配置図をつくる</h2><p>{key ? `有効範囲 ${Math.round(metrics.usableAreaM2).toLocaleString('ja-JP')} m²` : '地図で範囲を選んでください。'}</p></div>
+    {!key && <p role="status">{referenceCount ? '「地番選択」で境界を選び、「選択完了」で適用してください。' : '地図で角を点打ちして範囲を確定してください。'}</p>}
+    <div className="simple-batch-actions">
+      <button type="button" className="simple-primary" onClick={start} disabled={!key || !representative || busy}>{busy ? '作成中…' : result ? '配置図PDFを作り直す' : '配置図PDFを作成'}</button>
+      <button type="button" className="simple-settings-toggle" ref={settingsButton} aria-expanded={settingsOpen} aria-controls={settingsId} onClick={() => setSettingsOpen(value => !value)}>条件 <span aria-hidden="true">{settingsOpen ? '▴' : '▾'}</span></button>
+      <span className="simple-condition-summary">{selected.tiltDeg}° · {directionLabel}</span>
+      {busy ? <button type="button" className="simple-secondary" onClick={cancel}>中止</button> : <button type="button" className="simple-secondary" onClick={onDraw}>範囲を変更</button>}
+    </div>
+    <div id={settingsId} className="simple-settings" hidden={!settingsOpen} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); setSettingsOpen(false); settingsButton.current?.focus() } }}>
+      <div className="simple-setting-fields"><label>パネル傾斜 <select value={selected.tiltDeg} onChange={e => changeSetting({ tiltDeg: Number(e.target.value) })}>{[10, 15, 20].map(value => <option key={value} value={value}>{value}°</option>)}</select></label>
+        <label>配置方向 <select value={selected.direction} onChange={e => changeSetting({ direction: e.target.value })}><option value="south">真南</option><option value="optimized">最適（参考）</option></select></label></div>
+      <p className="simple-settings-hint">パネルの水平からの角度です。地形勾配の条件とは別です。</p>
+      <details><summary>縮尺・配置条件</summary><TerrainDrawingScaleControl value={drawingScale} onChange={onDrawingScaleChange} grid={terrainArea?.grid || cached?.snapshot.results.area.grid} disabled={busy || !onDrawingScaleChange}/><p>真南は北0°・時計回り180°固定。最適（参考）は南±30°を7.5°刻みと開始位置で比較（最大32試行・24,000候補・8秒）。全域最適は保証しません。</p><p>地形勾配{defaults.layout.slopeLimitDeg}°未満・4段×{defaults.layout.minColumns}〜{defaults.layout.maxColumns}列・720W。左右{defaults.layout.rackGapM}m・前後の空き{defaults.layout.rowGapM}m・境界離隔{defaults.layout.setbackM}m。詳細モードの間隔等を引き継ぎます。</p></details>
+    </div>
+    {busy && <p role="status">{state.progress?.name || '開始中…'} <progress aria-label="配置図作成の進捗" value={state.progress?.steps?.length || 0} max={6}/></p>}
     {!!state.error && <p role="alert">{state.error}</p>}
-    {!!state.progress?.steps?.length && <ul>{state.progress.steps.map(s => <li key={s.name}>{s.name}：{s.status === 'success' ? '取得済み' : '確認必要'} · {s.message}</li>)}</ul>}
-    <details><summary>適用する基本値と保存範囲</summary><p>断面±100m・10m間隔、地平線8方位・250m〜5km・仮障害物20m、モジュール傾斜15°・基準方位南180°・地形勾配10°未満、4段×4〜8列・720W、左右1m・前後の空き3.3m・境界離隔1m・モジュール間20mm・高さ0.8m。方位・開始位置は既存の自動探索を使い、実際の適用値は取得結果とPDFへ記録します。既存の詳細条件・結果を上書きしません。PDFは適用値と欠測・未取得を記録。配置・一括結果のJSON記録保存は未対応です。</p></details>
-    {result && <div className="simple-batch-complete" data-simple-result-key={result.key} data-simple-lat={result.snapshot.position.lat} data-simple-lon={result.snapshot.position.lon}><h3>{busy || ['error','cancelled'].includes(state.status) ? '前回の同じ範囲の結果' : `${result.snapshot.status === 'review'?'確認必要 · ':''}解析と${result.pdfs.length===2?'2種類のPDF':'地形レポートPDF'}ができました`}</h3><p>{result.snapshot.status === 'review' ? '取得状態・配置条件に確認が必要です。各項目とレポートを確認してください。' : '参考検討の取得が完了しました。施工可否は未確認です。'}</p>{result.drawingWarning&&<p role="alert">配置図1枚は未作成：{result.drawingWarning}</p>}<button type="button" className="secondary-button" disabled={busy} onClick={remakePdfs}>選んだ縮尺でPDFを再作成（再解析なし）</button><div className="simple-batch-downloads">{result.pdfs.map(pdf => <div key={pdf.kind}><a href={pdf.url} download={pdf.fileName}>{pdf.kind}をダウンロード（{pdf.pageCount}ページ）</a><a href={pdf.url} target="_blank" rel="noopener noreferrer">{pdf.kind}を開く</a><small>{pdf.fileName} · application/pdf</small></div>)}</div><p>{result.snapshot.results.layout.rackCount}架台 / {result.snapshot.results.layout.moduleCount.toLocaleString('ja-JP')}枚 / DC {result.snapshot.results.layout.dcKw.toLocaleString('ja-JP')} kW</p><details><summary>取得結果・適用値を確認</summary><dl>{simpleReviewReportRows(result.snapshot).map(([k,v],i)=><div key={i}><dt>{k}</dt><dd>{v}</dd></div>)}</dl><TerrainSectionPreview analysis={result.snapshot.results.section}/><HorizonGraphPreview position={result.snapshot.position} terrain={result.snapshot.results.horizon} obstructionHeight={result.snapshot.defaults.obstructionHeightM}/></details></div>}
-    <div className="simple-export-source" ref={source} aria-hidden="true">{state.pending && <TerrainAreaReport report={state.pending.report} drawingScale={state.pending.report.drawingScale} id="simple-terrain-area-report"/>}</div>
+    {result && <div className="simple-batch-complete" data-simple-result-key={result.key} data-simple-lat={result.snapshot.position.lat} data-simple-lon={result.snapshot.position.lon}>
+      <h3>{busy || ['error', 'cancelled'].includes(state.status) ? '同じ条件の前回PDF' : 'PDFができました'}</h3>
+      {result.snapshot.status === 'review' && <p role="status">一部の取得・計算結果は確認が必要です。レポートで確認してください。</p>}
+      {result.drawingWarning && <p role="alert">配置図1枚は未作成：{result.drawingWarning} 「条件」で縮尺を変更して作成してください。</p>}
+      <p>{result.snapshot.results.layout.moduleCount.toLocaleString('ja-JP')}枚 · DC {result.snapshot.results.layout.dcKw.toLocaleString('ja-JP')} kW · {result.snapshot.results.layout.options.tiltDeg}° / 方位{result.snapshot.results.layout.options.azimuthDeg}°</p>
+      <div className="simple-batch-downloads">{result.pdfs.filter(pdf => pdf.drawingOnly).map(pdf => <a key={pdf.kind} href={pdf.url} download={pdf.fileName}>配置図PDFを保存（1枚）</a>)}</div>
+      <details><summary>レポート・解析結果</summary><div className="simple-batch-downloads">{result.pdfs.map(pdf => <div key={pdf.kind}>{!pdf.drawingOnly && <a href={pdf.url} download={pdf.fileName}>{pdf.kind}を保存（{pdf.pageCount}ページ）</a>}<a href={pdf.url} target="_blank" rel="noopener noreferrer">{pdf.kind}を開く</a><small>{pdf.fileName} · application/pdf</small></div>)}</div><dl>{simpleReviewReportRows(result.snapshot).map(([k, v], i) => <div key={i}><dt>{k}</dt><dd>{v}</dd></div>)}</dl><TerrainSectionPreview analysis={result.snapshot.results.section}/><HorizonGraphPreview position={result.snapshot.position} terrain={result.snapshot.results.horizon} obstructionHeight={result.snapshot.defaults.obstructionHeightM}/></details>
+    </div>}
+    <details className="simple-batch-notes"><summary>解析・保存について</summary><p>範囲の内部代表点から断面・地平線・NEDOを取得し、地形・参考配置と2種類のPDFを作成します。代表点 {representative ? `${toDegreeMinutes(representative.lat, 'lat', 3)} / ${toDegreeMinutes(representative.lon, 'lon', 3)}` : '未確定'}。断面±100m・10m間隔、地平線8方位・250m〜5km・仮障害物20m。取得状態・適用値はレポートに記録。施工可否は未確認です。詳細モードの結果は上書きしません。配置・一括結果のJSON保存は未対応です。</p></details>
+    <div className="simple-export-source" ref={source} aria-hidden="true">{state.pending?.requestKey === requestKey && <TerrainAreaReport report={state.pending.report} drawingScale={state.pending.report.drawingScale} id="simple-terrain-area-report"/>}</div>
   </section>
 }

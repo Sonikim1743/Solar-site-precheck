@@ -427,10 +427,13 @@ function modelFromElement(report, element, checkDeadline) {
   }
 }
 
-export async function exportTerrainAreaPdf({ report, element, drawingOnly = false, drawingScale = 1000 }) {
+export async function exportTerrainAreaPdf({ report, element, drawingOnly = false, drawingScale = 1000, signal }) {
   if (typeof document === 'undefined' || typeof XMLSerializer === 'undefined') fail('ブラウザーで地形図面を開いてください。')
   const requestedScale=drawingOnly?normalizeTerrainDrawingScale(drawingScale):null
   const controller = new AbortController()
+  const abort = () => controller.abort(signal.reason || new DOMException('中止', 'AbortError'))
+  signal?.addEventListener('abort', abort, { once: true })
+  if (signal?.aborted) abort()
   const timeoutError = new Error('地形PDFの作成が30秒以内に完了しませんでした。図面を開き直して再試行してください。')
   const deadline = Date.now() + 30000
   const timer = setTimeout(() => controller.abort(timeoutError), 30000)
@@ -505,6 +508,7 @@ export async function exportTerrainAreaPdf({ report, element, drawingOnly = fals
     return { ...result, pageCount: pages.length }
   } finally {
     clearTimeout(timer)
+    signal?.removeEventListener('abort', abort)
     controller.abort()
     for (const image of images) image?.removeAttribute('src')
     if (canvas) { canvas.width = 1; canvas.height = 1 }
