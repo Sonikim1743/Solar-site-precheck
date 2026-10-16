@@ -6,7 +6,7 @@ import { geometryPolygons, featureInteriorPoint } from '../services/parcelGeomet
 import { layoutTerrainLabels, terrainLabelBounds } from '../utils/terrainLabelLayout.js'
 import { getTerrainCellSlope } from '../utils/terrainLayout.js'
 import { terrainSlopeIndex } from '../utils/terrainSlopeClasses.js'
-import { terrainDrainageArrows, terrainDrainageArrowDrawing } from '../utils/terrainDrainage.js'
+import { layoutTerrainDrainage } from '../utils/terrainDrainageLayout.js'
 import { TERRAIN_SLOPE_COLORS } from '../utils/terrainSlopeDistribution.js'
 import { terrainDrawingLabelFits } from '../utils/terrainDrawingLabels.js'
 
@@ -69,18 +69,7 @@ export default function TerrainDrawingPair({analysis,layout,fence,parcels,drawin
     // A 10m contour in the surrounding DEM may lie outside this selected area.
     // Retain the real 2m contours, and label those when no major label fits.
     if(!contourLabels.length)for(const c of analysis.contours||[]){if(contourLabels.length>=12)break;if(c.level%10!==0)placeContour(c)}
-    const arrowBoxes=[]
-    // Rails are sampled at grid intervals: small segment boxes keep the arrow
-    // halo clear of the fence without hiding an entire diagonal enclosure.
-    const fenceBoxes=(fence?.rails||[]).flatMap(rail=>rail.points.slice(1).map((point,i)=>{
-      const a=v.project(rail.points[i]),b=v.project(point)
-      return {left:Math.min(a[0],b[0])-2,right:Math.max(a[0],b[0])+2,top:Math.min(a[1],b[1])-2,bottom:Math.max(a[1],b[1])+2}
-    }))
-    const drainage= index===0 ? [] : terrainDrainageArrows(analysis).map(a=>({...a,icon:terrainDrainageArrowDrawing(a,v.project,{symbolic:true})})).filter(a=>{
-      const p=a.icon.tail,q=a.icon.head,b={left:Math.min(p[0],q[0])-8,right:Math.max(p[0],q[0])+8,top:Math.min(p[1],q[1])-8,bottom:Math.max(p[1],q[1])+8}
-      if(!a.icon.path||b.left<35||b.right>765||b.top<25||b.bottom>685||[...occupied,...arrowBoxes,...fenceBoxes].some(o=>b.left<o.right+5&&b.right>o.left-5&&b.top<o.bottom+5&&b.bottom>o.top-5))return false
-      arrowBoxes.push(b);return true
-    })
+    const drainage=index===0?[]:layoutTerrainDrainage(analysis,v,{occupied,fence,labelLeaders:placed.filter(l=>l.displaced).map(l=>[l.anchorScreen,[l.screen[0],l.screen[1]-6]])}).arrows
     return {drainage,v,boundary,fills,parcelPaths,labels:placed,contourLabels,unplaced:[...labelLayout.unplaced,...outsideLabels],missing:parcels.filter(p=>p.role==='target'&&!p.info?.number).length,noParcelMetadata:!parcels.some(p=>p.role==='target')}
   })},[g,parcels,analysis.contours,fence,setup])
   if(setup.error)return <div ref={source} className="terrain-drawing-export-source" aria-hidden="true" data-drawing-scale={drawingScale} data-scale-error={setup.error} data-context-status="unavailable"/>
@@ -102,7 +91,7 @@ export default function TerrainDrawingPair({analysis,layout,fence,parcels,drawin
         {fence?.rails?.map(r=><path key={r.id} d={path(r.points,v.project,false)} fill="none" stroke="#6b4938" strokeWidth="2" strokeDasharray="6 3 1 3" data-terrain-fence="rail"/>)}
         {!modules&&<g data-parcel-boundaries="effective-area" clipPath={`url(#${id}-${index}-boundary)`}>{model.parcelPaths.map((d,i)=><path key={i} d={d} fill="none" stroke="#207b83" strokeWidth="1.3"/>)}</g>}
         <path d={boundary} fill="none" stroke="#755a0c" strokeWidth="5" fillRule="evenodd"/><path d={boundary} fill="none" stroke="#ffe073" strokeWidth="2.5" fillRule="evenodd"/>
-        {!modules&&<g data-terrain-drainage="dem-downhill" aria-label="地形上の想定排水方向">{model.drainage.map((a,i)=><g key={i} data-drainage-tail={JSON.stringify(a.tail)} data-drainage-head={JSON.stringify(a.head)} data-drainage-drop={a.tailElevation-a.headElevation} data-drainage-slope={a.slopeDeg} data-drainage-length-px={a.icon.lengthPx} data-drainage-kind={a.kind}><path d={a.icon.path} fill="none" stroke="#fff" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round"/><path d={a.icon.path} fill="none" stroke="#164e63" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></g>)}</g>}
+        {!modules&&<g data-terrain-drainage="dem-downhill" aria-label="地形上の想定排水方向">{model.drainage.map((a,i)=><g key={i} data-drainage-tail={JSON.stringify(a.tail)} data-drainage-head={JSON.stringify(a.head)} data-drainage-anchor={JSON.stringify(a.point)} data-drainage-drop={a.tailElevation-a.headElevation} data-drainage-slope={a.slopeDeg} data-drainage-length-px={a.icon.lengthPx} data-drainage-kind={a.kind}>{a.icon.leader&&<g data-drainage-callout="boundary-anchor"><path d={path(a.icon.leader,p=>p,false)} fill="none" stroke="#fff" strokeWidth="2.5"/><path d={path(a.icon.leader,p=>p,false)} fill="none" stroke="#557079" strokeWidth="1"/><circle cx={a.icon.anchor[0]} cy={a.icon.anchor[1]} r="1.5" fill="#164e63" stroke="#fff" strokeWidth=".8"/></g>}<path d={a.icon.path} fill="none" stroke="#fff" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round"/><path d={a.icon.path} fill="none" stroke="#164e63" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></g>)}</g>}
         {!modules&&<g data-parcel-labels="effective-area" clipPath={`url(#${id}-${index}-boundary)`}>{model.labels.map(l=><g key={l.id}>{l.displaced&&<line x1={l.anchorScreen[0]} y1={l.anchorScreen[1]} x2={l.screen[0]} y2={l.screen[1]-6} stroke="#207b83"/>}<text x={l.screen[0]} y={l.screen[1]} textAnchor="middle" data-parcel-number={l.number} fontSize="18" fontWeight="700" fill="#142e35" stroke="#fff" strokeWidth="3" paintOrder="stroke">{l.number}</text></g>)}</g>}
         {!modules&&<g clipPath={`url(#${id}-${index}-boundary)`}>{model.contourLabels.map(l=><text key={l.level} x={l.screen[0]} y={l.screen[1]} textAnchor="middle" data-contour-level={l.level} style={{fontSize:18,fontWeight:700,fill:'#183b29',stroke:'#fff',strokeWidth:3.5,paintOrder:'stroke'}}>{l.level} m</text>)}</g>}
       </g>

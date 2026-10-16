@@ -36,31 +36,36 @@ export function terrainDrainageSymbolLength(slopeDeg) {
   return grade<0?null:[18,22,26,30,34][grade]
 }
 
-export function terrainDrainageArrows(analysis,{lengthM=8,maxArrows=24,minSpacingM=20,minSlopeDeg=1}={}) {
+// Keep corroborated alternatives until the print viewport and obstacles are
+// known. A valid scan point is useful even on a constant-gradient boundary.
+export function terrainDrainageCandidates(analysis,{lengthM=8,minSlopeDeg=1}={}) {
   const g=analysis?.grid
   if(!g?.boundary?.length||!(g.step>0)||!(lengthM>0))return []
-  const key=JSON.stringify([lengthM,maxArrows,minSpacingM,minSlopeDeg])
-  if(cache.get(analysis)?.key===key)return cache.get(analysis).arrows
-  const segments=[],corners=[]
+  const key=JSON.stringify([lengthM,minSlopeDeg])
+  if(cache.get(analysis)?.key===key)return cache.get(analysis).candidates
+  const parts=[]
   let perimeter=0
   g.boundary.forEach((polygon,part)=>{
-    const ring=polygon[0],holes=polygon.slice(1)
+    const ring=polygon[0],holes=polygon.slice(1),segments=[],corners=[]
+    const winding=Math.sign(ring.slice(1).reduce((sum,b,i)=>sum+ring[i][0]*b[1]-b[0]*ring[i][1],0))||1
+    let arc=0
     for(let i=0;i<ring.length-1;i++){
       const a=ring[i],b=ring[i+1],previous=ring[(i+ring.length-2)%(ring.length-1)]
       const length=Math.hypot(b[0]-a[0],b[1]-a[1]),u=a.map((x,k)=>x-previous[k]),v=b.map((x,k)=>x-a[k])
       const turn=Math.acos(Math.max(-1,Math.min(1,(u[0]*v[0]+u[1]*v[1])/(Math.hypot(...u)*Math.hypot(...v)))))*180/Math.PI
-      if(turn>=45)corners.push({point:a,holes,arc:perimeter,part,kind:'corner',score:turn})
-      if(length>0)segments.push({a,b,holes,length,arc:perimeter,part})
-      perimeter+=length
+      // This normal only positions an annotation; downhill always comes from DEM.
+      const outward=length>0?[winding*v[1]/length,-winding*v[0]/length]:[0,0]
+      if(turn>=45)corners.push({point:a,holes,arc,part,kind:'corner',score:turn,outward})
+      if(length>0)segments.push({a,b,holes,length,arc,part,outward})
+      arc+=length
     }
+    perimeter+=arc;parts.push({segments,corners,perimeter:arc,part})
   })
-  const cap=Math.min(24,Math.max(0,Math.floor(maxArrows)))
-  if(!cap)return []
-  const atArc=(arc,kind)=>{
+  const atArc=(segments,arc)=>{
     const segment=segments.find(s=>arc>=s.arc&&arc<s.arc+s.length)
     if(!segment)return null
     const t=(arc-segment.arc)/segment.length
-    return {point:segment.a.map((a,i)=>a+(segment.b[i]-a)*t),holes:segment.holes,arc,part:segment.part,kind}
+    return {point:segment.a.map((a,i)=>a+(segment.b[i]-a)*t),holes:segment.holes,arc,part:segment.part,outward:segment.outward,kind:'uniform',score:0}
   }
   const evaluate=candidate=>{
     if(!candidate)return null
@@ -82,37 +87,62 @@ export function terrainDrainageArrows(analysis,{lengthM=8,maxArrows=24,minSpacin
     }
     return {...candidate,tail,head,gradient,slopeDeg,cellSlopeDeg:cellSlope,tailElevation:zs[0],headElevation:zs.at(-1)}
   }
-  const uniform=[],features=corners.map(evaluate).filter(Boolean)
-  const spacing=Math.max(minSpacingM,perimeter/Math.min(16,cap))
-  for(let arc=spacing/2;arc<perimeter;arc+=spacing){const a=evaluate(atArc(arc,'uniform'));if(a)uniform.push(a)}
-  // At most 128 scan positions, never closer than two acquired DEM cells.
-  const scanStep=Math.max(g.step*2,perimeter/128)
-  let previous=null
-  for(let arc=scanStep/2;arc<perimeter;arc+=scanStep){
-    const a=evaluate(atArc(arc,'gradient-change'))
-    if(a&&previous&&a.part===previous.part){
-      const angle=Math.acos(Math.max(-1,Math.min(1,(a.gradient[0]*previous.gradient[0]+a.gradient[1]*previous.gradient[1])/(Math.hypot(...a.gradient)*Math.hypot(...previous.gradient)))))*180/Math.PI
-      const grades=Math.abs(terrainSlopeIndex(a.slopeDeg)-terrainSlopeIndex(previous.slopeDeg))
-      if(angle>=30||grades)features.push({...previous,kind:'gradient-change',score:100+angle+grades*25},{...a,score:100+angle+grades*25})
+  const candidates=[],scanStep=Math.max(g.step*2,perimeter/512)
+  for(const part of parts){
+    if(!part.perimeter)continue
+    const count=Math.max(1,Math.floor(part.perimeter/scanStep)),step=part.perimeter/count
+    const slots=Array.from({length:count},(_,i)=>evaluate(atArc(part.segments,(i+.5)*step)))
+    // Runs end at uncorroborated/flat samples, including across the ring seam.
+    const gap=slots.findIndex(a=>!a),start=gap<0?0:(gap+1)%count
+    let run=0,previous=null,runArc=0
+    for(let i=0;i<count;i++){
+      const a=slots[(start+i)%count]
+      if(!a){if(previous)run++;previous=null;runArc=0;continue}
+      if(previous)runArc+=step
+      Object.assign(a,{run:`${part.part}:${run}`,runArc,runClosed:gap<0,perimeter:part.perimeter,sampleWeightM:step})
+      previous=a
     }
-    previous=a
+    for(let i=0;i<count;i++){
+      const a=slots[i],b=slots[(i+1)%count]
+      if(!a||!b||a.run!==b.run)continue
+      const angle=Math.acos(Math.max(-1,Math.min(1,(a.gradient[0]*b.gradient[0]+a.gradient[1]*b.gradient[1])/(Math.hypot(...a.gradient)*Math.hypot(...b.gradient)))))*180/Math.PI
+      const grades=Math.abs(terrainSlopeIndex(a.slopeDeg)-terrainSlopeIndex(b.slopeDeg))
+      if(angle>=30||grades)for(const q of [a,b])Object.assign(q,{kind:'gradient-change',score:Math.max(q.score,100+angle+grades*25)})
+    }
+    const valid=slots.filter(Boolean)
+    candidates.push(...valid)
+    for(const corner of part.corners){
+      const a=evaluate(corner);if(!a)continue
+      const near=valid.reduce((best,b)=>{const d=Math.abs(a.arc-b.arc),distance=Math.min(d,part.perimeter-d);return !best||distance<best.distance?{b,distance}:best},null)
+      const linked=near&&near.distance<=step,delta=linked?((a.arc-near.b.arc+part.perimeter*1.5)%part.perimeter)-part.perimeter/2:0
+      candidates.push({...a,perimeter:part.perimeter,run:linked?near.b.run:`${part.part}:corner:${a.arc}`,runArc:linked?near.b.runArc+delta:0,runClosed:linked&&near.b.runClosed,sampleWeightM:0})
+    }
   }
+  cache.set(analysis,{key,candidates});return candidates
+}
+
+// Compatibility for callers requesting only a bounded set of world positions.
+// Print layout uses the full validated pool and selects after collision checks.
+export function terrainDrainageArrows(analysis,{maxArrows=24,minSpacingM=20,...options}={}) {
+  const cap=Math.min(24,Math.max(0,Math.floor(maxArrows))),g=analysis?.grid
+  if(!cap||!g)return []
+  const candidates=terrainDrainageCandidates(analysis,options)
   const arrows=[],separation=Math.max(g.step*2,minSpacingM/2)
   const add=a=>{if(arrows.length<cap&&!arrows.some(b=>Math.hypot(a.point[0]-b.point[0],a.point[1]-b.point[1])<separation-1e-7))arrows.push(a)}
-  for(const a of features.sort((a,b)=>b.score-a.score)){if(arrows.length>=Math.min(8,cap))break;add(a)}
-  for(const a of uniform)add(a)
-  cache.set(analysis,{key,arrows});return arrows
+  for(const a of candidates.filter(a=>a.score).sort((a,b)=>b.score-a.score)){if(arrows.length>=Math.min(8,cap))break;add(a)}
+  for(const a of candidates.filter(a=>a.kind==='uniform'))add(a)
+  return arrows
 }
 
 // The north-up map projection flips Y; projecting both actual DEM endpoints
 // preserves downhill direction. No camera rotation or boundary normal enters.
-export function terrainDrainageArrowDrawing(arrow,project,{symbolic=false}={}) {
+export function terrainDrainageArrowDrawing(arrow,project,{symbolic=false,offsetAlong=0,offset=[0,0]}={}) {
   const a=project(arrow.tail),b=project(arrow.head),length=Math.hypot(b[0]-a[0],b[1]-a[1])
   if(!(length>0))return {path:'',tail:a,head:b,lengthPx:0}
-  const u=b.map((v,i)=>(v-a[i])/length),lengthPx=symbolic?terrainDrainageSymbolLength(arrow.slopeDeg):length,center=project(arrow.point),tail=symbolic?center.map((v,i)=>v-u[i]*lengthPx/2):a,head=symbolic?center.map((v,i)=>v+u[i]*lengthPx/2):b,wing=Math.min(7,lengthPx*.3),n=[-u[1],u[0]]
+  const u=b.map((v,i)=>(v-a[i])/length),lengthPx=symbolic?terrainDrainageSymbolLength(arrow.slopeDeg):length,anchor=project(arrow.point),shift=symbolic?Math.max(-lengthPx/2+3,Math.min(lengthPx/2-3,offsetAlong)):0,center=anchor.map((v,i)=>v+u[i]*shift+(symbolic?offset[i]:0)),tail=symbolic?center.map((v,i)=>v-u[i]*lengthPx/2):a,head=symbolic?center.map((v,i)=>v+u[i]*lengthPx/2):b,wing=Math.min(7,lengthPx*.3),n=[-u[1],u[0]]
   const p=head.map((v,i)=>v-u[i]*wing+n[i]*wing*.55),q=head.map((v,i)=>v-u[i]*wing-n[i]*wing*.55)
   const pair=p=>p.map(v=>v.toFixed(2)).join(' ')
-  return {path:`M${pair(tail)} L${pair(head)} M${pair(p)} L${pair(head)} L${pair(q)}`,tail,head,lengthPx}
+  return {path:`M${pair(tail)} L${pair(head)} M${pair(p)} L${pair(head)} L${pair(q)}`,tail,head,lengthPx,anchor,offsetAlong:shift,segments:[[tail,head],[p,head],[head,q]]}
 }
 
 export const terrainDrainageArrowPath=(arrow,project)=>terrainDrainageArrowDrawing(arrow,project).path

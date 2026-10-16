@@ -34,11 +34,16 @@ test('only the expanded non-module drawing contains corroborated downhill arrows
  assert.match(left,/data-context-factor="1"/);assert.match(right,/data-context-factor="1.25"/)
  assert.doesNotMatch(left,/data-terrain-drainage/);assert.match(right,/data-terrain-drainage="dem-downhill"/)
  const drops=[...right.matchAll(/data-drainage-drop="([\d.]+)"/g)].map(x=>Number(x[1]))
- assert.ok(drops.length>0&&drops.length<=24);assert.ok(drops.every(x=>x>0))
+ assert.ok(drops.length>0&&drops.length<=64);assert.ok(drops.every(x=>x>0))
  const fence={rails:[{id:'test-rail',points:[[0,0,100],[20,0,100],[20,20,100],[0,20,100],[0,0,100]]}]}
  const fenced=renderToStaticMarkup(React.createElement(TerrainDrawingPair,{analysis:a,layout:{rackCount:0,racks:[]},parcels:[],fence}))
  assert.match(fenced,/data-terrain-fence="rail"/)
- assert.doesNotMatch(fenced,/data-drainage-drop=/,'boundary symbols that collide with the fence are omitted without changing direction')
+ assert.match(fenced,/data-drainage-callout="boundary-anchor"/,'a short anchored callout keeps the corroborated direction clear of a coincident fence')
+ const fencedViews=[...fenced.matchAll(/<svg[\s\S]*?<\/svg>/g)].map(x=>x[0])
+ assert.doesNotMatch(fencedViews[0],/data-terrain-drainage/)
+ const tails=[...fencedViews[1].matchAll(/data-drainage-tail="([^"]*)"/g)].map(x=>JSON.parse(x[1])),heads=[...fencedViews[1].matchAll(/data-drainage-head="([^"]*)"/g)].map(x=>JSON.parse(x[1]))
+ assert.ok(tails.length>0&&tails.length===heads.length)
+ tails.forEach((tail,i)=>assert.ok(heads[i][0]>tail[0]&&heads[i][1]<tail[1],'callout placement preserves the actual east/south downhill segment'))
 })
 
 const square = (x, y, size) => [[x,y],[x+size,y],[x+size,y+size],[x,y+size],[x,y]]
