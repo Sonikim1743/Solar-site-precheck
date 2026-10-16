@@ -50,3 +50,13 @@ GSI PNG形式の合成DEM（西側約8°、東側約18°）を実際の取得処
 ローカル証拠は `outputs/simple-slope-limit/` の `before-verification.json`、`before-cell-proof.json`、`after-verification.json`、各状態JSON・画像・実PDF・Popplerのページ画像。ログは `outputs/simple-slope-*.log`。実Appシナリオは `SIMPLE_TERRAIN_SLOPE_QA_PASSED`。比較用の主な図面は `after-simple-terrain15-panel15.pdf` と `after-simple-terrain20-panel15.pdf`。
 
 合成背景は白い画像で、NEDO等の対象外通信は中止し、未取得を明示している。実地図・雪データの健全性を検証したものではない。Mac/Safari・実機タッチ・実ユーザーの対象地・実印刷は未確認。既存ユーザーの保存領域は変更していない。
+
+## 配布統合の追加検証 — 2026-10-16
+
+上記は作成時の記録。公開main `46c62ca` の直後の単一ソース `26b75e5e73628008e2df020c2ff0e54ac9d72607` をそのまま配布対象にした。正規パッケージ処理567/567、両build、CSP・資産・Functions edge検査が成功。Cloudflare／Windowsの両ZIPは各64エントリーで、ソース・サイズ・SHA-256・全内部ファイルを照合した。
+
+検証対象 `outputs/v1.28.2-2026-10-16-D4BdjQ/cloudflare/dist` の実Appで、Reactの現在のpropsを読むだけで状態を観測し、製品のモジュール・配置エンジン・PDF出力処理を置換せずに再確認した。パネル15°固定の地形15°未満は24架台・672枚・15–20°セル上0枚、地形20°未満は48架台・1440枚・同区間768枚。正の面積で交差する各セルと実モジュールを照合し、全使用セルが選択限界未満だった。詳細20°からは36架台・1152枚で、適用済みの全架台・モジュール形状と出力元が一致。再選択後は30架台・800枚で、新しい範囲と地形20°／パネル15°を使用した。
+
+実Canvasの描画文字と実際に保存した4個のA3横1ページPDFで、地形条件とパネル15°の別表記を確認した。PDFへ直列化したモジュール数も各計算結果と一致。4ページをPopplerで画像化し、低勾配側だけの配置と15–20°側まで含む配置、数値・日本語・参考警告を目視確認した。
+
+条件変更で旧ダウンロードが消えること、実Workerの完了通知を遅らせて15°→20°変更後に渡しても復活しないこと、実JPEGエンコーダーの完了通知を保留中に初期化しても旧PDFが復活しないことを確認。範囲を実マウスで再作図し、モード・発電量画面の往復後も新範囲・地形20°／パネル15°・適用架台を保持し、画面往復だけのWorker再実行はなかった。375／320pxは入力44px以上・横はみ出しなし。pageerror 0、ブラウザー・検証サーバー終了。利用者のタブ・保存資料には触れていない。ローカル証拠は `outputs/slope-release/`、`outputs/built-slope-view/ui-evidence.json` と `rendered/contact.png`。公開照合は `DEPLOYED_VERSION.md` の今回記録を正とする。
