@@ -2,15 +2,15 @@
   "app": "Solar Site Precheck",
   "version": "1.28.2",
   "buildDate": "2026-10-16",
-  "sourceCommit": "44848117743cd363e34b20a9611dc89d1f12ca1b",
+  "sourceCommit": "353a90224a70b9051d7b531fd68818e8bdf67a29",
   "target": "cloudflare",
-  "buildId": "1.28.2-2026-10-16-18f45528bb49",
+  "buildId": "1.28.2-2026-10-16-94c4885c555c",
   "packageName": "SolarSitePrecheck_v1.28.2_2026-10-16_cloudflare.zip",
   "zipUrl": "https://raw.githubusercontent.com/Sonikim1743/Solar-site-precheck/main/release/latest/SolarSitePrecheck_v1.28.2_2026-10-16_cloudflare.zip",
-  "sha256": "18f45528bb49fb120f415472ea9650d179a8c6bbfcb50792c11b13fc1ac029ba",
-  "etag": "18f45528bb49fb12",
-  "bundleName": "index-DoPVRAK6.js",
+  "sha256": "94c4885c555cde48d02435f1dc15b66a469dcbee78a3d6bed41cc3b012cdb27c",
+  "etag": "94c4885c555cde48",
+  "bundleName": "index-Bqg2Umlh.js",
   "minRequiredRuntime": "1.2",
-  "notes": "3Dの地形面と黄色境界・選択点の表示ずれを修正。方位メニュー開閉時のCanvas/SVG比率を統一。標高・地形計算は変更していません。",
-  "sizeBytes": 14629322
+  "notes": "配置図の固定縮尺・案内整理・描画最適化。A3横100%印刷。境界・施工可否は未確認。dist・functions・sharedを含むルートから配布。",
+  "sizeBytes": 14636176
 }
