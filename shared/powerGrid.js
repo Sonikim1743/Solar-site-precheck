@@ -444,7 +444,8 @@ export async function fetchPowerGridPayload(lat, lon, radiusMeters, options = {}
   }
   if (cached) state.cache.delete(key)
 
-  if (!state.pending.has(key)) {
+  const existing = state.pending.get(key)
+  if (!existing || existing.controller.signal.aborted) {
     const controller = new AbortController()
     const pending = { controller, users: 0, done: false }
     const totalTimeout = setTimeout(() => controller.abort(gridError('timeout', '公開地図の取得時間を超えました。時間をおいて再試行してください。')), options.totalTimeoutMs || 30000)
