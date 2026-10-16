@@ -30,6 +30,10 @@
   .app .map-panel .map-shell .map-draw-controls button{padding-inline:7px;font-size:11px}
   .app .map-panel .map-shell .map-base-toggle{padding-inline:7px;font-size:11px}
 }
+@media(max-width:400px){
+  .app .map-panel .map-shell .map-touch-toggle{top:98px;max-width:calc(100% - 96px);height:auto;white-space:normal}
+  .app .map-panel .map-shell>.map-region-label{top:148px}
+}
 @media(max-width:340px){
   .app .map-panel .map-shell .map-draw-controls{max-width:calc(100% - 58px)}
   .app .map-panel .map-shell .map-display-controls{top:54px}

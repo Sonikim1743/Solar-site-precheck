@@ -669,7 +669,7 @@ function PowerGridReportPage({ data, capacityData, capacityMatches, placeCapacit
             </span>
           </div>
           <p className="report-note">
-            位置情報: OpenStreetMap / Overpass API（取得 {fetchedAt}、段階検索 {searchRangeLabel}）。
+            位置情報: OpenStreetMap / Overpass API（取得 {fetchedAt}、段階検索 {searchRangeLabel}）。{data?.stale && '前回の取得結果です。再取得は未完了です。'}
             空容量資料: {sourceLabel}{capacityData?.updatedAt ? `（${capacityData.updatedAt}）` : ''}。
             公開空容量は名称・設備番号・電圧の一致条件を表示します。位置確認度が「参考」の設備は公式資料で再確認してください。
             予想潮流は公開CSVの記載値です。潮流方向だけで系統上位・下位は判定しません。

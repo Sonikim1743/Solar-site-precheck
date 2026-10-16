@@ -12,6 +12,7 @@ import GenerationPanel from './components/GenerationPanel.jsx'
 import { pageFromHash, hashForPage } from './utils/pageRoutes.js'
 import './review-toolbar.css'
 import { createCandidateRequests } from './utils/candidateRequests.js'
+import { currentPlaceLabel, recoverTerrainEvidence, restoreDraftEvidence } from './utils/siteEvidence.js'
 import { generationCsvRows } from './utils/generationCsv.js'
 import { parcelReviewCsvRows } from './utils/parcelPresentation.js'
 import './workspace.css'
@@ -438,13 +439,13 @@ function createRotatedPreviewUrl(src, rotation = 0) {
 
 function loadDraft() {
   try {
-    return JSON.parse(window.localStorage.getItem(DRAFT_KEY)) || {}
+    return restoreDraftEvidence(window.localStorage.getItem(DRAFT_KEY), window.localStorage)
   } catch {
     return {}
   }
 }
 
-function placePositionKey(point, digits = 6) {
+function placePositionKey(point, digits = 7) {
   return `${Number(point.lat).toFixed(digits)},${Number(point.lon).toFixed(digits)}`
 }
 
@@ -606,6 +607,7 @@ export default function App() {
   const [terrainSectionRange, setTerrainSectionRange] = useState(draftSeed.terrainSection?.rangeMeters || 100)
   const [powerGrid, setPowerGrid] = useState({ status: 'idle', data: null, message: '' })
   const powerGridRequestSeq = useRef(0)
+  const powerGridController = useRef(null)
   const candidateRequests = useRef(createCandidateRequests())
   const [candidateRevision, setCandidateRevision] = useState(0)
   const [generationNotice, setGenerationNotice] = useState('')
@@ -613,7 +615,7 @@ export default function App() {
   const [recordInfo, setRecordInfo] = useState(draftSeed.reviewRecordInfo || null)
   const [pendingRecord, setPendingRecord] = useState(null)
   const [undoRecord, setUndoRecord] = useState(null)
-  const [recordStatus, setRecordStatus] = useState({ message: '', error: false })
+  const [recordStatus, setRecordStatus] = useState({ message: draftSeed.recoverySavePaused ? '旧自動保存を保護しています。変更内容は検討記録JSONで保存してください。' : '', error: Boolean(draftSeed.recoverySavePaused) })
   const [generation, setGeneration] = useState(() => generationAtPosition(draftSeed.generation, draftSeed.position) ? draftSeed.generation : null)
   const [generationInputs, setGenerationInputs] = useState(() => draftSeed.generationInputs || draftSeed.generation?.inputs || { peakpower: 50, angle: 20, aspect: 0, loss: 14 })
   const [generationScenarioDraft, setGenerationScenarioDraft] = useState(null)
@@ -729,6 +731,7 @@ export default function App() {
 
   useEffect(() => {
     window.clearTimeout(draftSaveTimer.current)
+    if (draftSeed.recoverySavePaused) return
     draftSaveTimer.current = window.setTimeout(() => {
       try {
         window.localStorage.setItem(DRAFT_KEY, JSON.stringify({
@@ -785,6 +788,7 @@ export default function App() {
     window.clearTimeout(placeRequestTimer.current)
     window.clearTimeout(pointActionTimer.current)
     candidateRequests.current.invalidateAll()
+    powerGridController.current?.abort()
   }, [])
 
   useEffect(() => {
@@ -974,6 +978,7 @@ export default function App() {
     setGenerationNotice('')
     setGenerationInputs({ peakpower: 50, angle: 20, aspect: 0, loss: 14 })
     setPdfProgress('')
+    powerGridController.current?.abort()
     powerGridRequestSeq.current += 1
     setGeneration(null)
     window.clearTimeout(placeRequestTimer.current)
@@ -1022,6 +1027,7 @@ export default function App() {
     const isCurrent = candidateRequests.current.start('elevation')
     setGenerationInputs({ peakpower: 50, angle: 20, aspect: 0, loss: 14 })
     setPdfProgress('')
+    powerGridController.current?.abort()
     powerGridRequestSeq.current += 1
     setGeneration(null)
     setGridNotes([])
@@ -1053,7 +1059,7 @@ export default function App() {
       if (!isCurrent()) return
       setElevation({
         status: 'error', value: null, source: '',
-        message: '標高を自動取得できませんでした。手動入力してください。',
+        message: 'DEM標高を取得できませんでした。海域・資料未整備・通信障害などが考えられます。再取得して確認してください。',
       })
     }
   }
@@ -1358,22 +1364,33 @@ export default function App() {
     openReviewSection('report-section')
   }
 
+  function cancelPowerGridCheck() {
+    powerGridController.current?.abort()
+    powerGridRequestSeq.current += 1
+    setPowerGrid(current => ({ ...current, status: 'cancelled', stale: Boolean(current.data), message: '取得を中止しました。' }))
+  }
+
   async function handlePowerGridCheck({ prefer66Or77 = false, radiusMeters = 10000 } = {}) {
+    powerGridController.current?.abort()
+    const controller = new AbortController()
+    powerGridController.current = controller
     const requestSeq = ++powerGridRequestSeq.current
     if (!position) {
       setPowerGrid({ status: 'error', data: null, message: '先に候補地点を選択してください。' })
       return
     }
-    setPowerGrid({ status: 'loading', data: null, message: '公開電力データを取得しています…' })
+    const previous = powerGrid.data?.position?.lat === position.lat && powerGrid.data?.position?.lon === position.lon ? powerGrid.data : null
+    setPowerGrid({ status: 'loading', data: previous, stale: Boolean(previous), message: '公開電力データを取得しています…' })
     try {
       const data = await fetchNearbyPowerGrid(position.lat, position.lon, {
+        signal: controller.signal,
         progressive: prefer66Or77,
         prefer66Or77,
         radiusMeters,
         radiiMeters: [5000, 10000, 20000, 50000],
         onProgress: ({ type, radiusMeters }) => requestSeq === powerGridRequestSeq.current && setPowerGrid({
           status: 'loading',
-          data: null,
+          data: previous, stale: Boolean(previous),
           message: type === 'fallback'
             ? `公開地図サーバーの接続を切り替えています…（周辺${radiusMeters / 1000}km）`
             : `公開電力データを取得しています…（周辺${radiusMeters / 1000}km）`,
@@ -1391,14 +1408,14 @@ export default function App() {
       if (data.search?.partialError) notes.push(`追加範囲の取得は未完了です。表示は取得済み${data.radiusMeters / 1000}km圏の結果です（${data.search.partialError}）`)
       setPowerGrid({
         status: 'success',
-        data,
+        data, stale: false,
         message: `${Math.round(data.radiusMeters / 1000)}km圏を取得しました。${notes.filter(Boolean).map((note) => note.replace(/。+$/, '')).join('。')}${notes.some(Boolean) ? '。' : ''}`,
       })
     } catch (error) {
       if (requestSeq !== powerGridRequestSeq.current) return
       setPowerGrid({
-        status: 'error',
-        data: null,
+        status: error.code === 'cancelled' ? 'cancelled' : 'error',
+        data: previous, stale: Boolean(previous),
         message: error.message || '公開電力データを取得できませんでした。',
       })
     }
@@ -1448,7 +1465,7 @@ export default function App() {
       setGridCapacity({
         status: 'success',
         data,
-        message: '中国電力NW（広島・岡山・島根・鳥取）の公開DBを準備しました。設備名・設備番号で検索できます。',
+        message: '中国電力NWの5県収録DBです。設備名・設備番号で検索できます。',
       })
     } catch (error) {
       if (!isCurrent()) return
@@ -1521,19 +1538,9 @@ export default function App() {
       }
       setSnowData({
         status: 'success', station: { ...station, expectedMesh },
-        message: `候補地点と同じ3次メッシュ（${expectedMesh}）を確認しました。表位置の自動検出、3方式OCR、年・季節値で交差検証済みです。${station.verification?.correctedColumns?.length ? ` 単純OCRの誤読候補を${station.verification.correctedColumns.length}列補正しました。` : ''}${Number.isFinite(station.elevation) ? '' : ' PDF標高は確定できなかったため国土地理院値を維持します。'}`,
+        message: `候補地点と同じ3次メッシュ（${expectedMesh}）を確認しました。表位置の自動検出、3方式OCR、年・季節値で交差検証済みです。${station.verification?.correctedColumns?.length ? ` 単純OCRの誤読候補を${station.verification.correctedColumns.length}列補正しました。` : ''}${Number.isFinite(station.elevation) ? '' : ' NEDO入力標高は読取未確定です。'}`,
       })
-      if (Number.isFinite(station.elevation)) {
-        candidateRequests.current.invalidate('elevation')
-        if (elevation.value !== station.elevation) {
-          candidateRequests.current.invalidate('terrain')
-          setTerrain(null)
-          setTerrainStatus('idle')
-          setHorizonPanelOpen(false)
-          setHorizonExportMessage('NEDO標高に更新しました。地平線を再分析してください。')
-        }
-        setElevation({ status: 'success', value: station.elevation, source: 'NEDO MONSOLA-11 PDF', message: '' })
-      }
+
     } catch (error) {
       if (!isCurrent()) return
       setSnowData({
@@ -1564,17 +1571,7 @@ export default function App() {
         station: { ...station, expectedMesh },
         message: `NEDO Webから候補地点と同じ3次メッシュ（${expectedMesh}）を取得しました。HTML表の積雪出現率を年・季節値で検証済みです。`,
       })
-      if (Number.isFinite(station.elevation)) {
-        candidateRequests.current.invalidate('elevation')
-        if (elevation.value !== station.elevation) {
-          candidateRequests.current.invalidate('terrain')
-          setTerrain(null)
-          setTerrainStatus('idle')
-          setHorizonPanelOpen(false)
-          setHorizonExportMessage('NEDO標高に更新しました。地平線を再分析してください。')
-        }
-        setElevation({ status: 'success', value: station.elevation, source: 'NEDO MONSOLA-11 Web', message: '' })
-      }
+
     } catch (error) {
       if (!isCurrent()) return
       const message = isDynamicChunkLoadError(error)
@@ -2782,7 +2779,7 @@ export default function App() {
   const confirmedSnowStation = isConfirmedSnowStation(snowData.station) && snowData.station.id === expectedSnowMesh ? snowData.station : null
   const referenceSnowStation = snowData.station && !isConfirmedSnowStation(snowData.station) ? snowData.station : null
   const confirmedMeshPlaceName = confirmedSnowStation?.placeName || ''
-  const selectedPlaceLabel = placeInfo.status === 'success' && placeInfo.positionKey === analysisPositionKey(position) ? normalizeDisplayText(placeInfo.data.label) : ''
+  const selectedPlaceLabel = currentPlaceLabel(position, placeInfo)
   const selectedCoordinateText = position ? `${position.lat.toFixed(6)}, ${position.lon.toFixed(6)}` : ''
   const selectedSolarProCoordinateText = position ? `${toDegreeMinutes(position.lat, 'lat')} / ${toDegreeMinutes(position.lon, 'lon')}` : ''
   const googleMapsUrl = position ? `https://www.google.com/maps?q=${position.lat.toFixed(6)},${position.lon.toFixed(6)}` : ''
@@ -2856,11 +2853,11 @@ export default function App() {
     generation,
     gridNotes,
     reviewRecordInfo: recordInfo,
-    powerGrid: powerGrid.data,
+    powerGrid: powerGrid.data ? { ...powerGrid.data, stale: powerGrid.stale === true } : null,
     gridCapacity: gridCapacity.data,
     capacityMatches,
     placeCapacityCandidates,
-  }), [position, elevation, terrain, terrainSection, currentTerrainArea, terrainReportPreview, siteName, selectedParcel, parcelReview, parcelMetrics, confirmedSnowStation, expectedSnowMesh, meshBoundary, snowBase, obstructionHeight, solarReference, selectedPlaceLabel, memo, fieldMemo, solarProMemo, generation, gridNotes, recordInfo, powerGrid.data, gridCapacity.data, capacityMatches, placeCapacityCandidates])
+  }), [position, elevation, terrain, terrainSection, currentTerrainArea, terrainReportPreview, siteName, selectedParcel, parcelReview, parcelMetrics, confirmedSnowStation, expectedSnowMesh, meshBoundary, snowBase, obstructionHeight, solarReference, selectedPlaceLabel, memo, fieldMemo, solarProMemo, generation, gridNotes, recordInfo, powerGrid.data, powerGrid.stale, gridCapacity.data, capacityMatches, placeCapacityCandidates])
   // PDF validity follows the fields used by the terrain sheets. Unrelated
   // checks and render state must not discard a completed download.
   const terrainPdfReport = useMemo(() => ({
@@ -2951,6 +2948,7 @@ export default function App() {
   function cancelCandidateWork() {
     cancelTerrainAreaWork()
     setRecordDownload(null)
+    powerGridController.current?.abort()
     candidateRequests.current.invalidateAll(); powerGridRequestSeq.current += 1; placeRequestSeq.current += 1
     window.clearTimeout(placeRequestTimer.current); window.clearTimeout(pointActionTimer.current)
     setCandidateRevision(current => current + 1)
@@ -2958,7 +2956,8 @@ export default function App() {
 
   function restoreReviewRecord(record) {
     cancelCandidateWork()
-    const { candidate, inputs, results } = record
+    const { candidate, inputs } = record
+    const results = { ...record.results, ...recoverTerrainEvidence(record.results) }
     const restoredTerrainArea = results.terrainArea ? normalizeTerrainArea(results.terrainArea, measureParcelReview(candidate.parcelReview).geometry) : null
     setPosition(candidate.position)
     setSiteName(candidate.name); setSiteNameTouched(true); setMemo(candidate.memo); setFieldMemo(candidate.fieldMemo)
@@ -2968,7 +2967,7 @@ export default function App() {
     setCurrentLocation(null); setLocationStatus({ status: 'idle', message: '' })
     setPlaceInfo({ status: 'success', data: { label: candidate.placeLabel || candidate.name || '保存記録の候補地', source: '検討記録（保存時）' }, message: '', positionKey: analysisPositionKey(candidate.position) })
     setPlaceApiStatus(initialPlaceApiStatus)
-    setElevation({ status: results.elevation.value === null ? 'idle' : 'success', value: results.elevation.value, source: results.elevation.source, message: '' })
+    setElevation({ ...results.elevation, status: results.elevation.value === null ? 'idle' : 'success', message: results.elevation.message || '' })
     setTerrain(results.terrain); setTerrainStatus(results.terrain ? 'success' : 'idle'); setHorizonPanelOpen(false); setHorizonExportMessage('')
     setTerrainSection(results.terrainSection); setTerrainSectionStatus(results.terrainSection ? 'success' : 'idle'); setTerrainSectionRange(results.terrainSection?.rangeMeters || 100); setTerrainSectionOpen(false)
     setTerrainArea(restoredTerrainArea); setTerrainAreaStatus(restoredTerrainArea ? 'success' : 'idle'); setTerrainAreaProgress(null); setTerrainAreaError(''); setTerrainAreaOpen(false); setReportView('summary')
@@ -3390,7 +3389,7 @@ export default function App() {
         {activePage === 'power' && <Suspense fallback={<p>系統確認マップを読み込んでいます…</p>}><PowerGridPage
           position={position} placeLabel={selectedPlaceLabel} powerGrid={powerGrid} gridCapacity={gridCapacity} capacityMatches={capacityMatches}
           annualYield={solarProMemo.annualYield} generation={generation} onSaveGridNote={addGridNote} savedGridNotes={gridNotes}
-          onCheck={handlePowerGridCheck} onLoadCapacity={handleBundledGridCapacity} onBack={() => switchPage('solar')}
+          onCheck={handlePowerGridCheck} onCancel={cancelPowerGridCheck} onLoadCapacity={handleBundledGridCapacity} onBack={() => switchPage('solar')}
           onReport={() => openReviewSection('report-section')} onGeneration={() => openReviewSection('solar-generation')}
           terrain={terrain} snowStation={confirmedSnowStation} onScenarioSources={openReviewSection}
         /></Suspense>}
@@ -3626,11 +3625,11 @@ export default function App() {
 
             <div className="map-analysis-strip">
               {simpleDesign ? <div className="simple-point">
-                <div className="simple-point-title"><span>選択地点</span><strong>{position ? selectedPlaceLabel || '住所を確認中' : '住所検索または地図で地点を選択'}</strong></div>
+                <div className="simple-point-title"><span>選択地点</span><strong>{position ? selectedPlaceLabel || (placeInfo.status === 'loading' ? '住所を確認中…' : '座標で確認') : '住所検索または地図で地点を選択'}</strong></div>
                 <div className="simple-point-meta"><span>{position ? selectedSolarProCoordinateText : '緯度・経度 —'}</span><span>標高 <b>{elevation.status === 'success' ? `${elevation.value.toFixed(1)} m` : elevation.status === 'loading' ? '取得中…' : '—'}</b></span></div>
                 <div className="simple-point-actions">{position && <><button type="button" onClick={copySelectedCoordinates}>コピー</button><a href={googleMapsUrl} target="_blank" rel="noreferrer">Google マップ ↗</a></>}{pointActionStatus && <span role="status">{pointActionStatus}</span>}</div>
               </div> : <div className="selected-point-mini">
-                <div className="selected-point-mini__location"><span>選択地点</span><strong>{position ? selectedPlaceLabel || '住所を確認中' : '住所検索または地図で地点を選択'}</strong></div>
+                <div className="selected-point-mini__location"><span>選択地点</span><strong>{position ? selectedPlaceLabel || (placeInfo.status === 'loading' ? '住所を確認中…' : '座標で確認') : '住所検索または地図で地点を選択'}</strong></div>
                 <div className="selected-point-mini__coordinates"><strong>{position ? <><b>{toDegreeMinutes(position.lat, 'lat')}</b><b>{toDegreeMinutes(position.lon, 'lon')}</b></> : '緯度・経度 —'}</strong></div>
                 <div className="selected-point-mini__elevation"><span>標高</span><strong>{elevation.status === 'success' ? `${elevation.value.toFixed(1)} m` : elevation.status === 'loading' ? '取得中…' : elevation.status === 'error' ? '未取得' : '—'}</strong></div>
                 {position && <button type="button" className="mini-copy-button" onClick={copySelectedCoordinates} aria-label="緯度・経度（度・分）をコピー" title={selectedSolarProCoordinateText}>コピー</button>}
@@ -4090,7 +4089,7 @@ export default function App() {
                         </strong>
                         <span>{snowStation.mode === 'manual-corrected' ? 'NEDO値・手動補正あり' : snowStation.mode === 'nedo-web' ? 'NEDO 3次メッシュWeb値・整合性確認済み' : 'NEDO 3次メッシュPDF値・整合性確認済み'}</span>
                         <span className="nedo-location-line">
-                          <span className="solarpro-location-values">北緯 {snowStation.latDeg}度 {snowStation.latMin.toFixed(1)}分 / 東経 {snowStation.lonDeg}度 {snowStation.lonMin.toFixed(1)}分 / 標高 {Number.isFinite(snowStation.elevation) ? `${snowStation.elevation}m` : 'PDF読取未確定'}</span>
+                          <span className="solarpro-location-values">北緯 {snowStation.latDeg}度 {snowStation.latMin.toFixed(1)}分 / 東経 {snowStation.lonDeg}度 {snowStation.lonMin.toFixed(1)}分 / NEDO入力標高 {Number.isFinite(snowStation.elevation) ? `${snowStation.elevation}m` : 'PDF読取未確定'}</span>
                           <SolarProPreviewButton
                             label="設置場所入力画面"
                             image="/screenshots/solarpro-location.png"
@@ -4121,7 +4120,7 @@ export default function App() {
                         </table>
                       </div>
                       <p className="formula-note formula-note--with-legend">
-                        <span className="formula-note__main">発電量係数 = {snowBase.toFixed(2)} − 積雪深10cm以上の出現率</span>
+                        <span className="formula-note__main" title="Solar Pro入力用の仮定係数（無次元）。基準値は編集可能で、PVGIS基本値には自動適用しません。">発電量係数 = {snowBase.toFixed(2)} − 積雪深10cm以上の出現率</span>
                         <span className="formula-note__legend"><span className="snow-legend__notice">0.01以上</span> は着色、<strong className="snow-legend__alert">0.50以上は ❄ 積雪注意</strong></span>
                       </p>
                     </div>
@@ -4250,7 +4249,7 @@ export default function App() {
               <p>Solar Pro上部メニューの <strong>3DCAD → 設置場所</strong> を開き、MONSOLA-11を選択して緯度・経度・標高を入力します。</p>
               <ul>
                 <li>緯度・経度はこのツールの度分表示を使用。</li>
-                <li>標高はNEDO取得後の値を優先し、必要に応じて原典確認。</li>
+                <li>地形はDEM標高を使用。Solar ProのNEDO入力標高は積雪資料で確認。</li>
                 <li>3次メッシュ番号とNEDO地点名も念のため確認。</li>
               </ul>
             </article>

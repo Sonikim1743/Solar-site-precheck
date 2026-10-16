@@ -7,7 +7,7 @@ import react from '@vitejs/plugin-react'
 
 let server, MapRegionLabel, getMapRegionLabel
 before(async () => {
-  server = await createServer({ configFile:false, root:process.cwd(), plugins:[react()], server:{middlewareMode:true,hmr:false,ws:false,watch:null}, appType:'custom', logLevel:'error', optimizeDeps:{noDiscovery:true,include:[]} })
+  server = await createServer({ configFile:false, root:process.cwd(), cacheDir:'.vite/map-region-label-tests', plugins:[react()], server:{middlewareMode:true,hmr:false,ws:false,watch:null}, appType:'custom', logLevel:'error', optimizeDeps:{noDiscovery:true,include:[]} })
   const module = await server.ssrLoadModule('/src/components/MapRegionLabel.jsx')
   MapRegionLabel = module.default
   getMapRegionLabel = module.getMapRegionLabel

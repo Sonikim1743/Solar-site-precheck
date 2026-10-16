@@ -44,6 +44,8 @@ export async function handlePowerGridRequest(request, options = {}) {
     const data = await fetchPowerGridPayload(lat, lon, radiusMeters, {
       fetchImpl: options.fetchImpl,
       timeoutMs: options.timeoutMs,
+      totalTimeoutMs: options.totalTimeoutMs,
+      signal: request.signal,
       includeSupports: params.get('supports') === '1',
       userAgent: POWER_GRID_USER_AGENT,
     })

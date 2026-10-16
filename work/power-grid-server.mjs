@@ -4,6 +4,10 @@ import { handleGenerationRequest } from '../functions/api/pv-generation.js'
 export async function powerGridMiddleware(request, response, next) {
   const pathname = new URL(request.url || '/', 'http://localhost').pathname
   if (!['/api/power-grid', '/api/pv-generation'].includes(pathname)) return next()
+  const controller = new AbortController()
+  const cancel = () => { if (!response.writableEnded) controller.abort() }
+  request.once('aborted', cancel)
+  response.once('close', cancel)
   try {
     const chunks = []
     let size = 0
@@ -20,12 +24,17 @@ export async function powerGridMiddleware(request, response, next) {
     const result = await handler(new Request(`http://${request.headers.host}${request.url}`, {
       method: request.method,
       headers: request.headers,
+      signal: controller.signal,
       ...(['GET', 'HEAD'].includes(request.method) ? {} : { body: Buffer.concat(chunks) }),
     }))
     response.writeHead(result.status, Object.fromEntries(result.headers))
     response.end(await result.text())
   } catch {
+    if (response.destroyed) return
     response.writeHead(502, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })
     response.end(JSON.stringify({ error: '公開地図データを取得できませんでした。' }))
+  } finally {
+    request.removeListener('aborted', cancel)
+    response.removeListener('close', cancel)
   }
 }

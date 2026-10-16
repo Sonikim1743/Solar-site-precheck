@@ -5,7 +5,7 @@ export default function GridEquipmentDetails({ record, compact = false }) {
   const flow = summarizeGridFlowDirection(record)
   const rows = [
     ['設備番号', record.no || '記載なし'],
-    ['電圧', Number.isFinite(record.voltageKv) ? `${record.voltageKv} kV` : '記載なし'],
+    [Number.isFinite(record.secondaryVoltageKv) ? '電圧（一次 → 二次）' : '電圧', Number.isFinite(record.voltageKv) ? `${record.voltageKv}${Number.isFinite(record.secondaryVoltageKv) ? ` → ${record.secondaryVoltageKv}` : ''} kV` : '記載なし'],
     ['空容量（当該設備）', capacityValueStatusLabel(record.availableCapacityMw)],
     ['空容量（上位系統考慮）', capacityValueStatusLabel(record.upstreamAvailableCapacityMw, { upstream: true })],
     ['設備容量', capacityValueLabel(record.installedCapacityMw)],

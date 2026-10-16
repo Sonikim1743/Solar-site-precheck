@@ -5,8 +5,9 @@ export const POWER_GRID_ENDPOINTS = Object.freeze([
   'https://lambert.openstreetmap.de/api/interpreter',
 ])
 const DEFAULT_RADIUS_METERS = 5000
-// Allow the server's 25s execution budget plus its queue and network overhead.
+// Per-attempt allowance; the overall deadline also bounds queue and body reads.
 const DEFAULT_TIMEOUT_MS = 45000
+export const POWER_GRID_TOTAL_TIMEOUT_MS = 35000
 const CACHE_TTL_MS = 10 * 60 * 1000
 const FAILURE_COOLDOWN_MS = 5 * 60 * 1000
 const transportStates = new WeakMap()
@@ -347,6 +348,31 @@ function gridError(code, message, retryable = false) {
   return Object.assign(new Error(message), { code, retryable })
 }
 
+function abortError(signal) {
+  return signal?.reason?.code === 'timeout' ? signal.reason : gridError('cancelled', '取得を中止しました。')
+}
+
+function abortable(promise, signal) {
+  if (signal.aborted) {
+    Promise.resolve(promise).catch(() => {})
+    return Promise.reject(abortError(signal))
+  }
+  return new Promise((resolve, reject) => {
+    const cancel = () => reject(abortError(signal))
+    signal.addEventListener('abort', cancel, { once: true })
+    Promise.resolve(promise).then(resolve, reject).finally(() => signal.removeEventListener('abort', cancel))
+  })
+}
+
+function subscribe(pending, signal) {
+  pending.users++
+  const result = signal ? abortable(pending.promise, signal) : pending.promise
+  return result.finally(() => {
+    pending.users--
+    if (!pending.users && !pending.done) pending.controller.abort()
+  })
+}
+
 function transportState(fetchImpl) {
   if (!transportStates.has(fetchImpl)) {
     transportStates.set(fetchImpl, { cache: new Map(), pending: new Map(), unavailable: new Map(), rateLimitedUntil: 0 })
@@ -354,17 +380,21 @@ function transportState(fetchImpl) {
   return transportStates.get(fetchImpl)
 }
 
-async function requestPowerGrid(endpoint, body, fetchImpl, timeoutMs, userAgent) {
+async function requestPowerGrid(endpoint, body, fetchImpl, timeoutMs, userAgent, signal) {
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), timeoutMs)
+  const cancel = () => controller.abort(abortError(signal))
+  signal.addEventListener('abort', cancel, { once: true })
+  if (signal.aborted) cancel()
+  const timeout = setTimeout(() => controller.abort(gridError('timeout', '公開地図データの取得がタイムアウトしました。', true)), timeoutMs)
   try {
-    const response = await fetchImpl(endpoint, {
+    if (controller.signal.aborted) throw controller.signal.reason
+    const response = await abortable(fetchImpl(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8', ...(userAgent ? { 'User-Agent': userAgent } : {}) },
       body,
       signal: controller.signal,
       credentials: 'omit',
-    })
+    }), controller.signal)
     if (response.status === 429) {
       const retryAfter = response.headers?.get('Retry-After')
       const seconds = retryAfter ? Number(retryAfter) : NaN
@@ -376,7 +406,7 @@ async function requestPowerGrid(endpoint, body, fetchImpl, timeoutMs, userAgent)
     if (!response.ok) {
       throw gridError('http', `公開地図サーバーが応答できませんでした（HTTP ${response.status}）。`, response.status >= 500 || response.status === 408)
     }
-    const payload = await response.json()
+    const payload = await abortable(response.json(), controller.signal)
     // Overpass can return HTTP 200 with a timeout/overload remark and partial data.
     // Never misrepresent an error response as an empty area or complete search.
     if (payload?.remark || !Array.isArray(payload?.elements)) {
@@ -384,6 +414,8 @@ async function requestPowerGrid(endpoint, body, fetchImpl, timeoutMs, userAgent)
     }
     return { elements: payload.elements, sourceEndpoint: payload.sourceEndpoint || endpoint, fetchedAt: payload.fetchedAt || new Date().toISOString() }
   } catch (error) {
+    if (signal.aborted) throw abortError(signal)
+    if (controller.signal.aborted) throw controller.signal.reason
     if (error?.code && typeof error.code === 'string') throw error
     if (controller.signal.aborted || error?.name === 'AbortError') {
       throw gridError('timeout', '公開地図データの取得がタイムアウトしました。', true)
@@ -391,10 +423,12 @@ async function requestPowerGrid(endpoint, body, fetchImpl, timeoutMs, userAgent)
     throw gridError('network', '公開地図サーバーに接続できませんでした。', true)
   } finally {
     clearTimeout(timeout)
+    signal.removeEventListener('abort', cancel)
   }
 }
 
 export async function fetchPowerGridPayload(lat, lon, radiusMeters, options = {}) {
+  if (options.signal?.aborted) throw abortError(options.signal)
   const fetchImpl = options.fetchImpl || fetch
   const state = transportState(fetchImpl)
   const endpoints = options.proxy ? ['/api/power-grid'] : options.endpoint ? [options.endpoint] : POWER_GRID_ENDPOINTS
@@ -411,12 +445,16 @@ export async function fetchPowerGridPayload(lat, lon, radiusMeters, options = {}
   if (cached) state.cache.delete(key)
 
   if (!state.pending.has(key)) {
-    const pending = (async () => {
+    const controller = new AbortController()
+    const pending = { controller, users: 0, done: false }
+    const totalTimeout = setTimeout(() => controller.abort(gridError('timeout', '公開地図の取得時間を超えました。時間をおいて再試行してください。')), options.totalTimeoutMs || 30000)
+    pending.promise = (async () => {
       if (state.rateLimitedUntil > Date.now()) {
         throw gridError('rate-limit', '公開地図サーバーの利用制限中です。しばらく待ってから再試行してください。')
       }
       let lastError
       for (const [index, endpoint] of endpoints.entries()) {
+        if (controller.signal.aborted) throw abortError(controller.signal)
         const unavailable = state.unavailable.get(endpoint)
         if (unavailable?.until > Date.now()) {
           lastError = unavailable.error
@@ -424,7 +462,8 @@ export async function fetchPowerGridPayload(lat, lon, radiusMeters, options = {}
         }
         options.onProgress?.({ type: index ? 'fallback' : 'request', radiusMeters })
         try {
-          const data = await requestPowerGrid(endpoint, body, fetchImpl, options.timeoutMs || (options.proxy ? 100000 : DEFAULT_TIMEOUT_MS), options.userAgent)
+          const data = await requestPowerGrid(endpoint, body, fetchImpl, options.timeoutMs || (options.proxy ? POWER_GRID_TOTAL_TIMEOUT_MS : DEFAULT_TIMEOUT_MS), options.userAgent, controller.signal)
+          if (controller.signal.aborted) throw abortError(controller.signal)
           state.unavailable.delete(endpoint)
           if (options.cache !== false) {
             // Bounded, memory-only cache: no new persistent location storage.
@@ -436,6 +475,7 @@ export async function fetchPowerGridPayload(lat, lon, radiusMeters, options = {}
           }
           return data
         } catch (error) {
+          if (controller.signal.aborted) throw abortError(controller.signal)
           if (error.code === 'rate-limit') state.rateLimitedUntil = error.retryAt
           if (!error.retryable) throw error
           lastError = error
@@ -443,16 +483,15 @@ export async function fetchPowerGridPayload(lat, lon, radiusMeters, options = {}
         }
       }
       throw gridError(lastError?.code || 'network', `${lastError?.message || '公開地図サーバーに接続できませんでした。'} 時間をおいて再試行してください。読込済みの公開空容量DBは引き続き確認できます。`)
-    })()
+    })().finally(() => {
+      pending.done = true
+      clearTimeout(totalTimeout)
+      if (state.pending.get(key) === pending) state.pending.delete(key)
+    })
     state.pending.set(key, pending)
   }
-  const pending = state.pending.get(key)
-  try {
-    const data = await pending
-    return { ...data, cached: false }
-  } finally {
-    if (state.pending.get(key) === pending) state.pending.delete(key)
-  }
+  const data = await subscribe(state.pending.get(key), options.signal)
+  return { ...data, cached: false }
 }
 
 async function fetchPowerGridRadius(lat, lon, radiusMeters, options) {
@@ -464,6 +503,11 @@ export async function fetchNearbyPowerGrid(lat, lon, options = {}) {
   if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) {
     throw new Error('候補地点の座標がありません。')
   }
+  const controller = new AbortController()
+  const cancel = () => controller.abort(abortError(options.signal))
+  options.signal?.addEventListener('abort', cancel, { once: true })
+  if (options.signal?.aborted) cancel()
+  const timeout = setTimeout(() => controller.abort(gridError('timeout', '公開地図の取得時間を超えました。時間をおいて再試行してください。')), options.totalTimeoutMs || POWER_GRID_TOTAL_TIMEOUT_MS)
   const progressive = options.progressive === true
   const targetVoltagesKv = options.prefer66Or77 === true ? [66, 77] : []
   const radii = progressive
@@ -478,9 +522,11 @@ export async function fetchNearbyPowerGrid(lat, lon, options = {}) {
       try {
         lastResult = await fetchPowerGridRadius(lat, lon, radiusMeters, {
           ...options,
+          signal: controller.signal,
           includeSupports: progressive ? false : options.includeSupports,
         })
       } catch (error) {
+        if (error.code === 'cancelled') throw error
         lastError = error
         if (!lastResult) throw error
         break
@@ -513,5 +559,8 @@ export async function fetchNearbyPowerGrid(lat, lon, options = {}) {
       throw new Error('公開電力データの取得がタイムアウトしました。時間をおいて再試行してください。')
     }
     throw error
+  } finally {
+    clearTimeout(timeout)
+    options.signal?.removeEventListener('abort', cancel)
   }
 }

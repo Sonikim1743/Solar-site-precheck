@@ -1,14 +1,8 @@
-import { normalizeDisplayText } from '../utils/text.js'
+import { currentPlaceLabel } from '../utils/siteEvidence.js'
 import './map-region-label.css'
 
 export function getMapRegionLabel(position, placeInfo) {
-  if (!Number.isFinite(position?.lat) || !Number.isFinite(position?.lon) || placeInfo?.status !== 'success') return ''
-  // Address lookups use six decimals; records reopened in App use seven.
-  // A label for another selected point must never linger on the map.
-  const key = placeInfo.positionKey
-  if (key && ![6, 7].some(digits => key === `${position.lat.toFixed(digits)},${position.lon.toFixed(digits)}`)) return ''
-  const label = typeof placeInfo.data?.label === 'string' ? normalizeDisplayText(placeInfo.data.label) : ''
-  return label === '住所情報なし' || label === '保存記録の候補地' ? '' : label
+  return currentPlaceLabel(position, placeInfo)
 }
 
 export default function MapRegionLabel({ position, placeInfo }) {
