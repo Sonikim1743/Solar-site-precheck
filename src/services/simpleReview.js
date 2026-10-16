@@ -9,13 +9,15 @@ import { normalizeTerrainArea, terrainGeometryKey } from '../utils/terrainArea.j
 import { layoutOutputState } from '../utils/layoutOutputState.js'
 const fetchMonsolaWeb = async (...args) => (await import('./nedoWeb.js')).fetchMonsolaWeb(...args)
 
-export function normalizeSimpleLayoutSettings(settings = {}) {
-  return { tiltDeg: Number.isFinite(settings.tiltDeg) && settings.tiltDeg >= 0 && settings.tiltDeg <= 60 ? settings.tiltDeg : 15, direction: ['optimized', 'manual'].includes(settings.direction) ? settings.direction : 'south' }
+export function normalizeSimpleLayoutSettings(settings = {}, layoutOptions) {
+  return { tiltDeg: Number.isFinite(settings.tiltDeg) && settings.tiltDeg >= 0 && settings.tiltDeg <= 60 ? settings.tiltDeg : 15,
+    slopeLimitDeg: [10, 15, 20].includes(settings.slopeLimitDeg) ? settings.slopeLimitDeg : normalizeTerrainLayoutOptions(layoutOptions).slopeLimitDeg,
+    direction: ['optimized', 'manual'].includes(settings.direction) ? settings.direction : 'south' }
 }
 export function simpleReviewDefaults(layoutOptions, settings) {
-  const selected = normalizeSimpleLayoutSettings(settings)
+  const selected = normalizeSimpleLayoutSettings(settings, layoutOptions)
   return { sectionRangeM: 100, sectionIntervalM: 10, obstructionHeightM: 20, horizonDirections: 8, snowBase: .95,
-    layout: normalizeTerrainLayoutOptions({ ...layoutOptions, tiltDeg: selected.tiltDeg, ...(selected.direction === 'south' ? { azimuthDeg: 180 } : {}) }), layoutSettings: selected }
+    layout: normalizeTerrainLayoutOptions({ ...layoutOptions, tiltDeg: selected.tiltDeg, slopeLimitDeg: selected.slopeLimitDeg, ...(selected.direction === 'south' ? { azimuthDeg: 180 } : {}) }), layoutSettings: selected }
 }
 const guard = signal => { if (signal?.aborted) throw signal.reason || new DOMException('中止', 'AbortError') }
 export function simpleLayoutWorker(analysis, options, signal, settings) {

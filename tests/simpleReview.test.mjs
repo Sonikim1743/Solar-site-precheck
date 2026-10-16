@@ -8,6 +8,9 @@ import { pointInGeometry, featureInteriorPoint } from '../src/services/parcelGeo
 import { thirdMeshCode } from '../src/services/nedo.js'
 import { simpleReviewReportRows } from '../src/utils/simpleReviewReport.js'
 import { terrainReportLayouts } from '../src/utils/terrainLayoutReport.js'
+import polygonClipping from 'polygon-clipping'
+import { getTerrainCellSlope } from '../src/utils/terrainLayout.js'
+import { terrainLayoutAnalysisKey } from '../src/utils/terrainLayoutComparison.js'
 function fixture(){const s=terrainReviewSynthetic();const area=normalizeTerrainArea({...s.terrainArea,grid:{...s.terrainArea.grid,elevations:s.terrainArea.grid.elevations.map(()=>100)}});return {...s,terrainArea:area}}
 function dependencies(s){return {fetchElevation:async()=>({value:100,dataSource:'合成DEM'}),section:async()=>({lines:[{label:'東西',points:[{elevation:100}],summary:{minElevation:100,maxElevation:100}}]}),horizon:async()=>({samples:Array.from({length:8},(_,i)=>({direction:String(i),angle:1,missingCount:0}))}),snow:async mesh=>({id:mesh,mode:'nedo-web',verified:true,validationVersion:2,snow10cm:{annual:10,winter:10},source:{statisticalPeriod:'合成'}}),area:async()=>s.terrainArea,layout:async(a,o)=>buildTerrainLayout(a,o)}}
 test('confirmed range uses an interior representative and untouched defaults, with explicit applied snapshot',async()=>{
@@ -77,4 +80,42 @@ test('wrong tilt, wrong south bearing, and unproven optimized bearing are reject
   const r=await runSimpleReview(s.parcelReview,{dependencies:deps,layoutSettings:settings})
   assert.equal(r.results.layout,null);assert.equal(r.status,'review')
  }
+})
+
+test('simple terrain cutoff is independent of panel tilt and otherwise inherits the detailed cutoff',()=>{
+ const options={slopeLimitDeg:15,tiltDeg:15,rowGapM:4.2}
+ const changed=simpleReviewDefaults(options,{tiltDeg:15,slopeLimitDeg:20,direction:'south'})
+ assert.equal(changed.layout.slopeLimitDeg,20);assert.equal(changed.layoutSettings.slopeLimitDeg,20)
+ assert.equal(changed.layout.tiltDeg,15);assert.equal(changed.layout.rowGapM,4.2)
+ assert.equal(simpleReviewDefaults(options,{tiltDeg:20}).layout.slopeLimitDeg,15)
+ assert.equal(simpleReviewDefaults(options,{slopeLimitDeg:17}).layout.slopeLimitDeg,15)
+ assert.equal(options.slopeLimitDeg,15)
+})
+
+// Inspect positive-area footprint/cell intersections, not just the option label
+// or eligible-area statistic. The fixture has distinct 12° and 18° terrain.
+function occupiedSlopes(area,layout){
+ const g=area.grid,values=[]
+ const areaOf=polygons=>polygons.reduce((sum,p)=>sum+Math.abs(p[0].reduce((a,v,i,r)=>{const n=r[(i+1)%r.length];return a+v[0]*n[1]-n[0]*v[1]},0))/2,0)
+ for(let row=0;row<g.height-1;row++)for(let col=0;col<g.width-1;col++){
+  const x=g.xMin+col*g.step,y=g.yMin+row*g.step,cell=[[x,y],[x+g.step,y],[x+g.step,y+g.step],[x,y+g.step],[x,y]]
+  if(layout.racks.some(r=>areaOf(polygonClipping.intersection([r.footprint],[cell]))>1e-7))values.push(getTerrainCellSlope(g,row,col))
+ }
+ return values
+}
+test('changing terrain 15→20 recalculates a stale detailed pool and places racks on actual 15–20° cells',async()=>{
+ const s=terrainReviewSynthetic(),deps=dependencies(s),settings={tiltDeg:15,direction:'south',slopeLimitDeg:15}
+ deps.layout=async(a,o)=>buildSouthTerrainLayout(a,o)
+ const lower=await runSimpleReview(s.parcelReview,{dependencies:deps,terrainArea:s.terrainArea,layoutOptions:{slopeLimitDeg:15},layoutSettings:settings})
+ const pool={...lower.results.layout,analysisReference:s.terrainArea,analysisKey:terrainLayoutAnalysisKey(s.terrainArea)}
+ let calls=0;deps.layout=async(a,o)=>{calls++;return buildSouthTerrainLayout(a,o)}
+ const upper=await runSimpleReview(s.parcelReview,{dependencies:deps,terrainArea:s.terrainArea,layoutOptions:pool.options,layoutSettings:{...settings,slopeLimitDeg:20},layoutPreview:{layout:pool,options:pool.options,appliedOptions:pool.options,layoutMode:'south',appliedMode:'south'}})
+ assert.equal(calls,1);assert.equal(upper.reusedLayout,false)
+ assert.equal(upper.results.layout.options.tiltDeg,15);assert.equal(upper.results.layout.options.slopeLimitDeg,20)
+ assert.ok(upper.results.layout.moduleCount>lower.results.layout.moduleCount)
+ const lowSlopes=occupiedSlopes(lower.results.area,lower.results.layout),highSlopes=occupiedSlopes(upper.results.area,upper.results.layout)
+ assert.ok(lowSlopes.length>0&&lowSlopes.every(v=>v<15))
+ assert.ok(highSlopes.some(v=>v>=15&&v<20));assert.ok(highSlopes.every(v=>v<20))
+ assert.ok(simpleReviewReportRows(upper).some(([k,v])=>k==='配置で実際に適用した値'&&v.includes('地形20°未満')&&v.includes('パネル傾斜15°')))
+ assert.equal(pool.options.slopeLimitDeg,15)
 })

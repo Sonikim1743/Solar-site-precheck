@@ -670,9 +670,9 @@ export default function App() {
   const [terrainAreaOpen, setTerrainAreaOpen] = useState(false)
   const [terrainDrawingRequested, setTerrainDrawingRequested] = useState(false)
   const [terrainPreview, setTerrainPreview] = useState({ options: {}, layout: null, enabled: false, labels: false })
-  const sharedLayoutSettings = { tiltDeg: normalizeTerrainLayoutOptions(terrainPreview.options).tiltDeg, direction: terrainLayoutMode(terrainPreview) }
+  const sharedLayoutSettings = { tiltDeg: normalizeTerrainLayoutOptions(terrainPreview.options).tiltDeg, slopeLimitDeg: normalizeTerrainLayoutOptions(terrainPreview.options).slopeLimitDeg, direction: terrainLayoutMode(terrainPreview) }
   const changeSharedLayoutSettings = useCallback(patch => setTerrainPreview(previous => ({ ...previous,
-    options: { ...normalizeTerrainLayoutOptions(previous.options), ...(patch.tiltDeg !== undefined ? { tiltDeg: patch.tiltDeg } : {}), ...(['south', 'optimized'].includes(patch.direction) ? { azimuthDeg: 180 } : {}) },
+    options: { ...normalizeTerrainLayoutOptions(previous.options), ...(patch.tiltDeg !== undefined ? { tiltDeg: patch.tiltDeg } : {}), ...(patch.slopeLimitDeg !== undefined ? { slopeLimitDeg: patch.slopeLimitDeg } : {}), ...(['south', 'optimized'].includes(patch.direction) ? { azimuthDeg: 180 } : {}) },
     layoutMode: patch.direction || terrainLayoutMode(previous), calculating: false })), [])
   const setSharedLayoutBusy = useCallback(calculating => setTerrainPreview(previous => previous.calculating === calculating ? previous : { ...previous, calculating }), [])
   const applySimpleLayout = useCallback(report => {

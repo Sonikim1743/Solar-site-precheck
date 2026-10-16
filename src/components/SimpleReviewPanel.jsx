@@ -134,13 +134,14 @@ export default function SimpleReviewPanel({ review, referenceCount = 0, siteName
     <div className="simple-batch-actions">
       <button type="button" className="simple-primary" onClick={start} disabled={!key || !representative || busy}>{busy ? '作成中…' : result ? '配置図PDFを作り直す' : '配置図PDFを作成'}</button>
       <button type="button" className="simple-settings-toggle" ref={settingsButton} aria-expanded={settingsOpen} aria-controls={settingsId} onClick={() => setSettingsOpen(value => !value)}>条件 <span aria-hidden="true">{settingsOpen ? '▴' : '▾'}</span></button>
-      <span className="simple-condition-summary">{selected.tiltDeg}° · {directionLabel}</span>
+      <span className="simple-condition-summary">地形{selected.slopeLimitDeg}°未満 · パネル{selected.tiltDeg}° · {directionLabel}</span>
       {ownBusy ? <button type="button" className="simple-secondary" onClick={cancel}>中止</button> : <button type="button" className="simple-secondary" onClick={onDraw}>範囲を変更</button>}
     </div>
     <div id={settingsId} className="simple-settings" hidden={!settingsOpen} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); setSettingsOpen(false); settingsButton.current?.focus() } }}>
-      <div className="simple-setting-fields"><label>パネル傾斜 <select value={selected.tiltDeg} onChange={e => changeSetting({ tiltDeg: Number(e.target.value) })}>{[...new Set([10, 15, 20, selected.tiltDeg])].sort((a,b)=>a-b).map(value => <option key={value} value={value}>{value}°</option>)}</select></label>
+      <div className="simple-setting-fields"><label>配置可能な地形勾配 <select aria-label="配置可能な地形勾配" value={selected.slopeLimitDeg} onChange={e => changeSetting({ slopeLimitDeg: Number(e.target.value) })}>{[10, 15, 20].map(value => <option key={value} value={value}>{value}°未満</option>)}</select></label>
+        <label>パネル傾斜 <select aria-label="パネル傾斜" value={selected.tiltDeg} onChange={e => changeSetting({ tiltDeg: Number(e.target.value) })}>{[...new Set([10, 15, 20, selected.tiltDeg])].sort((a,b)=>a-b).map(value => <option key={value} value={value}>{value}°</option>)}</select></label>
         <label>配置方向 <select value={selected.direction} onChange={e => changeSetting({ direction: e.target.value })}><option value="south">真南</option><option value="optimized">最適（参考）</option>{selected.direction === 'manual' && <option value="manual">入力方位を維持</option>}</select></label></div>
-      <p className="simple-settings-hint">パネルの水平からの角度です。地形勾配の条件とは別です。</p>
+      <p className="simple-settings-hint">地形勾配は配置対象にするDEMの局所勾配、パネル傾斜は水平からの角度です。地形勾配の選択は比較用で、施工可否の判定ではありません。</p>
       <details><summary>縮尺・配置条件</summary><TerrainDrawingScaleControl value={drawingScale} onChange={onDrawingScaleChange} grid={terrainArea?.grid || cached?.snapshot.results.area.grid} disabled={busy || !onDrawingScaleChange}/><p>真南は北0°・時計回り180°固定。最適（参考）は基準方位{defaults.layout.azimuthDeg}°±30°を7.5°刻みと開始位置で比較（最大32試行・24,000候補・8秒）。全域最適は保証しません。</p><p>地形勾配{defaults.layout.slopeLimitDeg}°未満・4段×{defaults.layout.minColumns}〜{defaults.layout.maxColumns}列・720W。左右{defaults.layout.rackGapM}m・前後の空き{defaults.layout.rowGapM}m・境界離隔{defaults.layout.setbackM}m。詳細モードの間隔等を引き継ぎます。</p></details>
     </div>
     {busy && <p role="status">{state.progress?.name || '開始中…'} <progress aria-label="配置図作成の進捗" value={state.progress?.steps?.length || 0} max={6}/></p>}
@@ -149,7 +150,7 @@ export default function SimpleReviewPanel({ review, referenceCount = 0, siteName
       <h3>{busy || ['error', 'cancelled'].includes(state.status) ? '同じ条件の前回PDF' : 'PDFができました'}</h3>
       {result.snapshot.status === 'review' && <p role="status">一部の取得・計算結果は確認が必要です。レポートで確認してください。</p>}
       {result.drawingWarning && <p role="alert">配置図1枚は未作成：{result.drawingWarning} 「条件」で縮尺を変更して作成してください。</p>}
-      <p>{result.snapshot.results.layout.moduleCount.toLocaleString('ja-JP')}枚 · DC {result.snapshot.results.layout.dcKw.toLocaleString('ja-JP')} kW · {result.snapshot.results.layout.options.tiltDeg}° / 方位{result.snapshot.results.layout.options.azimuthDeg}°</p>
+      <p>{result.snapshot.results.layout.moduleCount.toLocaleString('ja-JP')}枚 · DC {result.snapshot.results.layout.dcKw.toLocaleString('ja-JP')} kW · 地形{result.snapshot.results.layout.options.slopeLimitDeg}°未満 / パネル{result.snapshot.results.layout.options.tiltDeg}° / 方位{result.snapshot.results.layout.options.azimuthDeg}°</p>
       <div className="simple-batch-downloads">{result.pdfs.filter(pdf => pdf.drawingOnly).map(pdf => <a key={pdf.kind} href={pdf.url} download={pdf.fileName}>配置図PDFを保存（1枚）</a>)}</div>
       <details><summary>レポート・解析結果</summary><div className="simple-batch-downloads">{result.pdfs.map(pdf => <div key={pdf.kind}>{!pdf.drawingOnly && <a href={pdf.url} download={pdf.fileName}>{pdf.kind}を保存（{pdf.pageCount}ページ）</a>}<a href={pdf.url} target="_blank" rel="noopener noreferrer">{pdf.kind}を開く</a><small>{pdf.fileName} · application/pdf</small></div>)}</div><dl>{simpleReviewReportRows(result.snapshot).map(([k, v], i) => <div key={i}><dt>{k}</dt><dd>{v}</dd></div>)}</dl><TerrainSectionPreview analysis={result.snapshot.results.section}/><HorizonGraphPreview position={result.snapshot.position} terrain={result.snapshot.results.horizon} obstructionHeight={result.snapshot.defaults.obstructionHeightM}/></details>
     </div>}
