@@ -1,16 +1,16 @@
 {
   "app": "Solar Site Precheck",
   "version": "1.28.2",
-  "buildDate": "2026-10-15",
-  "sourceCommit": "0399ff8532e47113502cbb85aeba0db59132963d",
+  "buildDate": "2026-10-16",
+  "sourceCommit": "44848117743cd363e34b20a9611dc89d1f12ca1b",
   "target": "portable",
-  "buildId": "1.28.2-2026-10-15-9572603d8ed5",
+  "buildId": "1.28.2-2026-10-16-e153e5f0a418",
   "packageName": "SolarSitePrecheck_v1.28.2_release_light.zip",
   "zipUrl": "https://raw.githubusercontent.com/Sonikim1743/Solar-site-precheck/main/release/latest/SolarSitePrecheck_v1.28.2_release_light.zip",
-  "sha256": "9572603d8ed58012676bdb2bf54ea5ab08c4ad01ff0cfbfda44080dfc3cfa007",
-  "etag": "9572603d8ed58012",
-  "bundleName": "index-Be7tB-Ou.js",
+  "sha256": "e153e5f0a418667ab7650b9e409d1c828108966c29907c9f750839abd1f58661",
+  "etag": "e153e5f0a418667a",
+  "bundleName": "index-pxMeCjP7.js",
   "minRequiredRuntime": "1.2",
-  "notes": "配置図の固定縮尺・案内整理・描画最適化。A3横100%印刷。境界・施工可否は未確認。既存runtime/node.exeは保持。",
-  "sizeBytes": 15358522
+  "notes": "3Dの地形面と黄色境界・選択点の表示ずれを修正。方位メニュー開閉時のCanvas/SVG比率を統一。標高・地形計算は変更していません。",
+  "sizeBytes": 15358548
 }

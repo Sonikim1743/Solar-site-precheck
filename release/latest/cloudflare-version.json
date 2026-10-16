@@ -1,16 +1,16 @@
 {
   "app": "Solar Site Precheck",
   "version": "1.28.2",
-  "buildDate": "2026-10-15",
-  "sourceCommit": "0399ff8532e47113502cbb85aeba0db59132963d",
+  "buildDate": "2026-10-16",
+  "sourceCommit": "44848117743cd363e34b20a9611dc89d1f12ca1b",
   "target": "cloudflare",
-  "buildId": "1.28.2-2026-10-15-15841715f52d",
-  "packageName": "SolarSitePrecheck_v1.28.2_2026-10-15_cloudflare.zip",
-  "zipUrl": "https://raw.githubusercontent.com/Sonikim1743/Solar-site-precheck/main/release/latest/SolarSitePrecheck_v1.28.2_2026-10-15_cloudflare.zip",
-  "sha256": "15841715f52d68f03ee0b823b8c56dd5ba3ae4ba476f6bf3f73e23ad8b4378f3",
-  "etag": "15841715f52d68f0",
-  "bundleName": "index-DpAGKBg5.js",
+  "buildId": "1.28.2-2026-10-16-18f45528bb49",
+  "packageName": "SolarSitePrecheck_v1.28.2_2026-10-16_cloudflare.zip",
+  "zipUrl": "https://raw.githubusercontent.com/Sonikim1743/Solar-site-precheck/main/release/latest/SolarSitePrecheck_v1.28.2_2026-10-16_cloudflare.zip",
+  "sha256": "18f45528bb49fb120f415472ea9650d179a8c6bbfcb50792c11b13fc1ac029ba",
+  "etag": "18f45528bb49fb12",
+  "bundleName": "index-DoPVRAK6.js",
   "minRequiredRuntime": "1.2",
-  "notes": "配置図の固定縮尺・案内整理・描画最適化。A3横100%印刷。境界・施工可否は未確認。dist・functions・sharedを含むルートから配布。",
-  "sizeBytes": 14629299
+  "notes": "3Dの地形面と黄色境界・選択点の表示ずれを修正。方位メニュー開閉時のCanvas/SVG比率を統一。標高・地形計算は変更していません。",
+  "sizeBytes": 14629322
 }
