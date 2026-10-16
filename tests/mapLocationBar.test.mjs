@@ -20,3 +20,13 @@ test('without selected coordinates the Maps action stays visible with an explici
  const html=renderToStaticMarkup(React.createElement(MapLocationBar,{position:null,googleMapsUrl:''})),link=html.match(/<a\b[^>]*>[\s\S]*?<\/a>/)?.[0]||''
  assert.match(link,/Googleマップで開く/);assert.match(link,/aria-disabled="true"/);assert.match(link,/tabindex="-1"/);assert.match(link,/先に地点を選択/);assert.doesNotMatch(link,/href=/)
 })
+
+test('reset action distinguishes selection clearing from the explicit map reset',()=>{
+ const props={onResetWorkspace:()=>{}}
+ const first=renderToStaticMarkup(React.createElement(MapLocationBar,props))
+ const next=renderToStaticMarkup(React.createElement(MapLocationBar,{...props,resetMapNext:true}))
+ assert.match(first,/選択と分析結果をクリア（地図位置・縮尺は保持）/)
+ assert.match(first,/>初期化<\/button>/)
+ assert.match(next,/地図を初期位置・縮尺に戻す/)
+ assert.match(next,/<span>地図位置を<span class="map-reset-label-end">リセット<\/span><\/span><\/button>/)
+})

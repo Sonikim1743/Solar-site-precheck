@@ -33,6 +33,7 @@
 @media(max-width:1000px) {
   .app .map-panel .map-location-bar { grid-template-columns:minmax(0,1fr); gap:6px; }
   .map-location-actions { grid-template-columns:minmax(0,1.6fr) minmax(0,1fr) minmax(0,.7fr); }
+  .map-location-actions--reset-view { grid-template-columns:minmax(0,1.3fr) minmax(0,.8fr) minmax(0,1.1fr); }
 }
 @media(max-width:640px) {
   .map-point-meta { grid-template-columns:minmax(0,1fr) 104px 48px; gap:6px; }
@@ -40,6 +41,8 @@
   .map-location-bar .map-point-elevation { min-width:0; padding:0; }
   .map-point-elevation>strong { font-size:13px; }
   .map-location-actions button,.map-location-actions a { padding:6px 4px; font-size:12px; white-space:normal; }
+  .map-location-actions--reset-view button:last-child { line-height:1.2; }
+  .map-reset-label-end { display:block; }
   .app .map-panel .terrain-section-tools { padding:10px; }
   .app .map-panel .terrain-section-tools .terrain-section-quick { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:6px; }
   .terrain-section-tools .terrain-section-quick>div { display:grid; gap:0; }

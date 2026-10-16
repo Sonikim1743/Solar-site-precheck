@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import MapPanel from './components/MapPanel.jsx'
 import MapLocationBar from './components/MapLocationBar.jsx'
+import { createMapReset } from './utils/mapReset.js'
 import ParcelReviewPanel from './components/ParcelReviewPanel.jsx'
 import { createEmptyParcelReview, normalizeParcelReview, setReviewParcel, removeReviewParcel, measureParcelReview, getParcelKey } from './utils/parcelReview.js'
 import { featureInteriorPoint, pointInGeometry, validatePolygonGeometry } from './services/parcelGeometry.js'
@@ -600,6 +601,11 @@ export default function App() {
   }
   const [draftSeed] = useState(loadDraft)
   const [position, setPosition] = useState(draftSeed.position || null)
+  const mapViewport = useRef(null)
+  const [mapReset] = useState(createMapReset)
+  const [mapResetStage, setMapResetStage] = useState('selection')
+  const [selectionResetRequest, setSelectionResetRequest] = useState(0)
+  const [mapViewResetRequest, setMapViewResetRequest] = useState(0)
   const [elevation, setElevation] = useState(draftSeed.elevation || initialElevation)
   const [terrain, setTerrain] = useState(
     draftSeed.terrainAnalysisVersion === TERRAIN_ANALYSIS_VERSION ? (draftSeed.terrain || null) : null,
@@ -990,22 +996,36 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  function rearmMapReset() {
+    mapReset.selected()
+    setMapResetStage('selection')
+  }
+
   function resetWorkTools() {
+    const action = mapReset.next()
+    setMapResetStage(mapReset.stage)
+    if (action === 'view') {
+      setMapViewResetRequest(current => current + 1)
+      setPointActionStatus('地図位置をリセットしました。')
+      return
+    }
+    // Candidate data and viewport have separate lifetimes. Keep user conditions,
+    // notes, saved records and the independent PDF/registry tools intact.
+    cancelCandidateWork()
+    setSelectionResetRequest(current => current + 1)
     setPublicParcelReferences([])
     setSelectedParcelTerrain(null)
     setRegional3DRequest(0)
-    candidateRequests.current.invalidateAll()
     setLocationStatus({ status: 'idle', message: '' })
-    setCandidateRevision(current => current + 1)
     setGenerationNotice('')
-    setGenerationInputs({ peakpower: 50, angle: 20, aspect: 0, loss: 14 })
+    setGenerationScenarioDraft(null)
     setPdfProgress('')
-    powerGridController.current?.abort()
-    powerGridRequestSeq.current += 1
     setGeneration(null)
-    window.clearTimeout(placeRequestTimer.current)
-    placeRequestSeq.current += 1
-    resetCandidateInputs()
+    setGridNotes([])
+    setRecordInfo(null); setPendingRecord(null); setUndoRecord(null)
+    setRecordStatus({ message: '', error: false })
+    setSelectedParcel(null); setFocusParcelId(null); setParcelQuery('')
+    setAdjacentMeshCompare({ status: 'idle', stations: [], message: '' })
     setParcelReview(createEmptyParcelReview()); setParcelMode('point'); setParcelReviewStatus('')
     setParcelData(null); setParcelStatus({ status: 'idle', message: '' })
     setPosition(null)
@@ -1016,20 +1036,14 @@ export default function App() {
     setElevation(initialElevation)
     setSnowData(initialSnow)
     setPlaceApiStatus(initialPlaceApiStatus)
-    setDrawingJob(null)
-    setDrawingSelectedPages([])
-    setActiveDrawingPageNumber(null)
-    setPdfPreviewView(initialPdfPreviewView())
-    setDrawingPageRotations({})
-    setDrawingRotatedPreviews({})
-    setDrawingTextTool(initialDrawingTextTool)
-    setDrawingImageTool(initialDrawingImageTool)
-    setDrawingMergeFiles([])
-    setDrawingConvertStatus({ status: 'idle', message: '候補地点、PDF管理、地形解析の一時結果を初期化しました。' })
-    setInheritanceJob(null)
-    setInheritanceStatus({ status: 'idle', message: '' })
-    setInheritanceCopyStatus('')
-    setInheritanceSort('receipt')
+    setTerrainArea(null); setTerrainAreaStatus('idle'); setTerrainAreaError('')
+    setTerrainDrawingRequested(false); setReportView('summary')
+    setTerrainPreview(current => ({ options: current.options, layoutMode: terrainLayoutMode(current), labels: current.labels, fence: current.fence, layout: null, enabled: false }))
+    for (const pdf of simpleWorkflow.result?.pdfs || []) URL.revokeObjectURL(pdf.url)
+    setSimpleWorkflow(current => ({ ...initialSimpleReview(), layoutSettings: current.layoutSettings }))
+    setSimpleRepresentative(null)
+    terrainPdfJob.current++
+    setTerrainPdfDownload(null); setTerrainPdfStatus({ loading: false, message: '', error: false })
     setTerrain(null)
     setTerrainStatus('idle')
     setHorizonPanelOpen(false)
@@ -1039,10 +1053,11 @@ export default function App() {
     setTerrainSectionOpen(false)
     setPowerGrid({ status: 'idle', data: null, message: '' })
     setGridCapacity({ status: 'idle', data: null, message: '' })
-    setPointActionStatus('')
+    setPointActionStatus('選択をクリア（地図位置を保持）')
   }
 
   async function selectPosition(nextPosition, options = {}) {
+    rearmMapReset()
     candidateRequests.current.invalidateAll()
     setCandidateRevision(current => current + 1)
     setGenerationNotice('')
@@ -1103,6 +1118,7 @@ export default function App() {
     event.preventDefault()
     const query = address.trim()
     if (!query) return
+    rearmMapReset()
 
     const parsed = parseCoordinateInput(query)
     if (parsed && Number.isFinite(parsed.lat) && Number.isFinite(parsed.lon) &&
@@ -1147,6 +1163,7 @@ export default function App() {
       return
     }
 
+    rearmMapReset()
     const isCurrent = candidateRequests.current.start('geolocation')
     setLocationStatus({ status: 'loading', message: '位置情報の許可を確認しています…' })
     navigator.geolocation.getCurrentPosition(
@@ -1184,6 +1201,7 @@ export default function App() {
     event.target.value = ''
     if (!file) return
     const isCurrent = candidateRequests.current.start('cadastre-import')
+    rearmMapReset()
     setParcelStatus({ status: 'loading', message: '地番データを読み込んでいます…' })
     try {
       const data = await readCadastreFile(file, (message) => {
@@ -1210,6 +1228,7 @@ export default function App() {
   function updateParcelReview(next) {
     try {
       const valid = normalizeParcelReview(next)
+      if (valid.parcels.length || valid.boundary || valid.exclusions.length) rearmMapReset()
       const nextMetrics = measureParcelReview(valid)
       const nextKey = nextMetrics.geometry ? terrainGeometryKey(nextMetrics.geometry) : ''
       if (nextKey !== terrainAreaKey) {
@@ -2983,6 +3002,7 @@ export default function App() {
   }
 
   function restoreReviewRecord(record) {
+    rearmMapReset()
     cancelCandidateWork()
     const { candidate, inputs } = record
     const results = { ...record.results, ...recoverTerrainEvidence(record.results) }
@@ -3020,6 +3040,7 @@ export default function App() {
   }
 
   function undoOpenedRecord() {
+    rearmMapReset()
     if (!undoRecord) return
     cancelCandidateWork()
     const prior = undoRecord
@@ -3538,6 +3559,12 @@ export default function App() {
 
             <MapPanel
               position={position}
+              viewport={mapViewport.current}
+              onViewportChange={next => { mapViewport.current = next }}
+              onSelectionChange={rearmMapReset}
+              selectionResetRequest={selectionResetRequest}
+              mapViewResetRequest={mapViewResetRequest}
+              preserveViewport={mapResetStage === 'view'}
               onSelect={(nextPosition) => {
                 const preserve = Boolean(parcelMetrics.geometry && pointInGeometry(nextPosition, parcelMetrics.geometry))
                 selectPosition(nextPosition, { resetCandidate: !preserve, preserveParcelReview: preserve })
@@ -3569,7 +3596,7 @@ export default function App() {
               powerGrid={powerGrid.data}
               capacityMatches={capacityMatches}
               googleMapsUrl={googleMapsUrl}
-              locationBar={<MapLocationBar position={position} placeLabel={selectedPlaceLabel} placeStatus={placeInfo.status} elevation={elevation} googleMapsUrl={googleMapsUrl} onCopy={copySelectedCoordinates} copyStatus={pointActionStatus} onFetchElevation={fetchMissingElevation} onUseCurrentLocation={handleUseCurrentLocation} onResetWorkspace={resetWorkTools} locationStatus={locationStatus} />}
+              locationBar={<MapLocationBar position={position} placeLabel={selectedPlaceLabel} placeStatus={placeInfo.status} elevation={elevation} googleMapsUrl={googleMapsUrl} onCopy={copySelectedCoordinates} copyStatus={pointActionStatus} onFetchElevation={fetchMissingElevation} onUseCurrentLocation={handleUseCurrentLocation} onResetWorkspace={resetWorkTools} locationStatus={locationStatus} resetMapNext={mapResetStage === 'view'} />}
             />
 
             <details className="parcel-settings" id="parcel-review-tools" onToggle={event => {

@@ -66,27 +66,49 @@ function ClickHandler({ onSelect, mode, locked, onAddVertex, onFinish, onPublicP
   return null
 }
 
-function MapController({ position }) {
+function MapController({ position, viewport, onViewportChange, resetRequest }) {
   const map = useMap()
+  const lastPosition = useRef(viewport ? position : undefined)
+  const lastReset = useRef(viewport?.resetRequest || 0)
+  const onChange = useRef(onViewportChange)
+  onChange.current = onViewportChange
+  function remember() {
+    const center = map.getCenter()
+    onChange.current?.({ center: [center.lat, center.lng], zoom: map.getZoom(), resetRequest: lastReset.current })
+  }
+  useMapEvents({ move: remember, moveend: remember, zoomend: remember })
 
   useEffect(() => {
-    if (position) {
-      map.flyTo([position.lat, position.lon], Math.max(map.getZoom(), 14))
-    } else {
-      map.flyTo(INITIAL_MAP_CENTER, INITIAL_MAP_ZOOM)
-    }
+    if (lastPosition.current === position) return
+    lastPosition.current = position
+    map.stop()
+    if (position) map.flyTo([position.lat, position.lon], Math.max(map.getZoom(), 14))
+    // Clearing a candidate stops navigation, but never changes the viewport.
+    remember()
   }, [map, position])
+
+  useEffect(() => {
+    if (lastReset.current === resetRequest) return
+    lastReset.current = resetRequest
+    map.stop()
+    map.setView(INITIAL_MAP_CENTER, INITIAL_MAP_ZOOM, { animate: false })
+    remember()
+  }, [map, resetRequest])
+
+  useEffect(() => {
+    remember()
+  }, [map])
 
   return null
 }
 
-function MapInteractionController({ locked, drawing }) {
+function MapInteractionController({ locked, drawing, preserveViewport, resetRequest }) {
   const map = useMap()
 
   useEffect(() => {
-    // Leave the candidate and geometry intact; Leaflet clamps only the zoom
-    // when drawing ends. Raster/vector sources keep their original resolution.
-    map.setMaxZoom(drawing ? DRAWING_MAX_ZOOM : NORMAL_MAX_ZOOM)
+    // Normal drawing completion restores the standard cap. Clearing a drawing
+    // keeps its exact zoom until a new selection or an explicit viewport reset.
+    map.setMaxZoom(drawing ? DRAWING_MAX_ZOOM : preserveViewport ? Math.max(NORMAL_MAX_ZOOM, map.getZoom()) : NORMAL_MAX_ZOOM)
     const handlers = [
       map.dragging,
       map.touchZoom,
@@ -100,7 +122,7 @@ function MapInteractionController({ locked, drawing }) {
       else handler.enable()
     })
     if (drawing) map.doubleClickZoom.disable()
-  }, [map, locked, drawing])
+  }, [map, locked, drawing, preserveViewport, resetRequest])
 
   return null
 }
@@ -664,6 +686,12 @@ export default function MapPanel({
   capacityMatches,
   googleMapsUrl,
   locationBar,
+  viewport,
+  onViewportChange,
+  onSelectionChange,
+  selectionResetRequest = 0,
+  mapViewResetRequest = 0,
+  preserveViewport = false,
 }) {
   const hasTerrainOverlay = !!terrainSection?.lines?.length
   const hasRegionLabel = Boolean(getMapRegionLabel(position, placeInfo))
@@ -677,10 +705,14 @@ export default function MapPanel({
   const [regionalDirty,setRegionalDirty] = useState(false)
   const [mapPickBusy,setMapPickBusy] = useState(false)
   const mapPickJob=useRef(0)
+  const selectionEpoch=useRef(selectionResetRequest)
+  selectionEpoch.current=selectionResetRequest
+  const handledSelectionReset=useRef(selectionResetRequest)
   const confirmedRegionalKey=confirmedRegional.map(p=>p.id).join('|')
   useEffect(()=>{if(!regionalDirty)setRegionalDraft(confirmedDraft())},[confirmedRegionalKey])
   const toggleRegional = feature => {
     if(feature.selectionError){setRegionalMessage(feature.selectionError);return}
+    onSelectionChange?.()
     setRegionalDraft(previous=>previous.some(f=>f.id===feature.id)?previous.filter(f=>f.id!==feature.id):previous.length<100?[...previous,feature]:previous)
     setRegionalDirty(true)
     setRegionalMessage('選択変更は未確定です。「選択完了」で適用します（100区域まで）。')
@@ -690,11 +722,13 @@ export default function MapPanel({
   const publicPickerRef = useRef(null)
   const beginMapPick = picked => {
     if(mapPickBusy)return
+    onSelectionChange?.()
     const job=++mapPickJob.current
+    const epoch=selectionEpoch.current
     setMapPickBusy(true);setRegionalCandidates([]);setRegionalMessage(`地番 ${picked.number} の地図境界と隣接断片を確認中…`)
     let timer
-    Promise.race([picked.resolve(),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('地図境界の取得が20秒以内に完了しませんでした。再選択できます。')),20000)})]).then(feature=>{if(mapPickJob.current!==job)return;setMapPickBusy(false);toggleRegional(feature);setRegionalMessage(feature.properties.__selectionWarning)})
-      .catch(error=>{if(mapPickJob.current!==job)return;setMapPickBusy(false);setRegionalMessage(`${error.message} 前回の選択・結果は保持しています。`)})
+    Promise.race([picked.resolve(),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('地図境界の取得が20秒以内に完了しませんでした。再選択できます。')),20000)})]).then(feature=>{if(mapPickJob.current!==job||selectionEpoch.current!==epoch)return;setMapPickBusy(false);toggleRegional(feature);setRegionalMessage(feature.properties.__selectionWarning)})
+      .catch(error=>{if(mapPickJob.current!==job||selectionEpoch.current!==epoch)return;setMapPickBusy(false);setRegionalMessage(`${error.message} 前回の選択・結果は保持しています。`)})
       .finally(()=>clearTimeout(timer))
   }
   const pickPublicReference = latlng => {
@@ -702,6 +736,7 @@ export default function MapPanel({
     if(mapPickBusy)return true
     const picked = publicPickerRef.current?.(latlng)
     if (!picked) { setRegionalMessage('地番の表示境界の内側を押してください（ズーム16以上）。現在の地点・選択・結果は保持しています。'); return true }
+    onSelectionChange?.()
     if(picked.candidates.length>1){setRegionalCandidates(picked.candidates);setRegionalMessage('重なる表示境界があります。下の地番候補から選択してください。')}
     else beginMapPick(picked.candidates[0])
     return true
@@ -751,6 +786,7 @@ export default function MapPanel({
       return
     }
     lastVertexEventRef.current = { point, timeStamp }
+    onSelectionChange?.()
     replaceDraft([...draftRef.current, point])
     setDrawingMessage('')
   }
@@ -792,6 +828,15 @@ export default function MapPanel({
   }, [parcelMode, parcelReview])
 
   useEffect(() => {
+    if (handledSelectionReset.current === selectionResetRequest) return
+    handledSelectionReset.current = selectionResetRequest
+    mapPickJob.current++
+    setMapPickBusy(false); setRegionalDraft([]); setRegionalDirty(false)
+    setRegionalCandidates([]); setRegionalMessage('')
+    replaceDraft([]); lastVertexEventRef.current = null; setDrawingMessage('')
+  }, [selectionResetRequest])
+
+  useEffect(() => {
     if (typeof window === 'undefined' || !window.matchMedia) return undefined
     const query = window.matchMedia('(max-width: 640px)')
     const sync = () => setIsCompactMap(query.matches)
@@ -808,10 +853,10 @@ export default function MapPanel({
       if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); finishDrawing() }
     }}>
       <MapContainer
-        center={INITIAL_MAP_CENTER}
-        zoom={INITIAL_MAP_ZOOM}
+        center={viewport?.center || INITIAL_MAP_CENTER}
+        zoom={viewport?.zoom ?? INITIAL_MAP_ZOOM}
         minZoom={4}
-        maxZoom={NORMAL_MAX_ZOOM}
+        maxZoom={Math.max(NORMAL_MAX_ZOOM, viewport?.zoom || 0)}
         scrollWheelZoom
         className="map"
       >
@@ -825,8 +870,8 @@ export default function MapPanel({
         {showPublicParcels && <PublicParcelOverlay referenceSelections={regionalDraft} onStatus={setPublicParcelStatus} onPickerChange={picker => { publicPickerRef.current = picker }} onPublicParcelsChange={onPublicParcelsChange} />}
         <MapDistanceScale position="bottomleft" />
         <ClickHandler onPublicParcelPick={pickPublicReference} onSelect={onSelect} mode={parcelMode} locked={mapLocked} onAddVertex={addDraftVertex} onFinish={finishDrawing} />
-        <MapController position={position} />
-        <MapInteractionController locked={mapLocked} drawing={isDrawing} />
+        <MapController position={position} viewport={viewport} onViewportChange={onViewportChange} resetRequest={mapViewResetRequest} />
+        <MapInteractionController locked={mapLocked} drawing={isDrawing} preserveViewport={preserveViewport} resetRequest={mapViewResetRequest} />
         <ParcelLayer
           data={parcelData}
           selectedParcelId={selectedParcelId}
