@@ -1,16 +1,16 @@
 {
   "app": "Solar Site Precheck",
-  "version": "1.28.2",
-  "buildDate": "2026-10-16",
-  "sourceCommit": "26b75e5e73628008e2df020c2ff0e54ac9d72607",
+  "version": "1.28.3",
+  "buildDate": "2026-10-22",
+  "sourceCommit": "5e4b4aa9e779fdd0227e6b7b7680ee1a2ab5f829",
   "target": "cloudflare",
-  "buildId": "1.28.2-2026-10-16-77f9c7369dff",
-  "packageName": "SolarSitePrecheck_v1.28.2_2026-10-16_cloudflare.zip",
-  "zipUrl": "https://raw.githubusercontent.com/Sonikim1743/Solar-site-precheck/main/release/latest/SolarSitePrecheck_v1.28.2_2026-10-16_cloudflare.zip",
-  "sha256": "77f9c7369dffbd800e73ac29c85a92119f31af1ffabb898f5ce91c6876e9b18a",
-  "etag": "77f9c7369dffbd80",
-  "bundleName": "index-BZE2s8VS.js",
+  "buildId": "1.28.3-2026-10-22-78bd44243b31",
+  "packageName": "SolarSitePrecheck_v1.28.3_2026-10-22_cloudflare.zip",
+  "zipUrl": "https://raw.githubusercontent.com/Sonikim1743/Solar-site-precheck/main/release/latest/SolarSitePrecheck_v1.28.3_2026-10-22_cloudflare.zip",
+  "sha256": "78bd44243b31f8422838ee75b5fe7586ac086b00c93e6f31a0dae699ed9bce11",
+  "etag": "78bd44243b31f842",
+  "bundleName": "index-DfIuFC15.js",
   "minRequiredRuntime": "1.2",
-  "notes": "配置図の固定縮尺・案内整理・描画最適化。A3横100%印刷。境界・施工可否は未確認。dist・functions・sharedを含むルートから配布。",
-  "sizeBytes": 14641725
+  "notes": "除外検討区域の参考表示・岡山文化財/農業地域・広島/山口の古い農地資料・実寸2D DXF保存。資料年/測地系/現行境界は各注記を確認。dist・functions・sharedを含むルートから配布。",
+  "sizeBytes": 38049548
 }
