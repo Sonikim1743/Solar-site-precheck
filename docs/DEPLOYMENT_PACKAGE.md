@@ -1,6 +1,6 @@
-# 配布パッケージ v1.28.2 / 2026-10-14
+# 配布パッケージ v1.28.3 / 2026-10-22
 
-公開・配布版は1.28.2 / Build 2026-10-14です。main反映・検証ZIP作成・Functionsを含むproduction配布と運用URLの実検証が完了しました。Production IDは `939a74b3-7620-43f1-b895-89eecda6584a`、公開JSは `index-CqpSJyZ2.js`。ソース・ハッシュ・実検証範囲と旧版復旧先は [公開記録](https://github.com/Sonikim1743/Solar-site-precheck/blob/main/docs/DEPLOYED_VERSION.md)、制約は [引き継ぎ](MAP_REFERENCE_DRAWING_2026_10_14_JA.md) を参照してください。
+この資料は1.28.3 / Build 2026-10-22向けです。除外検討区域、公開参考資料6種、実寸2D DXFを追加しました。[対応範囲・資料年・測地系・DXFの注意](REGULATORY_DXF_2026_10_22_JA.md)を確認してください。実際の公開状態、ソース・ハッシュ・検証範囲と旧版復旧先は [公開記録](https://github.com/Sonikim1743/Solar-site-precheck/blob/main/docs/DEPLOYED_VERSION.md) を参照してください。
 
 ## 今回の使い方と変更
 
@@ -24,8 +24,8 @@
 
 | 対象 | ファイル | 使用場所 |
 |---|---|---|
-| Cloudflare | `SolarSitePrecheck_v1.28.2_2026-10-14_cloudflare.zip` | 既存Pagesへ公開する展開先 |
-| Windows更新 | `SolarSitePrecheck_v1.28.2_release_light.zip` | 既存ローカル版の更新 |
+| Cloudflare | `SolarSitePrecheck_v1.28.3_2026-10-22_cloudflare.zip` | 既存Pagesへ公開する展開先 |
+| Windows更新 | `SolarSitePrecheck_v1.28.3_release_light.zip` | 既存ローカル版の更新 |
 | Windows更新情報 | `release/latest/latest-version.json` | オンライン更新が参照 |
 | Cloudflare配布情報 | `release/latest/cloudflare-version.json` | 公開用ZIPの照合 |
 

@@ -2,6 +2,7 @@ import { readdir, readFile } from 'node:fs/promises'
 import { extname, join, relative } from 'node:path'
 import { PUBLIC_PARCEL_SOURCE } from '../src/utils/publicParcelLayer.js'
 import { GSI_PLACE_NAMES_URL } from '../src/utils/mapPlaceNames.js'
+import { HAZARD_TILE_ORIGIN } from '../src/utils/regulatoryLayers.js'
 
 const root = process.cwd()
 const servicesDir = join(root, 'src', 'services')
@@ -66,7 +67,7 @@ async function collectRuntimeFetchOrigins() {
   }
   // Canvas map providers delegate their range fetches to the bundled renderer.
   // Check its exact runtime archive URLs, not attribution/navigation links.
-  for (const [owner, url] of [['src/utils/publicParcelLayer.js', PUBLIC_PARCEL_SOURCE.url], ['src/utils/mapPlaceNames.js', GSI_PLACE_NAMES_URL]]) {
+  for (const [owner, url] of [['src/utils/publicParcelLayer.js', PUBLIC_PARCEL_SOURCE.url], ['src/utils/mapPlaceNames.js', GSI_PLACE_NAMES_URL], ['src/utils/regulatoryLayers.js', HAZARD_TILE_ORIGIN]]) {
     const origin = new URL(url).origin
     origins.set(origin, [...(origins.get(origin) || []), owner])
   }

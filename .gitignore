@@ -18,6 +18,7 @@ work/*
 !work/assert-clean-tree.mjs
 !work/verify-release-metadata.mjs
 !work/verify-csp-hosts.mjs
+!work/build-regulatory-reference-data.py
 !work/power-grid-server.mjs
 *.zip
 !release/latest/*.zip

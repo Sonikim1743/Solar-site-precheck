@@ -27,6 +27,7 @@ import TerrainSectionPreview from './components/TerrainSectionPreview.jsx'
 import TerrainAreaPanel from './components/TerrainAreaPanel.jsx'
 import TerrainAreaReport from './components/TerrainAreaReport.jsx'
 import TerrainDrawingScaleControl from './components/TerrainDrawingScaleControl.jsx'
+import TerrainDxfButton from './components/TerrainDxfButton.jsx'
 import SelectedParcel3D, { selectedParcelUnionReview } from './components/SelectedParcel3D.jsx'
 import { REGIONAL_PARCEL_SOURCE } from './services/regionalParcels.js'
 import { MAP_PARCEL_SOURCE } from './utils/mapParcelSelection.js'
@@ -2863,7 +2864,7 @@ export default function App() {
 
   // Output must match the current request and acquisition. A screen may retain
   // its previous rack pool for comparison while changed conditions block PDF.
-  const terrainOutputScopeBlocked = Boolean(simpleDesign && (simpleTerrainArea && simpleTerrainArea !== currentTerrainArea || simpleWorkflow.result && simpleWorkflow.result.snapshot.results.area.geometryKey !== currentTerrainArea?.geometryKey))
+  const terrainOutputScopeBlocked = ['loading', 'fetching', 'calculating'].includes(terrainAreaStatus) || Boolean(simpleDesign && (simpleTerrainArea && simpleTerrainArea !== currentTerrainArea || simpleWorkflow.result && simpleWorkflow.result.snapshot.results.area.geometryKey !== currentTerrainArea?.geometryKey))
   const terrainReportPreview = useMemo(() => ({ layout: terrainPreview.layout, options: terrainPreview.options, appliedOptions: terrainPreview.appliedOptions,
     layoutMode: terrainPreview.layoutMode, appliedMode: terrainPreview.appliedMode, calculating: terrainPreview.calculating,
     outputBlocked: terrainOutputScopeBlocked,
@@ -3731,10 +3732,10 @@ export default function App() {
               {terrainSectionOpen && <TerrainSectionPreview analysis={terrainSection} />}
             </section>
             <SelectedParcel3D review={parcelReview} referenceCount={publicParcelReferences.length} request={regional3DRequest} onAcquired={setSelectedParcelTerrain} initialAnalysis={selectedParcelTerrain} />
-            <SimpleReviewPanel visible={simpleDesign} review={simpleReviewInput} referenceCount={publicParcelReferences.length} siteName={siteName} appVersion={APP_VERSION} terrainArea={simpleTerrainArea} layoutOptions={terrainPreview.options} layoutSettings={sharedLayoutSettings} onLayoutSettingsChange={changeSharedLayoutSettings} layoutPreview={terrainPreview} onApplied={applySimpleLayout} onBusyChange={setSharedLayoutBusy} drawingScale={terrainDrawingScale} onDrawingScaleChange={setTerrainDrawingScale} state={simpleWorkflow} onChange={setSimpleWorkflow} onRepresentativeChange={setSimpleRepresentative} onDraw={() => openReviewSection('site-select', 'boundary')} />
+            <SimpleReviewPanel visible={simpleDesign} review={simpleReviewInput} referenceCount={publicParcelReferences.length} siteName={siteName} appVersion={APP_VERSION} terrainArea={simpleTerrainArea} layoutOptions={terrainPreview.options} layoutSettings={sharedLayoutSettings} onLayoutSettingsChange={changeSharedLayoutSettings} layoutPreview={terrainPreview} onApplied={applySimpleLayout} onBusyChange={setSharedLayoutBusy} outputBlocked={['loading', 'fetching', 'calculating'].includes(terrainAreaStatus)} drawingScale={terrainDrawingScale} onDrawingScaleChange={setTerrainDrawingScale} state={simpleWorkflow} onChange={setSimpleWorkflow} onRepresentativeChange={setSimpleRepresentative} onDraw={() => openReviewSection('site-select', 'boundary')} />
             <details id="terrain-area" className="terrain-area-disclosure" open={terrainAreaOpen} onToggle={event => setTerrainAreaOpen(event.currentTarget.open)}>
               <summary><strong>検討範囲の等高線・勾配・3D</strong><span>{terrainAreaOpen ? '閉じる' : '開く'}</span></summary>
-              <TerrainAreaPanel geometry={parcelMetrics.geometry} metrics={parcelMetrics} analysis={currentTerrainArea} status={terrainAreaStatus} progress={terrainAreaProgress} error={terrainAreaError} position={position} onAnalyze={handleTerrainAreaAnalysis} onCancel={cancelTerrainAreaAnalysis} onClear={() => { cancelTerrainAreaWork(); setTerrainArea(null); setTerrainAreaStatus('idle'); setTerrainAreaError(''); setReportView('summary') }} onDrawBoundary={() => openReviewSection('site-select', 'boundary')} onOpenReport={openTerrainAreaReport} onOpenDrawing={() => { openTerrainAreaReport(); setTerrainDrawingRequested(true) }} parcels={parcelReview.parcels} publicParcels={publicParcelSnapshot.features} publicParcelsLimited={publicParcelSnapshot.truncated || publicParcelSnapshot.status === 'partial'} preview={terrainPreview} onPreviewChange={setTerrainPreview} outputBlocked={terrainOutputBlocked} />
+              <TerrainAreaPanel geometry={parcelMetrics.geometry} metrics={parcelMetrics} analysis={currentTerrainArea} status={terrainAreaStatus} progress={terrainAreaProgress} error={terrainAreaError} position={position} onAnalyze={handleTerrainAreaAnalysis} onCancel={cancelTerrainAreaAnalysis} onClear={() => { cancelTerrainAreaWork(); setTerrainArea(null); setTerrainAreaStatus('idle'); setTerrainAreaError(''); setReportView('summary') }} onDrawBoundary={() => openReviewSection('site-select', 'boundary')} onOpenReport={openTerrainAreaReport} onOpenDrawing={() => { openTerrainAreaReport(); setTerrainDrawingRequested(true) }} parcels={parcelReview.parcels} publicParcels={publicParcelSnapshot.features} publicParcelsLimited={publicParcelSnapshot.truncated || publicParcelSnapshot.status === 'partial'} preview={terrainPreview} onPreviewChange={setTerrainPreview} outputBlocked={terrainOutputBlocked} dxfReport={terrainPdfReport} />
             </details>
             {selectedParcel && (
               <div className="selected-parcel-card">
@@ -4204,7 +4205,7 @@ export default function App() {
               <button type="button" className="secondary-button" onClick={downloadCsv}>チェックCSV出力</button>
               <button type="button" className="secondary-button" disabled={!position} onClick={saveReviewRecord}>検討記録を保存</button>
               <button type="button" className="secondary-button" onClick={() => openReviewSection('use-cases')}>資料の使い方を見る</button>
-              {reportView === 'terrain' && terrainPreview.layout?.analysisReference === currentTerrainArea && <button type="button" className="secondary-button" disabled={terrainPdfStatus.loading || terrainPreview.calculating || terrainOutputBlocked} onClick={() => saveTerrainPdf({ drawingOnly: true })}>配置図PDF · 1枚</button>}
+              {reportView === 'terrain' && terrainPreview.layout?.analysisReference === currentTerrainArea && <><button type="button" className="secondary-button" disabled={terrainPdfStatus.loading || terrainPreview.calculating || terrainOutputBlocked} onClick={() => saveTerrainPdf({ drawingOnly: true })}>配置図PDF · 1枚</button><TerrainDxfButton report={terrainPdfReport} blocked={terrainOutputBlocked || terrainPdfStatus.loading} /></>}
               {reportView === 'terrain' && currentTerrainArea ? <button type="button" className="primary-button" disabled={terrainPdfStatus.loading || terrainOutputBlocked} onClick={saveTerrainPdf}>{terrainPdfStatus.loading ? 'PDFを作成中…' : '地形PDFを保存'}</button> : <button type="button" className="primary-button" onClick={() => window.print()}>PDF印刷</button>}
             </div>
             {reportView === 'terrain' && terrainOutputBlocked && <p className="inline-message" role="status">配置条件または地形が更新されています。現在の条件で再計算してから出力してください。</p>}

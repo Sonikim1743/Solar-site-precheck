@@ -184,7 +184,7 @@
 .terrain-area-evidence dd { margin:0; overflow-wrap:anywhere; }
 .terrain-area-evidence ul { margin:5px 0 0; padding-left:17px; }
 .terrain-area-evidence p { color:#64786f; font-size:11px; line-height:1.6; }
-.terrain-area-result-actions { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:16px; }
+.terrain-area-result-actions { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; margin-top:16px; }
 .terrain-area-quiet-button { background:none; border:0; color:#476653; font-size:12px; padding:9px 4px; cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
 .terrain-area-panel button:focus-visible { outline:3px solid #4f9676; outline-offset:3px; }
 .terrain-area-panel button:disabled { cursor:default; opacity:.55; }

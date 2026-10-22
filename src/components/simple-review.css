@@ -5,7 +5,7 @@
 .simple-batch-heading p { margin:6px 0 0; color:#53685d; }
 .simple-batch-actions,.simple-batch-downloads { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:12px 0; }
 .simple-batch button,.simple-batch select { font:inherit; }
-.simple-batch-actions button,.simple-batch-downloads a { min-height:44px; padding:10px 14px; border:1px solid #a9c8b7; border-radius:8px; }
+.simple-batch-actions button,.simple-batch-downloads a,.simple-batch-downloads button { min-height:44px; padding:10px 14px; border:1px solid #a9c8b7; border-radius:8px; }
 .simple-batch-actions .simple-primary { color:white; background:#176b50; font-weight:700; }
 .simple-batch-actions .simple-settings-toggle { background:#fff; color:#15593f; padding-inline:12px; }
 .simple-batch-actions .simple-secondary { color:#53685d; background:transparent; border-color:transparent; margin-left:auto; }
@@ -22,6 +22,7 @@
 .simple-batch-complete { border-top:1px solid #d4dfd8; padding-top:12px; }
 .simple-batch-complete h3 { font-size:16px; margin:0; }
 .simple-batch-downloads a { display:inline-flex; align-items:center; box-sizing:border-box; background:white; color:#15593f; font-weight:700; overflow-wrap:anywhere; max-width:100%; }
+.simple-batch-downloads a[aria-disabled="true"] { opacity:.55; cursor:default; }
 .simple-batch dl > div { display:grid; grid-template-columns:minmax(100px,1fr) 2fr; gap:8px; padding:8px 0; border-bottom:1px solid #d4dfd8; }
 .simple-batch dd { margin:0; overflow-wrap:anywhere; }
 .simple-export-source { position:fixed; left:-10000px; top:0; width:1280px; pointer-events:none; }

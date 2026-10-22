@@ -10,13 +10,15 @@ import TerrainAreaReport from './TerrainAreaReport.jsx'
 import TerrainSectionPreview from './TerrainSectionPreview.jsx'
 import HorizonGraphPreview from './HorizonGraphPreview.jsx'
 import TerrainDrawingScaleControl from './TerrainDrawingScaleControl.jsx'
+import TerrainDxfButton from './TerrainDxfButton.jsx'
+import { layoutOutputState } from '../utils/layoutOutputState.js'
 import { terrainDrawingPrintFit } from '../utils/terrainDrawingViewport.js'
 import './simple-review.css'
 
 export const initialSimpleReview = () => ({ status: 'idle', progress: null, pending: null, result: null, error: '', layoutSettings: { tiltDeg: 15, direction: 'south' } })
 const release = result => { for (const pdf of result?.pdfs || []) URL.revokeObjectURL(pdf.url) }
 
-export default function SimpleReviewPanel({ review, referenceCount = 0, siteName, appVersion, terrainArea, state, onChange, onDraw, onRepresentativeChange, visible = true, run = runSimpleReview, exporter, drawingScale = 1000, onDrawingScaleChange, layoutOptions, layoutSettings, onLayoutSettingsChange, layoutPreview, onApplied, onBusyChange }) {
+export default function SimpleReviewPanel({ review, referenceCount = 0, siteName, appVersion, terrainArea, state, onChange, onDraw, onRepresentativeChange, visible = true, run = runSimpleReview, exporter, drawingScale = 1000, onDrawingScaleChange, layoutOptions, layoutSettings, onLayoutSettingsChange, layoutPreview, onApplied, onBusyChange, outputBlocked = false }) {
   const job = useRef({ id: 0, controller: null }), latest = useRef(null), source = useRef(null), stateRef = useRef(state)
   const [settingsOpen, setSettingsOpen] = useState(false), settingsId = useId(), settingsButton = useRef(null)
   stateRef.current = state
@@ -46,7 +48,7 @@ export default function SimpleReviewPanel({ review, referenceCount = 0, siteName
   }, [requestKey, onChange])
   // Keep completed results across the simple/detail round trip, but stop in-flight work.
   useEffect(() => () => onChange(previous => ({ ...previous, pending: null, progress: null, status: ['running', 'pdf'].includes(previous.status) ? 'cancelled' : previous.status })), [onChange])
-  const ownBusy = state.status === 'running' || state.status === 'pdf', busy = ownBusy || Boolean(layoutPreview?.calculating)
+  const ownBusy = state.status === 'running' || state.status === 'pdf', busy = ownBusy || Boolean(layoutPreview?.calculating) || outputBlocked
   const samePool = !layoutPreview?.layout || layoutPreview.layout.analysisReference?.geometryKey !== key || state.result?.report.terrainPreview.layout === layoutPreview.layout
   const result = state.result?.requestKey === requestKey && samePool ? state.result : null
   const cached = state.result?.analysisKey === analysisKey && samePool ? state.result : null
@@ -151,8 +153,8 @@ export default function SimpleReviewPanel({ review, referenceCount = 0, siteName
       {result.snapshot.status === 'review' && <p role="status">一部の取得・計算結果は確認が必要です。レポートで確認してください。</p>}
       {result.drawingWarning && <p role="alert">配置図1枚は未作成：{result.drawingWarning} 「条件」で縮尺を変更して作成してください。</p>}
       <p>{result.snapshot.results.layout.moduleCount.toLocaleString('ja-JP')}枚 · DC {result.snapshot.results.layout.dcKw.toLocaleString('ja-JP')} kW · 地形{result.snapshot.results.layout.options.slopeLimitDeg}°未満 / パネル{result.snapshot.results.layout.options.tiltDeg}° / 方位{result.snapshot.results.layout.options.azimuthDeg}°</p>
-      <div className="simple-batch-downloads">{result.pdfs.filter(pdf => pdf.drawingOnly).map(pdf => <a key={pdf.kind} href={pdf.url} download={pdf.fileName}>配置図PDFを保存（1枚）</a>)}</div>
-      <details><summary>レポート・解析結果</summary><div className="simple-batch-downloads">{result.pdfs.map(pdf => <div key={pdf.kind}>{!pdf.drawingOnly && <a href={pdf.url} download={pdf.fileName}>{pdf.kind}を保存（{pdf.pageCount}ページ）</a>}<a href={pdf.url} target="_blank" rel="noopener noreferrer">{pdf.kind}を開く</a><small>{pdf.fileName} · application/pdf</small></div>)}</div><dl>{simpleReviewReportRows(result.snapshot).map(([k, v], i) => <div key={i}><dt>{k}</dt><dd>{v}</dd></div>)}</dl><TerrainSectionPreview analysis={result.snapshot.results.section}/><HorizonGraphPreview position={result.snapshot.position} terrain={result.snapshot.results.horizon} obstructionHeight={result.snapshot.defaults.obstructionHeightM}/></details>
+      <div className="simple-batch-downloads">{result.pdfs.filter(pdf => pdf.drawingOnly).map(pdf => <a key={pdf.kind} href={busy ? undefined : pdf.url} aria-disabled={busy || undefined} download={pdf.fileName}>配置図PDFを保存（1枚）</a>)}<TerrainDxfButton report={result.report} blocked={busy || layoutOutputState(terrainArea, layoutPreview).blocked} /></div>
+      <details><summary>レポート・解析結果</summary><div className="simple-batch-downloads">{result.pdfs.map(pdf => <div key={pdf.kind}>{!pdf.drawingOnly && <a href={busy ? undefined : pdf.url} aria-disabled={busy || undefined} download={pdf.fileName}>{pdf.kind}を保存（{pdf.pageCount}ページ）</a>}<a href={busy ? undefined : pdf.url} aria-disabled={busy || undefined} target="_blank" rel="noopener noreferrer">{pdf.kind}を開く</a><small>{pdf.fileName} · application/pdf</small></div>)}</div><dl>{simpleReviewReportRows(result.snapshot).map(([k, v], i) => <div key={i}><dt>{k}</dt><dd>{v}</dd></div>)}</dl><TerrainSectionPreview analysis={result.snapshot.results.section}/><HorizonGraphPreview position={result.snapshot.position} terrain={result.snapshot.results.horizon} obstructionHeight={result.snapshot.defaults.obstructionHeightM}/></details>
     </div>}
     <details className="simple-batch-notes"><summary>解析・保存について</summary><p>範囲の内部代表点から断面・地平線・NEDOを取得し、地形・参考配置と2種類のPDFを作成します。代表点 {representative ? `${toDegreeMinutes(representative.lat, 'lat', 3)} / ${toDegreeMinutes(representative.lon, 'lon', 3)}` : '未確定'}。断面±100m・10m間隔、地平線8方位・250m〜5km・仮障害物20m。取得状態・適用値はレポートに記録。施工可否は未確認です。配置条件と適用済み配置は詳細モード・レポートと共通です。配置・一括結果のJSON保存は未対応です。</p></details>
     <div className="simple-export-source" ref={source} aria-hidden="true">{state.pending?.requestKey === requestKey && <TerrainAreaReport report={state.pending.report} drawingScale={state.pending.report.drawingScale} id="simple-terrain-area-report"/>}</div>
