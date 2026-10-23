@@ -1,0 +1,14 @@
+{
+  "app": "Solar Site Precheck",
+  "version": "1.28.4",
+  "buildDate": "2026-10-23",
+  "target": "cloudflare-web",
+  "sourceCommit": "64bf856a5270b93dc51bf7631f191428560c70d2",
+  "deploymentId": "183662be-d93e-4c9f-85f3-44695f1cc63c",
+  "url": "https://solar-site-precheck.pages.dev/",
+  "deploymentUrl": "https://183662be.solar-site-precheck.pages.dev/",
+  "bundleName": "index-DOxiuaPp.js",
+  "storedDataVersion": "r2025-cf5c8704b2b2",
+  "storedManifestSha256": "7a5b24d5eba3bc0e04629afe31fc1ed8630984daea5572552a71cc381e3ade38",
+  "scope": "Web and source update; existing portable ZIP update metadata remains v1.28.3."
+}
