@@ -19,6 +19,7 @@ work/*
 !work/verify-release-metadata.mjs
 !work/verify-csp-hosts.mjs
 !work/build-regulatory-reference-data.py
+!work/build-stored-hazards.py
 !work/power-grid-server.mjs
 *.zip
 !release/latest/*.zip

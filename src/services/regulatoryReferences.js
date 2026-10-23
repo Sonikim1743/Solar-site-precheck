@@ -1,6 +1,6 @@
 import { selectReferenceFiles, bboxIntersects } from '../utils/regulatoryRegistry.js'
 
-async function readChunk(file,{signal,fetchImpl}) {
+export async function readReferenceChunk(file,{signal,fetchImpl}) {
   if(!/^\/data\/regulatory\/[a-z0-9-]+\/[0-9_]+\.geojson$/.test(file.url))throw Error('Invalid reference asset URL')
   const controller=new AbortController(),abort=()=>controller.abort()
   if(signal?.aborted)throw new DOMException('cancelled','AbortError')
@@ -26,7 +26,7 @@ export async function loadReferenceFeatures(bounds,{includeHistorical=false,maxF
       const {source,file}=selected.files[index++]
       if(signal?.aborted)throw new DOMException('cancelled','AbortError')
       try {
-        const loaded=await readChunk(file,{signal,fetchImpl})
+        const loaded=await readReferenceChunk(file,{signal,fetchImpl})
         for(const feature of loaded) {
           if(feature.type!=='Feature'||feature.geometry?.type!=='Polygon'||!Array.isArray(feature.geometry.coordinates)||!Array.isArray(feature.bbox)||feature.bbox.length!==4||!feature.bbox.every(Number.isFinite)||feature.bbox[0]>feature.bbox[2]||feature.bbox[1]>feature.bbox[3])throw Error('参考図形の範囲が不正です。')
           if(bboxIntersects(feature.bbox,bounds))features.push({...feature,properties:{...feature.properties,sourceDatasetId:source.id}})

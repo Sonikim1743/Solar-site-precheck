@@ -77,6 +77,12 @@ def read_shp(data):
 def union_box(boxes):
     return [min(b[0] for b in boxes),min(b[1] for b in boxes),max(b[2] for b in boxes),max(b[3] for b in boxes)]
 
+def reference_attributes(properties,dataset,record):
+    attrs={'sourceRecordId':properties.get('OBJECTID') or str(record),'sourceRecordIndex':record,'sourceYear':properties.get('FIS_YEAR') or None,'name':properties.get('遺跡名') or dataset['label'],'place':properties.get('所在地') or properties.get('CTV_NAME') or '', 'kind':properties.get('代表的な') or properties.get('種別') or dataset['category'],'era':properties.get('主な時代') or '', 'layerCode':properties.get('LAYER_NO') or None,'sourceRemark':properties.get('REMARK_STR') or ''}
+    if dataset['category']=='culture':
+        attrs.update({'detailKind':properties.get('詳細な種') or '', 'sourceCondition':properties.get('遺跡の残') or '', 'sourceDescription':'\n'.join(properties[key] for key in ['遺跡概_1','遺跡概_2'] if properties.get(key)), 'sourceFinds':properties.get('主な出土') or '', 'sourceRemark':properties.get('備考') or ''})
+    return attrs
+
 def write_dataset(archive_path,stem,dataset,output):
     with zipfile.ZipFile(archive_path) as archive:
         rows=read_dbf(archive.read(stem+'.dbf'));shapes=read_shp(archive.read(stem+'.shp'))
@@ -87,7 +93,7 @@ def write_dataset(archive_path,stem,dataset,output):
     for record,(properties,polygons) in enumerate(zip(rows,shapes),1):
         if properties is None:continue
         if properties.get('FIS_YEAR'):years[properties['FIS_YEAR']]+=1
-        attrs={'sourceRecordId':properties.get('OBJECTID') or str(record),'sourceRecordIndex':record,'sourceYear':properties.get('FIS_YEAR') or None,'name':properties.get('遺跡名') or dataset['label'],'place':properties.get('所在地') or properties.get('CTV_NAME') or '', 'kind':properties.get('代表的な') or properties.get('種別') or dataset['category'],'era':properties.get('主な時代') or '', 'layerCode':properties.get('LAYER_NO') or None,'sourceRemark':properties.get('REMARK_STR') or ''}
+        attrs=reference_attributes(properties,dataset,record)
         for component,polygon in enumerate(polygons):
             box=ring_box(polygon[0]);cell=(math.floor((box[0]+box[2])*5),math.floor((box[1]+box[3])*5))
             geometry={'type':'Polygon','coordinates':polygon}

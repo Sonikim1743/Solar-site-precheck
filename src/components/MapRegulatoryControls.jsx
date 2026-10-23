@@ -2,8 +2,10 @@ import { HAZARD_LAYERS, HAZARD_SOURCE, HAZARD_TERMS, hazardStatus, hazardRegionM
 import { REGULATORY_REFERENCE_SOURCES, REFERENCE_UNKNOWN, referenceYears } from '../utils/regulatoryRegistry.js'
 import './regulatory-layers.css'
 
-export function RegulatoryToggle({enabled,onToggle}) {
-  return <button type="button" className="map-base-toggle map-regulatory-toggle" aria-label="除外検討区域" aria-pressed={enabled} onClick={onToggle}>除外検討区域 {enabled?'ON':'OFF'}</button>
+export function RegulatoryToggle({enabled,onToggle,detailsOpen=false,onDetailsToggle,detailsId,detailsButtonRef}) {
+  const toggle=<button type="button" className="map-base-toggle map-regulatory-toggle" aria-label="除外検討区域" aria-pressed={enabled} title="参考区域の表示ON/OFF。ONにすると地点の説明を開きます。" onClick={onToggle}>検討区域 {enabled?'ON':'OFF'}</button>
+  if(!onDetailsToggle)return toggle
+  return <div className="map-regulatory-control" role="group" aria-label="検討区域の表示と説明">{toggle}<button ref={detailsButtonRef} type="button" className="map-base-toggle map-regulatory-disclosure" aria-label="区域の説明" aria-expanded={detailsOpen} aria-controls={detailsId} title={detailsOpen?'説明を閉じる（区域表示は維持）':'説明を開く（区域表示は変更しません）'} onClick={onDetailsToggle}><span aria-hidden="true">{detailsOpen?'▴':'▾'}</span></button></div>
 }
 
 export function UnsupportedRegulatoryInfo({kind}) {
@@ -23,11 +25,12 @@ export function ReferenceRegulatoryInfo({includeHistorical=false,onHistoricalCha
   </details>
 }
 
-export default function MapRegulatoryControls({settings,onChange,statuses={},region={},onRetry,referenceStatus={},includeHistorical=false,onHistoricalChange}) {
+export default function MapRegulatoryControls({settings,onChange,statuses={},region={},storedStatus={},onRetry,referenceStatus={},includeHistorical=false,onHistoricalChange}) {
   return <details className="regulatory-controls"><summary>除外検討区域 · 凡例・資料状況</summary>
     <p>対応済みの公開資料を一括表示。文化財・農地など未対応あり。</p>
     <p className="hazard-caution">白色・透明・未提供は安全の根拠になりません。視覚的な参考表示であり、自動除外・法的判断には使いません。</p>
     <p>{settings.enabled?hazardRegionMessage(region):'OFF（未照会）'}</p>
+    <details><summary>保存ハザード・試験対応3県</summary><p>岡山・広島・山口の土砂A33と洪水A31a（想定最大規模）を保存した参考表示。対象県はN03行政境界で照合し、外部住所APIを使いません。対象外は従来の外部画像方式です。</p><p role="status">{storedStatus.message||'保存資料の表示範囲は未確認'}</p><p>黄：土砂の警戒区域、赤：特別警戒区域。指定前は基礎調査公表で、現在の指定とは区別します。洪水は淡黄→桃→紫の順で浸水深ランク1～6。正確な区分・原属性は地点の説明で確認してください。</p><p>JGD2011原本座標の分割・圧縮で、単純化なし。原本年度2025と原資料日・取得日は別です。広島土砂は2025-07-24、概略参考図・境界未確定・法関連情報の不完全性あり。出典：国土数値情報／土砂災害ポータルひろしま・DoboX（形式変換）。CC BY 4.0と広島個別注意事項。</p><p>収録された河川・指定資料のみ。内水・高潮・津波等は含まず、空白を安全と解釈しません。以下の画像凡例は従来の外部方式用です。</p></details>
     <p>土砂は商用再利用を確認した42都道府県のうち地図中心の県のみ。神奈川・京都・和歌山・鳥取・長崎は個別条件未確認のため未対応。全国表示では洪水のみ、土砂はズーム8以上。</p>
     {region.prefecture==='34'&&<p>広島土砂：原資料 {HIROSHIMA_SOIL_METADATA.sourceDate}、A33共通基準 {HIROSHIMA_SOIL_METADATA.a33Date}、GSI反映 {HIROSHIMA_SOIL_METADATA.gsiDate}。CC BY／出典：{HIROSHIMA_SOIL_METADATA.attribution}。概略参考図・不完全性あり。法定境界・取引の証拠ではありません。</p>}
     <label>透明度 <input aria-label="除外検討区域の透明度" type="range" min="10" max="100" step="5" value={Math.round(settings.opacity*100)} onChange={e=>onChange({opacity:Number(e.target.value)/100})}/><output>{Math.round(settings.opacity*100)}%</output></label>
@@ -45,10 +48,10 @@ export default function MapRegulatoryControls({settings,onChange,statuses={},reg
   </details>
 }
 
-export function MapHazardSummary({settings,statuses={},region={},referenceStatus={}}) {
+export function MapHazardSummary({settings,statuses={},region={},storedStatus={},referenceStatus={}}) {
   if(!settings.enabled)return null
   const status=hazardStatus(HAZARD_LAYERS.filter(l=>!l.soil||region.state==='ready').flatMap(l=>{
     const s=statuses[l.id];return s?Object.keys(s).filter(k=>['ready','loading','unavailable','error'].includes(k)&&s[k]>0):[]
   }))
-  return <div className="regulatory-layer-summary" aria-label="除外検討区域の状態"><strong>公開資料を表示・未対応あり</strong><span>{status.message}</span><span>{hazardRegionMessage(region)}</span><span>{referenceStatus.message||'文化財・農業地域：表示範囲は未確認'}</span><small>文化財は岡山、農業地域は岡山・広島・山口の参考資料。原資料年・精度・未対応範囲を確認。白色・透明・未提供・失敗は安全を意味しません。PDF・DXF出力対象外。</small></div>
+  return <div className="regulatory-layer-summary" aria-label="除外検討区域の状態"><strong>公開資料を表示・未対応あり</strong><span>{region.stored?storedStatus.message||'保存ハザード未確認':status.message}</span><span>{hazardRegionMessage(region)}</span><span>{referenceStatus.message||'文化財・農業地域：表示範囲は未確認'}</span><small>文化財は岡山、農業地域は岡山・広島・山口の参考資料。原資料年・精度・未対応範囲を確認。白色・透明・未提供・失敗は安全を意味しません。PDF・DXF出力対象外。</small></div>
 }

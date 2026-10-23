@@ -27,6 +27,7 @@ export function hazardRegionFromAddress(address) {
   return prefecture?{state:prefecture.allowed?'ready':'unsupported',prefecture:code,name:prefecture.name}:{state:'unavailable',prefecture:''}
 }
 export function hazardRegionMessage(region={}) {
+  if(region.stored)return region.state==='ready'?`保存ハザード：地図中心 ${region.name}（N03 2025行政境界）。地点の重なりは説明で個別確認。`:`保存ハザード：対象県未確定・表示なし。${region.message||'取得・境界を確認してください。'}`
   return ({ready:`土砂：地図中心の${region.name}のみ（県境外は未確認）`,unsupported:`土砂：${region.name}は個別利用条件未確認のため未対応`,wide:'土砂：拡大すると地図中心の対象県を自動確認',loading:'土砂：対象県を確認中',error:'土砂：対象県の取得失敗・表示なし',unavailable:'土砂：対象県未確認・表示なし',idle:'土砂：対象県未確認・表示なし'})[region.state||'idle']
 }
 export function hazardTileUrl(id, coords, prefecture='') {
