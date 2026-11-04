@@ -11,7 +11,9 @@ export function inspectionRowSummary(rows=[]){
   if(states.includes('error'))return {kind:'error',count,statusLabel:count?`重なり${count}件・一部エラー`:'取得エラー'}
   if(states.includes('partial'))return {kind:'partial',count,statusLabel:count?`重なり${count}件・一部未確認`:'一部未確認'}
   if(states.some(s=>['unconfirmed','unreadable'].includes(s)))return {kind:'unconfirmed',count,statusLabel:count?`重なり${count}件・一部未確認`:'未確認'}
+  if(count&&states.some(s=>['painted','unavailable','nodata','outside','unsupported','off'].includes(s)))return {kind:'partial',count,statusLabel:`重なり${count}件・一部未確認`}
   if(count)return {kind:'matched',count,statusLabel:`重なり${count}件`}
+  if(states.includes('none')&&states.some(s=>s!=='none'))return {kind:'partial',count,statusLabel:'一部未確認'}
   if(states.includes('painted'))return {kind:'unconfirmed',count,statusLabel:'表示あり・種別未確認'}
   if(states.includes('unavailable'))return {kind:'unavailable',count,statusLabel:'資料なし（404）'}
   if(states.includes('nodata'))return {kind:'unavailable',count,statusLabel:'資料なし（透明）'}

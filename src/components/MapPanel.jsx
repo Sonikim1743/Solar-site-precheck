@@ -710,6 +710,8 @@ export default function MapPanel({
   selectionResetRequest = 0,
   mapViewResetRequest = 0,
   preserveViewport = false,
+  regulatoryFollowUpNotes,
+  onRegulatoryFollowUpNotesChange,
 }) {
   const hasTerrainOverlay = !!terrainSection?.lines?.length
   const hasRegionLabel = Boolean(getMapRegionLabel(position, placeInfo))
@@ -963,7 +965,7 @@ export default function MapPanel({
         </button>
       )}
       {parcelData && <div className="parcel-map-badge">地番レイヤー {parcelData.features.length.toLocaleString()}筆</div>}
-      <RegulatoryPointInspector id={regulatoryDetailsId} open={regulatoryDetailsOpen} onClose={closeRegulatoryDetails} position={position} settings={hazardSettings} includeHistorical={includeHistoricalFarmland} isDrawing={isDrawing} region={hazardRegion} />
+      <RegulatoryPointInspector id={regulatoryDetailsId} open={regulatoryDetailsOpen} onClose={closeRegulatoryDetails} position={position} settings={hazardSettings} includeHistorical={includeHistoricalFarmland} isDrawing={isDrawing} region={hazardRegion} followUpNotes={regulatoryFollowUpNotes} onFollowUpNotesChange={onRegulatoryFollowUpNotesChange} />
     </div>
       <MapHazardSummary settings={hazardSettings} statuses={hazardStatuses} region={hazardRegion} storedStatus={storedHazardStatus} referenceStatus={referenceStatus} />
       {locationBar || <div className="map-location-control">

@@ -637,6 +637,7 @@ function AppWorkspace({ coordinateLink }) {
   const [candidateRevision, setCandidateRevision] = useState(0)
   const [generationNotice, setGenerationNotice] = useState('')
   const [gridNotes, setGridNotes] = useState(Array.isArray(draftSeed.gridNotes) ? draftSeed.gridNotes : [])
+  const [regulatoryFollowUpNotes, setRegulatoryFollowUpNotes] = useState({})
   const [recordInfo, setRecordInfo] = useState(draftSeed.reviewRecordInfo || null)
   const [pendingRecord, setPendingRecord] = useState(null)
   const [undoRecord, setUndoRecord] = useState(null)
@@ -3606,6 +3607,8 @@ function AppWorkspace({ coordinateLink }) {
 
             <MapPanel
               position={position}
+              regulatoryFollowUpNotes={regulatoryFollowUpNotes}
+              onRegulatoryFollowUpNotesChange={setRegulatoryFollowUpNotes}
               viewport={mapViewport.current}
               onViewportChange={next => { mapViewport.current = next }}
               onSelectionChange={rearmMapReset}

@@ -8,7 +8,7 @@ const hash=b=>createHash('sha256').update(b).digest('hex'),version='r2025-123456
 const box=[129,34,131,36],point={lat:35,lon:130}
 const ring=[[129,34],[131,34],[131,36],[129,36],[129,34]]
 function feature(id,category='soil',geometry={type:'Polygon',coordinates:[ring]}){return {type:'Feature',id,bbox:box,geometry,properties:{sourceDatasetId:id,sourceRecordId:'1',A33_001:2,A33_002:3,A33_005:'合成区域',A33_008:0,...(category==='admin'?{N03_001:'合成県',N03_007:id.slice(-2)+'001'}:{})}}}
-function fixture({hole=false,line=false,fail=false,tamper=false}={}){
+function fixture({hole=false,line=false,fail=false,tamper=false,municipalityCodes}={}){
   const assets=new Map(),datasets=[]
   for(const [category,codes] of [['soil',['33','34','35']],['flood',['33','34','35','87']],['admin',['33','34','35']]])for(const code of codes){
     const id=`${category}-${code}`,d={id,category,prefecture:code,bbox:code==='33'?box:[140,40,141,41],files:[],archiveSha256:'a'.repeat(64),sourceCrs:{epsg:6668},geometryCounts:{Polygon:1}}
@@ -16,8 +16,9 @@ function fixture({hole=false,line=false,fail=false,tamper=false}={}){
       let f=feature(id,category)
       if(hole&&category==='soil')f.geometry.coordinates.push([[129.5,34.5],[130.5,34.5],[130.5,35.5],[129.5,35.5],[129.5,34.5]])
       if(line&&category==='soil')f.geometry={type:'LineString',coordinates:[[129,34],[131,36]]}
-      const plain=Buffer.from(JSON.stringify({type:'FeatureCollection',features:[f]})),bytes=gzipSync(plain),name='1300_350_0.geojson.gz'
-      d.files.push({name,bbox:box,count:1,bytes:bytes.length,decodedBytes:plain.length,encoding:'gzip',sha256:hash(bytes)})
+      const features=category==='admin'&&municipalityCodes?municipalityCodes.map((code,i)=>({...f,id:`${id}-${i}`,properties:{...f.properties,N03_007:code}})):[f]
+      const plain=Buffer.from(JSON.stringify({type:'FeatureCollection',features})),bytes=gzipSync(plain),name='1300_350_0.geojson.gz'
+      d.files.push({name,bbox:box,count:features.length,bytes:bytes.length,decodedBytes:plain.length,encoding:'gzip',sha256:hash(bytes)})
       assets.set(`/data/stored-hazards/${version}/${id}/${name}`,{body:tamper&&category==='soil'?Buffer.from('bad'):bytes,type:'application/octet-stream',status:fail&&category==='soil'?404:200})
     }
     datasets.push(d)
@@ -40,6 +41,16 @@ test('polygon holes and actual boundary are distinct from source missing',async(
   const h=await inspectStoredPoint(point,fixture({hole:true}));assert.equal(h.datasets[0].state,'none')
   const b=await storedPrefecture({lat:34,lon:130},fixture());assert.equal(b.state,'unconfirmed');assert.equal(b.stored,true)
   const outside=await storedPrefecture({lat:38,lon:135},fixture());assert.equal(outside.state,'outside')
+})
+
+test('municipal overlaps cannot choose a contact by the last matching administrative feature',async()=>{
+  const known=await storedPrefecture(point,fixture({municipalityCodes:['33210','33210']}))
+  assert.equal(known.municipality,'33210');assert.equal(known.municipalityState,'ready')
+  for(const municipalityCodes of [['33210','33209'],['33210',''],['invalid'],['34210']]){
+    const result=await storedPrefecture(point,fixture({municipalityCodes}))
+    assert.equal(result.state,'ready');assert.equal(result.code,'33')
+    assert.equal(result.municipality,'');assert.equal(result.municipalityState,'unconfirmed')
+  }
 })
 test('404, corrupt data and line-only candidates never become successful no-overlap',async()=>{
   for(const options of [{fail:true},{tamper:true}]){const r=await inspectStoredPoint(point,fixture(options));assert.equal(r.datasets[0].state,'error');assert.ok(r.datasets[0].failures.length)}

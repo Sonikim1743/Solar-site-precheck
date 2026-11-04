@@ -6,6 +6,7 @@ import { REFERENCE_UNKNOWN, referenceYears } from '../utils/regulatoryRegistry.j
 import { toDegreeMinutes } from '../utils/coordinates.js'
 import './regulatory-point.css'
 import PointInspectionSummary from './PointInspectionSummary.jsx'
+import { followUpPointKey } from '../utils/regulatoryFollowUp.js'
 
 function Swatch({ color, historic = false }) {
   return <i aria-hidden="true" className={`point-zone-swatch${historic ? ' is-historic' : ''}`} style={{ backgroundColor: color }} />
@@ -83,17 +84,18 @@ function PointInspectionDetails({ result }) {
   </div>
 }
 
-export function RegulatoryPointResults({result}) {
-  return <PointInspectionSummary result={result}><PointInspectionDetails result={result}/></PointInspectionSummary>
+export function RegulatoryPointResults({result,notes,onNotesChange}) {
+  return <PointInspectionSummary result={result} notes={notes} onNotesChange={onNotesChange}><PointInspectionDetails result={result}/></PointInspectionSummary>
 }
 
-export default function RegulatoryPointInspector({ id, open = false, onClose, position, settings, includeHistorical = false, isDrawing = false, region = {}, queryPoint = inspectRegulatoryPoint }) {
+export default function RegulatoryPointInspector({ id, open = false, onClose, position, settings, includeHistorical = false, isDrawing = false, region = {}, queryPoint = inspectRegulatoryPoint, followUpNotes = {}, onFollowUpNotesChange }) {
   const key = `${inspectionPointKey(position)}|${!!settings.enabled}|${includeHistorical}`
   const job = useRef(null)
   const autoTimer = useRef(null)
   const closeButton = useRef(null)
   useEffect(() => { if(open) closeButton.current?.focus({preventScroll:true}) }, [open])
   const [state, setState] = useState({ key, status: 'idle' })
+  const followUpKey = followUpPointKey(position)
   useEffect(() => {
     job.current?.abort()
     setState({ key, status: 'idle' })
@@ -131,7 +133,7 @@ export default function RegulatoryPointInspector({ id, open = false, onClose, po
       event.currentTarget.scrollBy({top:event.currentTarget.clientHeight*.85*(event.key==='PageDown'?1:-1),behavior:'instant'})
     }
   }}>
-    <div className="point-zone-header"><strong>区域の確認</strong><div className="point-zone-actions">
+    <div className="point-zone-header"><strong>先に確認する条件</strong><div className="point-zone-actions">
       {valid && settings.enabled && (current.status === 'loading' ? <button type="button" className="secondary-button" onClick={() => { clearTimeout(autoTimer.current); job.current?.abort(); setState({ key, status: 'cancelled' }) }}>中止</button> : <button type="button" className="secondary-button" onClick={inspect} disabled={isDrawing}>再確認</button>)}
       <button ref={closeButton} type="button" className="secondary-button" onClick={onClose} aria-label="区域の説明を閉じる（区域表示は維持）">閉じる</button>
     </div></div>
@@ -146,7 +148,7 @@ export default function RegulatoryPointInspector({ id, open = false, onClose, po
       <p>{settings.enabled ? hazardRegionMessage(region) : 'OFF・表示および地点照会は未実行'}。古い農用地区域：{includeHistorical ? 'ON' : 'OFF・未照会'}。</p>
     </details>
     <p role="status" aria-live="polite">{current.status === 'loading' ? '選択地点の資料を確認中…' : current.status === 'cancelled' ? '地点確認を中止しました。結果は未確認です。' : current.status === 'error' ? `地点確認失敗・未確認：${current.message}` : current.status === 'ready' ? '' : ''}</p>
-    {current.status === 'ready' && <RegulatoryPointResults result={current.result} />}
+    {current.status === 'ready' && <RegulatoryPointResults result={current.result} notes={followUpNotes[followUpKey]||{}} onNotesChange={onFollowUpNotesChange?notes=>onFollowUpNotesChange(previous=>({...previous,[followUpKey]:notes})):undefined} />}
     </>}
   </section>
 }

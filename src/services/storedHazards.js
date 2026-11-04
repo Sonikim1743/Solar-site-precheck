@@ -63,18 +63,23 @@ export async function storedChunk(manifest,dataset,file,{fetchImpl=fetch,signal}
 export async function storedPrefecture(point,{manifest,fetchImpl=fetch,signal}={}){
   if(!isInspectionPoint(point))throw Error('日本の地点を確認してください。')
   manifest ||= await storedManifest({fetchImpl,signal})
-  const sources=manifest.datasets.filter(d=>d.category==='admin'&&pointInBounds(point,d.bbox)),found=new Map();let boundary=false
+  const sources=manifest.datasets.filter(d=>d.category==='admin'&&pointInBounds(point,d.bbox)),found=new Map(),municipalities=new Set();let boundary=false
   for(const d of sources)for(const file of d.files.filter(f=>pointInBounds(point,f.bbox))){
     const features=await storedChunk(manifest,d,file,{fetchImpl,signal})
     for(const f of features){if(!pointInBounds(point,f.bbox))continue;const state=locateReferencePoint(point,f.geometry)
       if(state==='invalid')throw Error('行政境界の形状を判読できません。')
       if(state==='boundary')boundary=true
-      if(state==='inside'||state==='boundary')found.set(d.prefecture,{code:d.prefecture,name:f.properties.N03_001,municipality:f.properties.N03_007})
+      if(state==='inside'||state==='boundary'){
+        found.set(d.prefecture,{code:d.prefecture,name:f.properties.N03_001})
+        const municipality=String(f.properties.N03_007||'')
+        if(/^\d{5}$/.test(municipality)&&municipality.startsWith(d.prefecture))municipalities.add(municipality)
+        else municipalities.add('')
+      }
     }
   }
   stopped(signal)
   if(boundary||found.size>1)return {state:'unconfirmed',stored:true,message:'行政境界上・複数県のため対象県未確定。推定しません。'}
-  if(found.size===1)return {state:'ready',stored:true,...found.values().next().value,sourceDate:'2025-01-01'}
+  if(found.size===1){const municipality=municipalities.size===1?[...municipalities][0]:'';return {state:'ready',stored:true,...found.values().next().value,municipality,municipalityState:municipality?'ready':'unconfirmed',sourceDate:'2025-01-01'}}
   return {state:'outside',stored:false,message:'保存型の対象3県外、海上または行政境界未収録。'}
 }
 export const SOIL_PHENOMENA={1:'急傾斜地の崩壊',2:'土石流',3:'地滑り'}

@@ -8,6 +8,10 @@ test('some matches never hide failures or incomplete coverage',()=>{
   const match={state:'matched',matches:[{id:'a'}]}
   assert.equal(inspectionRowSummary([match,{state:'error'}]).statusLabel,'重なり1件・一部エラー')
   assert.equal(inspectionRowSummary([match,{state:'partial'}]).statusLabel,'重なり1件・一部未確認')
+  for(const state of ['outside','unsupported','unavailable','nodata','painted','off']){
+    assert.equal(inspectionRowSummary([match,{state}]).statusLabel,'重なり1件・一部未確認')
+    assert.equal(inspectionRowSummary([{state:'none'},{state}]).statusLabel,'一部未確認')
+  }
 })
 test('quick groups distinguish agriculture from historical agricultural-use and preserve all matches',()=>{
   const result={references:[{source:{category:'culture',color:'#7b3fc6'},state:'matched',matches:[{id:'a',name:'合成遺跡',condition:'調査後一部消滅'}]},{source:{category:'agriculture-region'},state:'none',matches:[]},{source:{category:'agricultural-use'},state:'matched',matches:[{id:'b',name:'古い範囲'}]}],hazards:{mode:'stored',region:{state:'error'},datasets:[]}}
