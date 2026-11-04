@@ -1,4 +1,8 @@
-# 配布パッケージ v1.28.3 / 2026-10-22
+# Web配布パッケージ v1.28.5 / 2026-11-04
+
+今回のWeb更新は座標リンクと地点操作です。[リンク仕様・保存の注意](https://github.com/Sonikim1743/Solar-site-precheck/blob/main/docs/COORDINATE_LINKS_JA.md)を参照してください。`pnpm package:deployment` が生成した今回のCloudflareパッケージを検証して公開します。GitHubの既存ポータブルZIP・自動更新メタデータはv1.28.3を保持します。以下のv1.28.3の機能・配布名は旧配布の説明です。実際の版・公開ID・ハッシュは [公開記録](https://github.com/Sonikim1743/Solar-site-precheck/blob/main/docs/DEPLOYED_VERSION.md) を参照してください。
+
+## 旧配布パッケージ v1.28.3 / 2026-10-22
 
 この資料は1.28.3 / Build 2026-10-22向けです。除外検討区域、公開参考資料6種、実寸2D DXFを追加しました。[対応範囲・資料年・測地系・DXFの注意](REGULATORY_DXF_2026_10_22_JA.md)を確認してください。実際の公開状態、ソース・ハッシュ・検証範囲と旧版復旧先は [公開記録](https://github.com/Sonikim1743/Solar-site-precheck/blob/main/docs/DEPLOYED_VERSION.md) を参照してください。
 
