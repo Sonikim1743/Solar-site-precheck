@@ -1,0 +1,16 @@
+.coordinate-link-notice {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  background: #edf5fa;
+  border: 1px solid #bdd5e4;
+  border-radius: 10px;
+  color: #183d53;
+  font-size: 14px;
+}
+.coordinate-link-notice > div { flex: 1 1 320px; }
+.coordinate-link-notice p { margin: 4px 0 0; line-height: 1.5; }
+.coordinate-link-notice a { color: #14577b; font-weight: 600; }

@@ -4,11 +4,17 @@
 
 参考発電量は上部のツールメニューから比較できます。地形・発電量の結果は初期検討用であり、測量、設計、接続可否、採算判断を代替しません。
 
-- 公開・配布版：**v1.28.2 / 2026-10-15** — GitHub main・オンライン版の確認記録は下記を参照
+- Webソース：**v1.28.5 / 2026-11-04** — 実際の公開状態は下記の確認記録を参照
 - [オンライン版を開く](https://solar-site-precheck.pages.dev/)
-- [Windows更新ZIP](release/latest/SolarSitePrecheck_v1.28.2_release_light.zip) — 既存のNode.js実行環境を使う更新用
+- [Windows更新ZIP](release/latest/SolarSitePrecheck_v1.28.3_release_light.zip) — 既存v1.28.3を保持。今回のWeb更新とは別
 - [公開・配布の確認記録](docs/DEPLOYED_VERSION.md) — ソース、配布物、実際のデプロイを区別
 - [更新内容](CHANGELOG.md) · [更新手順](RELEASE_UPDATE_GUIDE.md)
+
+## 座標リンクで地点を開く — v1.28.5
+
+Excel等から `https://solar-site-precheck.pages.dev/?lat=34.4089&lon=133.2049` を開くと、その地点へ移動し地形検討を開きます。住所の文字列ではなく、確認した十進度の緯度・経度を渡します。範囲を選択してから地形を取得してください。
+
+リンクからは自動保存しない一時検討を開始し、既存の保存中の候補地・メモ・範囲・結果を読み込まず保持します。再読み込みで一時検討はリセットされます。必要な内容は検討記録JSONへ保存してください。[リンク仕様・保存の注意](docs/COORDINATE_LINKS_JA.md)
 
 ## 最近の更新 — 2026-10-15
 
