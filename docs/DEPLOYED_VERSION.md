@@ -1,3 +1,27 @@
+# 公開更新 — 座標リンクと地点操作 / 2026-11-04
+
+Excel等の `?lat=緯度&lon=経度` から指定地点と地形検討を開く。リンクは自動保存しない一時検討で、既存候補地の保存読み書きを拒否し、メモ・範囲・結果の混在を防ぐ。範囲選択・地形取得は利用者が行う。[リンク仕様・保存の注意](COORDINATE_LINKS_JA.md)を参照。
+
+- 運用URL：https://solar-site-precheck.pages.dev/
+- Production ID：`c794895b-2982-4502-8743-f07f3001d190` / branch main / 配布完了
+- 固定URL：https://c794895b.solar-site-precheck.pages.dev/
+- 配布ソース：`e710b3781fcc6422ee450e50aa8ab02edd44fe61` / [PR #7](https://github.com/Sonikim1743/Solar-site-precheck/pull/7)
+- main統合：`f00b729243a137bba78535f80cb83f13b8761702`（配布ソースと同一tree）
+- [PR CI 41756424318](https://github.com/Sonikim1743/Solar-site-precheck/actions/runs/41756424318)・[main CI 41756659453](https://github.com/Sonikim1743/Solar-site-precheck/actions/runs/41756659453)：success
+- Version 1.28.5 / Build 2026-11-04 / JS：`index-Bm_79pZJ.js` / CSS：`index-D838bn0W.css`
+- 検証済みCloudflare ZIP：303,572,428 bytes / SHA-256 `df4137a7cfb3caa0e748e01f0e6fe433c4001698af65a8584e3e9b2d11fdf954`
+- 旧production：`183662be-d93e-4c9f-85f3-44695f1cc63c` を復旧用に保持
+
+従来の度・分コピーを保持し、十進度コピーとGoogleマップ／ストリートビュー／Mapionの手動確認を別タブで開く操作を追加した。コピーは小型で整列し、外部リンクは淡い背景・影、MAPCODE案内は「?」から開く。MAPCODE自動変換・自動コピーは未対応。
+
+全667テスト、build、CSP、資産、既存配布メタデータが成功。コミット済みclean sourceからの正式パッケージ作成でも667/667、両build、Functions edge依存検査、両ZIP全ファイルの照合が成功した。公開2026-11-04T01:53:16.703Z時点のHTTP22項目ではHTML・JS・CSSとパッケージのSHA-256、2地点URL・無効/欠落座標URLのHTML応答、保存資料のcurrent/manifest、10データセット各1断片のgzipヘッダー・ハッシュ・展開件数、尾道/福山の公開地点照合（取得失敗0）、欠落断片404を確認。既存API等6項目のpreflightも成功。公開全ファイルの独立HTTP照合ではない。
+
+今回の公開版で実ブラウザーによる地図移動・折りたたみ・履歴・キー操作・OSクリップボード、狭い画面の再検証は未実施。保存の拒否・復元はコード試験で確認し、実ブラウザーの保存領域を使う通し検証と区別する。PDFのサーバー送信経路は変更・修正確認の対象外であり、個人PDFは試験に送信していない。通常画面同士の複数タブ保存競合や別の3D作業も変更しない。
+
+新ZIPは約304MBのためGitHub通常ファイルへ追加していない。既存ポータブルZIP、`latest-version.json` と `cloudflare-version.json` はv1.28.3を保持し、Webの実際の識別値は `web-version.json` に分離。原ローカル作業本・個人資料を保全し、公開/認証/セキュリティ設定は変更していない。
+
+---
+
 # 公開更新 — 保存ハザードと区域確認 / 2026-10-23
 
 利用者の公開更新依頼に基づき、岡山・広島・山口の公式土砂・洪水・行政区域を保存型の参考資料として追加した。地図内右側の「区域の確認」は文化財・農業地域・土砂・洪水の重なり、短い意味、次に確認する窓口を優先して表示する。出典・基準日・原属性・詳しい注意は折りたたみで参照できる。農業地域と農用地区域を区別し、未検出・未確認・資料なし・取得失敗を安全や開発可否に置き換えない。
