@@ -39,15 +39,17 @@ test('map targets with a split shared edge apply as one valid terrain scope in e
 })
 
 test('real holes, detached parts and gaps survive map union and terrain planning', () => {
-  const left = shape(ring(10, 10, 60, 100), ring(20, 30, 20))
-  const right = shape(ring(70, 10, 60, 100))
+  const left = { ...a, coordinates: [...a.coordinates, ring(20, 30, 20).map(ll)] }
   const detached = shape(ring(170, 30, 20, 50))
-  const result = measureParcelReview(reviewOf([left, right, detached]))
+  const geometries = [left, b, detached]
+  assert.throws(() => validatePolygonGeometry(measureGeometryReview(geometries, null, []).geometry),
+    { code: 'HOLE_OUTSIDE_OR_TOUCHING' }, 'exercise the retry with both a real hole and a projection sliver')
+  const result = measureParcelReview(reviewOf(geometries))
   validatePolygonGeometry(result.geometry)
   assert.equal(result.geometry.type, 'MultiPolygon')
   assert.equal(result.geometry.coordinates.length, 2)
   assert.equal(result.geometry.coordinates.filter(p => p.length === 2).length, 1)
-  for (const [p, expected] of [[[30, 40], false], [[60, 40], true], [[100, 40], true], [[150, 40], false], [[180, 40], true]]) {
+  for (const [p, expected] of [[[30, 40], false], [[60, 40], true], [[80, 120], true], [[150, 40], false], [[180, 40], true]]) {
     assert.equal(pointInGeometry(ll(p), result.geometry), expected)
   }
   assert.ok(createTerrainPlan(result.geometry).grid.inside.some(Boolean))
