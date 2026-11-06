@@ -87,7 +87,7 @@ export function RegulatoryPointResults({result}) {
   return <PointInspectionSummary result={result}><PointInspectionDetails result={result}/></PointInspectionSummary>
 }
 
-export default function RegulatoryPointInspector({ id, open = false, onClose, position, settings, includeHistorical = false, isDrawing = false, region = {}, queryPoint = inspectRegulatoryPoint }) {
+export default function RegulatoryPointInspector({ id, open = false, onClose, position, settings, includeHistorical = false, isDrawing = false, region = {}, queryPoint = inspectRegulatoryPoint, onInspectionState }) {
   const key = `${inspectionPointKey(position)}|${!!settings.enabled}|${includeHistorical}`
   const job = useRef(null)
   const autoTimer = useRef(null)
@@ -101,6 +101,10 @@ export default function RegulatoryPointInspector({ id, open = false, onClose, po
   }, [key])
   const valid = !!inspectionPointKey(position)
   const current = state.key === key ? state : { status: 'idle' }
+  useEffect(() => {
+    const result = state.key === key ? state : { status: 'idle' }
+    onInspectionState?.({ ...result, status: !open && result.status === 'loading' ? 'cancelled' : result.status, pointKey: inspectionPointKey(position), enabled: settings.enabled })
+  }, [state, key, open, settings.enabled, onInspectionState])
   const lat = position?.lat, lon = position?.lon
   const inspect = useCallback(async () => {
     clearTimeout(autoTimer.current)

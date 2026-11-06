@@ -44,8 +44,8 @@ export default function UseCasesGuide({ onExample, onReport }) {
         <p className="use-cases-guide__note">基本機能は無料。保存ファイルは自動更新されないため、条件・メモの変更後は検討記録を保存し直してください。</p>
       </section>
       <details className="use-cases-guide__topic"><summary>練習例で確認する</summary><div>
-        <p className="use-cases-guide__example-label">架空の相談例・仮条件。実際の発電量、接続可否、販売実績を示す例ではありません。</p>
-        <ol><li><b>候補地を選ぶ。</b> 航空写真・座標を確認し、相談の目的と受け取った資料をメモします。</li><li><b>仮条件で計算する。</b> DC 50kWp・南向き・20°・損失14%を練習条件にします。推奨設計値ではありません。結果は対象地点で実際に計算した値を使います。</li><li><b>地形・積雪・系統を確認する。</b> 樹木や建物、NEDO資料、公式設備番号と資料の日付を確認します。</li><li><b>分かったことと残ったことを渡す。</b> 「樹高を現地で確認」「電力会社に接続点と条件を確認」などを追記し、レポートと検討記録を保存します。</li></ol>
+        <p className="use-cases-guide__example-label">架空の相談例・仮条件。実際の発電量、販売実績を示す例ではありません。</p>
+        <ol><li><b>候補地を選ぶ。</b> 航空写真・座標を確認し、相談の目的と受け取った資料をメモします。</li><li><b>仮条件で計算する。</b> DC 50kWp・南向き・20°・損失14%を練習条件にします。推奨設計値ではありません。結果は対象地点で実際に計算した値を使います。</li><li><b>地形・積雪・系統を確認する。</b> 樹木や建物、NEDO資料、公式設備番号と資料の日付を確認します。</li><li><b>分かったことと残ったことを渡す。</b> 「樹高を現地で確認」「現地の境界・接道を確認」などを追記し、レポートと検討記録を保存します。</li></ol>
         <button type="button" className="secondary-button" onClick={() => leaveGuide(onExample)}>仮条件の練習例を確認</button>
         <p>確認画面が開きます。選択するまでは現在の候補地を変更しません。練習例には計算済みの発電量を入れていません。</p>
       </div></details>
@@ -56,7 +56,7 @@ export default function UseCasesGuide({ onExample, onReport }) {
         <p>発電量を金額へ換算するには、売電・自家消費の量、適用単価、制御条件、工事費・運用費などの確認が必要です。この画面の発電量だけで売上や利益は決まりません。</p>
       </div></details>
       <details className="use-cases-guide__topic"><summary>実務資料パッケージの企画について</summary><div>
-        <p><strong>企画中・販売未開始。</strong> 入力・確認記録と説明用テンプレートを検討中です。内容・価格・時期・利用条件は未定。基本機能は無料で、Solar Pro本体・個別設計・接続申込み代行は含みません。</p>
+        <p><strong>企画中・販売未開始。</strong> 入力・確認記録と説明用テンプレートを検討中です。内容・価格・時期・利用条件は未定。基本機能は無料で、Solar Pro本体・個別設計は含みません。</p>
       </div></details>
     </div>
   </details>

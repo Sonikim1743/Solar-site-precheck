@@ -15,7 +15,7 @@ export function gridReviewNote({position,placeLabel,row,official,annualYield='',
  const record=row?.capacity||official
  return ['系統・発電量 検討メモ',placeLabel||'候補地',position?'座標: '+position.lat+', '+position.lon:'座標未設定','記録日時: '+new Date().toISOString(),
  row?'地図設備: '+row.equipment.name+' / '+row.equipment.id:'地図設備: 未選択',
- row?'直線距離: '+gridDistance(row.equipment.distanceMeters)+'（接続経路ではありません）':'',
+ row?'直線距離: '+gridDistance(row.equipment.distanceMeters)+'（地図上の参考値）':'',
  '照合: '+(row?.capacity?'完全な設備番号が一意に一致':'地図と公式設備の対応は未確認'),
  record?'公式資料の設備: '+record.name+' / '+record.no:'公式設備: 未確認',
  record?'当該設備の公表空容量: '+(Number.isFinite(record.availableCapacityMw)?record.availableCapacityMw+' MW':'記載なし'):'',
@@ -27,6 +27,5 @@ export function gridReviewNote({position,placeLabel,row,official,annualYield='',
  generation?'PVGIS標準地平線。樹木・建物の日影、NEDO積雪係数、個別PCS制約、系統出力制御は未反映。':'',
  generation?.sourceUrl||'',
  !generation&&annualYield?'Solar Pro年間発電量（手入力）: '+annualYield:'',
- '発電量と系統空容量は別の確認項目です。空容量から発電量・出力制御率・接続可否を推定していません。',
- '次の確認: 接続点、工事費・工期、出力制御条件を電力会社へ確認。'].filter(Boolean).join('\n')
+ '発電量と公表空容量は別の資料です。資料の出典と更新日を記録します。'].filter(Boolean).join('\n')
 }

@@ -560,7 +560,7 @@ function PowerGridReportPage({ data, capacityData, capacityMatches, placeCapacit
             )}
           </div>
 
-          {data.search?.targetVoltagesKv?.length > 0 && <p className="report-note">{powerGridSearchSummary(data)} 接続可否・空容量の確定を意味するものではありません。</p>}
+          {data.search?.targetVoltagesKv?.length > 0 && <p className="report-note">{powerGridSearchSummary(data)} 公表空容量の確定値ではありません。</p>}
 
           {(lineMatches.length > 0 || substationMatches.length > 0) && (
             <div className="report-power-grid-capacity">
@@ -710,7 +710,7 @@ function GenerationReportPage({ report, page }) {
       </div>
     </>}
     {report.solarProMemo?.annualYield && <p className="report-generation-solarpro">Solar Pro年間発電量（入力値）：{report.solarProMemo.annualYield}</p>}
-    <p className="report-generation-next">次に確認：接続点・工事費・工期・制御条件を電力会社に確認します。設備確認メモがある場合は次ページ以降に記載します。</p>
+    <p className="report-generation-next">保存した設備メモがある場合は次ページ以降に記載します。</p>
   </ReportPage>
 }
 

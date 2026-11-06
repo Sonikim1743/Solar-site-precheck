@@ -37,7 +37,7 @@ export default function GridCapacityExplorer({ dataset }) {
           {!lines.length && !substations.length && <p>読み込んだDBに同名の接続先詳細はありません。</p>}
         </div>)}
       </div>}
-      <p className="power-grid-note">検索した設備の位置・候補地との接続関係は未確定です。検索結果を最寄り設備として地図やレポートに自動適用しません。</p>
+      <p className="power-grid-note">検索した設備の位置は未確定です。検索結果を最寄り設備として地図やレポートに自動適用しません。</p>
     </>}
   </section>
 }

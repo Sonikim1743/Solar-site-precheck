@@ -1,0 +1,71 @@
+.comprehensive-review { margin: 14px 0; padding: 0 14px; border: 1px solid #dce6df; border-radius: 7px; background: #f8fbf9; }
+.comprehensive-review__heading { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; min-height: 48px; padding: 8px 0; cursor: pointer; list-style: none; }
+.comprehensive-review__heading::-webkit-details-marker { display: none; }
+.comprehensive-review__heading::after { content: '⌄'; margin-left: auto; }
+.comprehensive-review__heading > span { color: #596b61; font-size: 12px; }
+.comprehensive-review__body { padding: 6px 0 14px; }
+.comprehensive-review h2 { margin: 0; font-size: 16px; }
+.comprehensive-review__heading p { margin: 5px 0 0; color: #52695d; font-size: 14px; }
+.comprehensive-review__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.comprehensive-review__item { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; min-width: 0; padding: 14px; border: 1px solid #d0dfd6; border-radius: 7px; background: #fff; color: #244f3f; text-align: left; overflow-wrap: anywhere; }
+.comprehensive-review__item:hover { border-color: #478268; background: #f0f7f3; }
+.comprehensive-review__item > span { font-size: 13px; color: #52695d; }
+.comprehensive-review__item > strong { font-size: 16px; line-height: 1.5; }
+.comprehensive-review__item > small { font-size: 12px; line-height: 1.6; color: #52695d; }
+.comprehensive-review__item > em { margin-top: auto; padding-top: 5px; font-size: 12px; font-style: normal; }
+.comprehensive-review__item.is-pending > strong { color: #7b5a24; }
+.comprehensive-review__note { font-size: 12px; line-height: 1.7; margin: 12px 0 0; color: #596b61; }
+.comprehensive-review__next { margin-top: 12px; }
+.comprehensive-review__next summary { display: flex; align-items: center; min-height: 44px; cursor: pointer; font-size: 14px; }
+.comprehensive-review__next summary::after { content: '⌄'; margin-left: 12px; }
+.comprehensive-review__next li { margin: 8px 0; font-size: 13px; line-height: 1.6; }
+.comprehensive-review__next li > span { display: block; }
+.comprehensive-review__next li button { padding: 6px 10px; min-height: 44px; border: 1px solid #cdded4; border-radius: 5px; background: white; color: #245c46; }
+.comprehensive-review button:focus-visible, .comprehensive-review summary:focus-visible, .app .map-toolbar button:focus-visible, .app .map-toolbar summary:focus-visible { outline: 3px solid #258366; outline-offset: 3px; }
+.app .map-toolbar { position: relative; z-index: 650; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 0 0 8px; }
+.app .map-toolbar .map-display-controls, .app .map-toolbar .map-draw-controls { position: static; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0; padding: 0; max-width: 100%; transform: none; }
+.app .map-toolbar .map-draw-controls { order: -1; }
+.app .map-toolbar button, .app .map-toolbar summary { min-height: 44px; min-width: 44px; height: auto; font-size: 13px; border-radius: 6px; }
+.app .map-toolbar .map-display-options { position: relative; }
+.app .map-toolbar .map-base-toggle, .app .map-toolbar .map-display-options > summary { padding: 8px 10px; border: 1px solid #c6d6cc; background: #fff; color: #2e483c; font-family: inherit; font-weight: 600; cursor: pointer; }
+.app .map-toolbar .map-base-toggle[aria-pressed=true] { background: #e7f2eb; }
+.app .map-toolbar .map-display-options > summary { display: flex; align-items: center; justify-content: center; width: 44px; padding: 0; list-style: none; font-size: 20px; }
+.app .map-toolbar .map-display-options > summary::-webkit-details-marker { display: none; }
+.app .map-toolbar .map-display-options > div { position: absolute; top: calc(100% + 6px); right: 0; width: min(320px, calc(100vw - 72px)); max-height: min(50vh, 360px); overflow-y: auto; overscroll-behavior: contain; padding: 12px; border: 1px solid #c6d6cc; border-radius: 7px; background: #fff; box-shadow: 0 4px 12px #183c3526; font-size: 13px; }
+.app .map-toolbar .map-display-options > div summary { width: auto; }
+.app .map-toolbar .map-place-names-toggle { width: 100%; border: 1px solid #c6d6cc; border-radius: 6px; background: #fff; color: #2e483c; }
+.app .map-toolbar .map-regulatory-disclosure { width: 44px; }
+.app .solar-workspace[hidden] { display: none !important; }
+.app .map-interaction-toggle { padding: 8px 12px; background: #fff; border: 1px solid #c6d6cc; color: #305840; }
+.app .map-interaction-toggle[aria-pressed=true] { background: #e7f2eb; border-color: #478268; }
+.app .map-load-status { min-height: 20px; margin: 0 0 4px; font-size: 12px; color: #52695d; }
+.app .map-load-status.is-error { color: #9b332e; }
+.app .map-panel .map-shell .leaflet-control-zoom a { width: 44px; height: 44px; min-width: 44px; min-height: 44px; line-height: 44px; }
+.app .map-panel .map-shell > .map-region-label { top: 10px; left: 64px; right: 10px; max-width: calc(100% - 74px); }
+.app .map-panel .terrain-area-disclosure > summary { display: flex; justify-content: space-between; width: 100%; padding: 14px 16px; border: 1px solid #9bc8b0; border-radius: 8px; background: #eaf5ee; }
+.app .map-panel .terrain-area-disclosure > summary strong { font-size: 18px; }
+.app .workflow-help > summary { min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+.app .review-toolbar--standalone { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 0 0 14px; }
+.app .review-toolbar--standalone .review-records__preview, .app .review-toolbar--standalone .review-toolbar__feedback { flex-basis: 100%; }
+.app .review-toolbar--standalone summary, .app .review-toolbar--standalone button, .app .review-toolbar--standalone a { min-height: 44px; font-size: 13px; }
+.app .review-toolbar--standalone .review-toolbar__popover { left: 0; right: auto; width: min(32rem, calc(100vw - 72px)); }
+.app .review-download { display: flex; align-items: center; overflow-wrap: anywhere; }
+.app .workspace-nav > button, .app .workspace-tools > summary { min-height: 44px; }
+@media (max-width: 760px) {
+  .comprehensive-review { padding: 0 12px; }
+  .comprehensive-review__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .comprehensive-review__item { padding: 11px; }
+  .comprehensive-review__item > strong { font-size: 15px; }
+  .comprehensive-review__item > em, .comprehensive-review__item > small { display: none; }
+  .comprehensive-review__item[data-review-id=simple-horizon] > small { display: block; }
+  .app .site-map-header .address-search input { font-size: 16px; }
+  .app .map-panel .map-analysis-strip .terrain-section-button, .app .map-panel .map-analysis-strip .terrain-range-select select, .app .map-panel .selected-point-mini > .mini-copy-button { min-height: 44px; height: auto; }
+  .app .map-toolbar { gap: 8px; }
+  .app .map-toolbar .map-display-controls, .app .map-toolbar .map-draw-controls { width: 100%; }
+  .app .map-toolbar .map-display-options > div { left: auto; right: 0; }
+}
+@media print { .app .map-toolbar, .app .map-load-status { display: none; } }
+@media (max-width: 640px) {
+  .app #terrain-area .terrain-area-model--navigation .terrain-area-stage { grid-row: 1; }
+  .app #terrain-area .terrain-view-navigation { grid-row: 2; justify-self: center; margin: 8px 0 0; }
+}
