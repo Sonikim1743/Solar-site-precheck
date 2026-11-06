@@ -10,7 +10,7 @@ export const MAX_GEOMETRY_PARTS = 100
 export const MAX_REVIEW_SPAN_DEGREES = 2
 const MAX_DERIVED_VERTICES = 20000
 const EPS = 1e-12
-const fail = message => { throw new Error('筆界の図形が不正です。' + message) }
+const fail = (message, code) => { throw Object.assign(new Error('筆界の図形が不正です。' + message), code ? { code } : {}) }
 const same = (a, b) => a[0] === b[0] && a[1] === b[1]
 const cross = (a, b, c) => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
 
@@ -112,7 +112,7 @@ function validatedGeometry(geometry, maxVertices = MAX_GEOMETRY_VERTICES, maxRin
       return copy
     })
     for (let h = 1; h < rings.length; h++) {
-      if (ringLocation(rings[h][0], rings[0]) !== 1 || ringsMeet(rings[0], rings[h])) fail('中抜きは外周の内側に収め、外周に接触させないでください。')
+      if (ringLocation(rings[h][0], rings[0]) !== 1 || ringsMeet(rings[0], rings[h])) fail('中抜きは外周の内側に収め、外周に接触させないでください。', 'HOLE_OUTSIDE_OR_TOUCHING')
       for (let k = 1; k < h; k++) {
         if (ringsMeet(rings[h], rings[k]) || ringLocation(rings[h][0], rings[k]) >= 0 || ringLocation(rings[k][0], rings[h]) >= 0) fail('中抜き同士の重なり・接触・入れ子は使えません。')
       }

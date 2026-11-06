@@ -1,5 +1,7 @@
+import polygonClipping from 'polygon-clipping'
 import { parcelInfo } from '../services/cadastre.js'
-import { validatePolygonGeometry, geometryVertexCount, geometryBounds, MAX_REVIEW_SPAN_DEGREES, measureGeometryReview } from '../services/parcelGeometry.js'
+import { validatePolygonGeometry, geometryPolygons, geometryVertexCount, geometryBounds, MAX_REVIEW_SPAN_DEGREES, measureGeometryReview } from '../services/parcelGeometry.js'
+import { isMapParcel } from './mapParcelSelection.js'
 
 export const MAX_REVIEW_PARCELS = 100
 export const MAX_REVIEW_VERTICES = 10000
@@ -126,8 +128,29 @@ export function measureParcelReview(review) {
   const normalized = normalizeParcelReview(review)
   const targets = normalized.parcels.filter(parcel => parcel.role === 'target')
   const references = normalized.parcels.filter(parcel => parcel.role === 'reference')
+  const mapTargets = targets.filter(isMapParcel)
+  let metrics = measureGeometryReview(targets.map(parcel => parcel.geometry), normalized.boundary, normalized.exclusions)
+  if (mapTargets.length > 1 && metrics.geometry) {
+    try { validatePolygonGeometry(metrics.geometry) } catch (error) {
+      if (error.code === 'HOLE_OUTSIDE_OR_TOUCHING') {
+        // Tile fragments can insert a vertex on only one side of a shared
+        // edge. Projecting each parcel first can turn it into a sliver hole
+        // touching the exterior. Retry that failure in the map references'
+        // shared coordinates before the nonlinear area projection, then apply
+        // the same metre-based boundary/exclusion work and strict validation.
+        // No tolerance, snapping, buffering or hole removal is applied. Valid
+        // previous output (including saved terrain identity) stays unchanged.
+        const merged = polygonClipping.union(...mapTargets.map(parcel => geometryPolygons(parcel.geometry)))
+        const geometries = [...targets.filter(parcel => !isMapParcel(parcel)).map(parcel => parcel.geometry),
+          { type: 'MultiPolygon', coordinates: merged }]
+        const retried = measureGeometryReview(geometries, normalized.boundary, normalized.exclusions)
+        if (retried.geometry) validatePolygonGeometry(retried.geometry)
+        metrics = retried
+      }
+    }
+  }
   return {
-    ...measureGeometryReview(targets.map(parcel => parcel.geometry), normalized.boundary, normalized.exclusions),
+    ...metrics,
     targetCount: targets.length,
     referenceCount: references.length,
   }
