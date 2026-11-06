@@ -1,5 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import MapPanel from './components/MapPanel.jsx'
+import CandidateWorkflow from './components/CandidateWorkflow.jsx'
+import './comprehensive-review.css'
 import MapLocationBar from './components/MapLocationBar.jsx'
 import { createMapReset } from './utils/mapReset.js'
 import ParcelReviewPanel from './components/ParcelReviewPanel.jsx'
@@ -235,12 +237,11 @@ function PowerGridCheckPanel({ position, powerGrid, gridCapacity, capacityMatche
           </label>
         </div>
 
-      <div className="power-grid-flow" aria-label="系統確認の進め方">
+      <div className="power-grid-flow" aria-label="公開設備資料の見方">
         <span>① 地域DB</span>
         <span>② 最寄り系統線</span>
         <span>③ 参考変電所</span>
         <span>④ 公開空容量</span>
-        <span>⑤ 事前相談</span>
       </div>
       <p className="power-grid-db-note">
         中国電力NW DBは広島・岡山・島根・鳥取の公開空容量CSV/ZIPをアプリ用に整理したものです。系統線の位置は公開地図データ、空容量は中国電力NW公開資料を参照します。
@@ -359,7 +360,7 @@ function PowerGridCheckPanel({ position, powerGrid, gridCapacity, capacityMatche
                 <div className="power-grid-place-candidates">
                   <div className="power-grid-place-candidates__head">
                     <strong>住所地名から確認できる公式DB候補</strong>
-                    <span>距離・接続先は未確定</span>
+                    <span>位置・直線距離は未確定</span>
                   </div>
                   <p>
                     選択地点の「{placeCapacityCandidates.tokens.join('・')}」を含む設備名を公式DBから抽出した候補です。座標未確認のため、周辺設備・最寄り設備とは断定しません。
@@ -393,7 +394,7 @@ function PowerGridCheckPanel({ position, powerGrid, gridCapacity, capacityMatche
       )}
 
       <p className="power-grid-note">
-        ※ 接続可否を自動判定する機能ではありません。最寄り系統線と参考変電所を距離順で整理し、公開空容量資料を読み込んだ場合のみ名称が一致した設備の公表値を表示します。
+        最寄り系統線と参考変電所を距離順で整理し、公開空容量資料を読み込んだ場合のみ名称が一致した設備の公表値を表示します。
       </p>
       </div>
     </details>
@@ -552,7 +553,7 @@ function formatHorizonSummary(terrain) {
     .reduce((max, sample) => (!max || sample.angle > max.angle ? sample : max), null)
   const direction = formatHorizonDirection(highest) || terrain.direction || '方向未特定'
   const timeBand = highest ? horizonTimeBand(highest.bearing) : ''
-  return `分析済み：最大 ${terrain.maxAngle.toFixed(1)}°（${direction}${timeBand ? `・${timeBand}` : ''}）`
+  return `入力角・最大 ${terrain.maxAngle.toFixed(1)}°（${direction}${timeBand ? `・${timeBand}` : ''}）`
 }
 
 function analysisPositionKey(point) {
@@ -653,6 +654,8 @@ function AppWorkspace({ coordinateLink }) {
   const [terrainStatus, setTerrainStatus] = useState(draftSeed.terrainAnalysisVersion === TERRAIN_ANALYSIS_VERSION && draftSeed.terrain ? 'success' : 'idle')
   const [horizonPanelOpen, setHorizonPanelOpen] = useState(false)
   const [horizonExportMessage, setHorizonExportMessage] = useState('')
+  const [inspectionState, setInspectionState] = useState(null)
+  const [regulatoryRequest, setRegulatoryRequest] = useState(0)
   const [address, setAddress] = useState('')
   const [addressResults, setAddressResults] = useState([])
   const [searchStatus, setSearchStatus] = useState('idle')
@@ -1158,6 +1161,7 @@ function AppWorkspace({ coordinateLink }) {
     try {
       const results = await searchAddress(query)
       if (!isCurrent()) return
+      if (results.length === 1) { chooseAddress(results[0]); return }
       setAddressResults(results)
       setSearchStatus(results.length ? 'success' : 'empty')
     } catch {
@@ -3004,7 +3008,7 @@ function AppWorkspace({ coordinateLink }) {
       setRecordDownload({ url: `data:application/json;charset=utf-8,${encodeURIComponent(serialized)}`, fileName })
       const link = document.createElement('a'); link.href = url; link.download = fileName; link.click()
       window.setTimeout(() => URL.revokeObjectURL(url), 1000)
-      setRecordStatus({ message: '検討記録の保存を開始しました。ダウンロード先のファイルから再開できます。PDF原本・全設備地図・公式DB本体は含みません。', error: false })
+      setRecordStatus({ message: '記録の保存を開始しました。ダウンロードしたファイルを確認してください。', error: false })
     } catch (error) { setRecordStatus({ message: error.message, error: true }) }
   }
 
@@ -3395,19 +3399,12 @@ function AppWorkspace({ coordinateLink }) {
     }, 0)
   }
 
-  function openSimpleSection(target) {
-    const analysis = document.getElementById('simple-analysis')
-    if (analysis) analysis.open = true
-    requestAnimationFrame(() => document.getElementById(target)?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
-  }
-
   const powerPanel = <PowerGridCheckPanel
     position={position} powerGrid={powerGrid} gridCapacity={gridCapacity}
     capacityMatches={capacityMatches} placeCapacityCandidates={placeCapacityCandidates}
     matchedCapacityArea={matchedCapacityArea} onCheck={handlePowerGridCheck}
     onBundledCapacity={handleBundledGridCapacity} onCapacityFile={handleGridCapacityFile}
   />
-  const analysisCount = Number(terrainSectionStatus === 'success') + Number(['success', 'manual'].includes(terrainStatus)) + Number(Boolean(confirmedSnowStation))
 
   return (
     <div className={`app${simpleDesign ? ' app--simple' : ''}`}>
@@ -3418,7 +3415,7 @@ function AppWorkspace({ coordinateLink }) {
           </button>
           <div>
             <div className="brand-name">Solar Site <strong>Precheck</strong></div>
-            <div className="brand-subtitle">太陽光候補地・入力準備ツール</div>
+            <div className="brand-subtitle">太陽光計画の総合チェック</div>
           </div>
         </div>
         <div className="topbar-actions">
@@ -3430,16 +3427,19 @@ function AppWorkspace({ coordinateLink }) {
               const button = event.currentTarget.querySelectorAll('button')[index]
               button?.focus(); button?.click()
             }}><button type="button" aria-pressed={simpleDesign} onClick={() => { if (!simpleDesign) toggleSimpleDesign() }}>シンプル</button><button type="button" aria-pressed={!simpleDesign} onClick={() => { if (simpleDesign) toggleSimpleDesign() }}>詳細</button></div>
-            <button type="button" aria-current={activePage === 'solar' && !solarManualActive ? 'page' : undefined} onClick={() => switchPage('solar')}>候補地マップ</button>
+            <button type="button" aria-current={activePage === 'solar' && !solarManualActive ? 'page' : undefined} onClick={() => switchPage('solar')}>地図・3D地形</button>
+            <button type="button" onClick={() => openReviewSection('report-section')}>レポート</button>
             <details className="workspace-tools"><summary>ツール</summary>
               <div className="workspace-tools-menu" onClick={event => { if (event.target.closest('button, a')) { event.currentTarget.parentElement.open = false; event.currentTarget.parentElement.querySelector('summary')?.focus() } }}>
                 <button type="button" onClick={() => openReviewSection('solar-generation')}>発電量計算</button>
-                <button type="button" aria-current={activePage === 'power' ? 'page' : undefined} onClick={() => switchPage('power')}>系統確認</button>
+                <button type="button" aria-current={activePage === 'power' ? 'page' : undefined} onClick={() => switchPage('power')}>系統資料</button>
                 <button type="button" onClick={() => openReviewSection('simple-horizon')}>地平線・日影を計算</button>
                 <button type="button" onClick={() => openReviewSection('terrain-area')}>範囲の地形・3Dを見る</button>
                 <button type="button" onClick={() => openReviewSection('simple-snow')}>積雪データを見る</button>
                 <button type="button" onClick={() => openReviewSection('parcel-review-tools')}>範囲・地番の詳細</button>
-                <button type="button" onClick={() => openReviewSection('site-details')}>検討記録・メモ</button>
+                <button type="button" disabled={!position} onClick={saveReviewRecord}>記録を保存</button>
+                <button type="button" onClick={() => { openReviewSection('report-section'); window.setTimeout(() => { const menu = document.querySelector('.review-toolbar__menu--records'); if (menu) menu.open = true }, 0) }}>記録を開く</button>
+                <button type="button" onClick={() => openReviewSection('site-details')}>検討メモ</button>
                 <button type="button" onClick={() => openReviewSection('report-section')}>レポート</button>
                 <hr />
                 <button type="button" onClick={() => openReviewSection('use-cases')}>使い方・活用例</button>
@@ -3482,15 +3482,14 @@ function AppWorkspace({ coordinateLink }) {
             }} expanded />
           {generationNotice && <p role="status">{generationNotice}</p>}
         </section>}
-        {activePage === 'power' && <Suspense fallback={<p>系統確認マップを読み込んでいます…</p>}><PowerGridPage
+        {activePage === 'power' && <Suspense fallback={<p>系統資料マップを読み込んでいます…</p>}><PowerGridPage
           position={position} placeLabel={selectedPlaceLabel} powerGrid={powerGrid} gridCapacity={gridCapacity} capacityMatches={capacityMatches}
           annualYield={solarProMemo.annualYield} generation={generation} onSaveGridNote={addGridNote} savedGridNotes={gridNotes}
           onCheck={handlePowerGridCheck} onCancel={cancelPowerGridCheck} onLoadCapacity={handleBundledGridCapacity} onBack={() => switchPage('solar')}
           onReport={() => openReviewSection('report-section')} onGeneration={() => openReviewSection('solar-generation')}
           terrain={terrain} snowStation={confirmedSnowStation} onScenarioSources={openReviewSection}
         /></Suspense>}
-        {activePage === 'solar' && (
-          <>
+        <div className="solar-workspace" hidden={activePage !== 'solar'}>
 
 
         {drawingPanelOpen && <section id="drawing-utility" className={`utility-panel no-print ${drawingPanelOpen ? 'utility-panel--open' : 'utility-panel--collapsed'}`}>
@@ -3551,7 +3550,7 @@ function AppWorkspace({ coordinateLink }) {
 
               <div>
                 <div className="heading-with-help">
-                  <h1>候補地を探す</h1>
+                  <h1>3D地形分析</h1>
                   <details className="workflow-help no-print">
                     <summary aria-label="候補地点選択のヒントと基本作業順を確認">?</summary>
                     <div className="workflow-help__body">
@@ -3561,9 +3560,9 @@ function AppWorkspace({ coordinateLink }) {
                         GroundyやGoogleマップで周辺道路・区画を確認してから指定すると、位置のずれを減らせます。
                       </p>
                       <p className="workflow-help__quick">
-                        候補地点を決めた後、断面・地平線・NEDO積雪を順に確認し、最後にレポートで根拠を整理します。
+                        総合チェックから地形・日影・積雪・規制・発電量を見直し、残る確認と根拠をレポートにまとめます。必要な項目から開けます。
                       </p>
-                      <strong>基本作業順</strong>
+                      <strong>確認できること</strong>
                       <ol>
                         <li><b>地点を選択</b><span>住所・座標・地図クリックで候補地点を決める</span></li>
                         <li><b>断面確認</b><span>50/100/200mの断面で高低差と傾きを確認する</span></li>
@@ -3606,6 +3605,8 @@ function AppWorkspace({ coordinateLink }) {
 
             <MapPanel
               position={position}
+              regulatoryRequest={regulatoryRequest}
+              onInspectionState={setInspectionState}
               viewport={mapViewport.current}
               onViewportChange={next => { mapViewport.current = next }}
               onSelectionChange={rearmMapReset}
@@ -3645,6 +3646,7 @@ function AppWorkspace({ coordinateLink }) {
               googleMapsUrl={googleMapsUrl}
               locationBar={<MapLocationBar position={position} placeLabel={selectedPlaceLabel} placeStatus={placeInfo.status} elevation={elevation} onCopy={copySelectedCoordinates} onCopyDecimal={handleCopyDecimalCoordinates} copyStatus={pointActionStatus} onFetchElevation={fetchMissingElevation} onUseCurrentLocation={handleUseCurrentLocation} onResetWorkspace={resetWorkTools} locationStatus={locationStatus} resetMapNext={mapResetStage === 'view'} />}
             />
+
 
             <details className="parcel-settings" id="parcel-review-tools" onToggle={event => {
               const details = event.currentTarget
@@ -3726,6 +3728,10 @@ function AppWorkspace({ coordinateLink }) {
               </div>
               </details>
 
+            <details id="terrain-area" className="terrain-area-disclosure" open={terrainAreaOpen} onToggle={event => setTerrainAreaOpen(event.currentTarget.open)}>
+              <summary><strong>範囲を3Dで見る</strong><span>{terrainAreaOpen ? '閉じる' : '開く'}</span></summary>
+              <TerrainAreaPanel preferredView="3d" geometry={parcelMetrics.geometry} metrics={parcelMetrics} analysis={currentTerrainArea} status={terrainAreaStatus} progress={terrainAreaProgress} error={terrainAreaError} position={position} onAnalyze={handleTerrainAreaAnalysis} onCancel={cancelTerrainAreaAnalysis} onClear={() => { cancelTerrainAreaWork(); setTerrainArea(null); setTerrainAreaStatus('idle'); setTerrainAreaError(''); setReportView('summary') }} onDrawBoundary={() => openReviewSection('site-select', 'boundary')} onOpenReport={openTerrainAreaReport} onOpenDrawing={() => { openTerrainAreaReport(); setTerrainDrawingRequested(true) }} parcels={parcelReview.parcels} publicParcels={publicParcelSnapshot.features} publicParcelsLimited={publicParcelSnapshot.truncated || publicParcelSnapshot.status === 'partial'} preview={terrainPreview} onPreviewChange={setTerrainPreview} outputBlocked={terrainOutputBlocked} dxfReport={terrainPdfReport} />
+            </details>
             <section className="terrain-section-tools" aria-label="地点の地形断面">
               <div className="terrain-section-quick">
                 <div title={`選択地点から東西・南北へ各${terrainSectionRange}m、10m間隔の標高を確認します。`}>
@@ -3773,10 +3779,11 @@ function AppWorkspace({ coordinateLink }) {
             </section>
             <SelectedParcel3D review={parcelReview} referenceCount={publicParcelReferences.length} request={regional3DRequest} onAcquired={setSelectedParcelTerrain} initialAnalysis={selectedParcelTerrain} />
             <SimpleReviewPanel visible={simpleDesign} review={simpleReviewInput} referenceCount={publicParcelReferences.length} siteName={siteName} appVersion={APP_VERSION} terrainArea={simpleTerrainArea} layoutOptions={terrainPreview.options} layoutSettings={sharedLayoutSettings} onLayoutSettingsChange={changeSharedLayoutSettings} layoutPreview={terrainPreview} onApplied={applySimpleLayout} onBusyChange={setSharedLayoutBusy} outputBlocked={['loading', 'fetching', 'calculating'].includes(terrainAreaStatus)} drawingScale={terrainDrawingScale} onDrawingScaleChange={setTerrainDrawingScale} state={simpleWorkflow} onChange={setSimpleWorkflow} onRepresentativeChange={setSimpleRepresentative} onDraw={() => openReviewSection('site-select', 'boundary')} />
-            <details id="terrain-area" className="terrain-area-disclosure" open={terrainAreaOpen} onToggle={event => setTerrainAreaOpen(event.currentTarget.open)}>
-              <summary><strong>検討範囲の等高線・勾配・3D</strong><span>{terrainAreaOpen ? '閉じる' : '開く'}</span></summary>
-              <TerrainAreaPanel geometry={parcelMetrics.geometry} metrics={parcelMetrics} analysis={currentTerrainArea} status={terrainAreaStatus} progress={terrainAreaProgress} error={terrainAreaError} position={position} onAnalyze={handleTerrainAreaAnalysis} onCancel={cancelTerrainAreaAnalysis} onClear={() => { cancelTerrainAreaWork(); setTerrainArea(null); setTerrainAreaStatus('idle'); setTerrainAreaError(''); setReportView('summary') }} onDrawBoundary={() => openReviewSection('site-select', 'boundary')} onOpenReport={openTerrainAreaReport} onOpenDrawing={() => { openTerrainAreaReport(); setTerrainDrawingRequested(true) }} parcels={parcelReview.parcels} publicParcels={publicParcelSnapshot.features} publicParcelsLimited={publicParcelSnapshot.truncated || publicParcelSnapshot.status === 'partial'} preview={terrainPreview} onPreviewChange={setTerrainPreview} outputBlocked={terrainOutputBlocked} dxfReport={terrainPdfReport} />
-            </details>
+
+            <CandidateWorkflow position={position} terrainArea={currentTerrainArea} terrain={terrain} terrainStatus={terrainStatus} obstructionHeight={obstructionHeight} snowStation={confirmedSnowStation} snowStatus={snowData.status} inspection={inspectionState} onOpen={target => {
+              if (target === 'regulatory') { setRegulatoryRequest(value => value + 1); openReviewSection('site-select'); return }
+              openReviewSection(target)
+            }} />
             {selectedParcel && (
               <div className="selected-parcel-card">
                 <div>
@@ -3794,23 +3801,13 @@ function AppWorkspace({ coordinateLink }) {
           </section>
 
           <section className="panel details-panel" id="site-details">
-            {simpleDesign && <div className="simple-review">
-              <div className="simple-review-heading"><div><span className="simple-kicker">候補地の確認</span><h2>必要な情報を、順番に。</h2></div><span>{analysisCount} / 3 取得済み</span></div>
-              <div className="simple-review-grid">
-                <a href="#site-select" className="simple-review-item"><span>01　地形断面</span><strong>{terrainSectionStatus === 'success' ? `周辺${terrainSectionRange}m · 取得済み` : terrainSectionStatus === 'loading' ? '標高を取得中…' : terrainSectionStatus === 'error' ? '再取得が必要' : '未取得'}</strong><small>東西・南北の高低差を確認</small><em>地図・断面へ ↑</em></a>
-                <button type="button" className="simple-review-item" onClick={() => openSimpleSection('simple-horizon')}><span>02　地平線・日影</span><strong>{terrainStatus === 'loading' ? '地平線を分析中…' : ['success', 'manual'].includes(terrainStatus) ? '分析済み' : terrainStatus === 'error' ? '再分析が必要' : '未分析'}</strong><small>周辺地形と冬の太陽を比較</small><em>分析・結果を確認 →</em></button>
-                <button type="button" className="simple-review-item" onClick={() => openSimpleSection('simple-snow')}><span>03　NEDO積雪</span><strong>{confirmedSnowStation ? '同一メッシュ確認済み' : snowData.status === 'loading' ? '積雪データを取得中…' : snowData.status === 'error' ? '取得結果を確認' : '未取得'}</strong><small>月別の積雪補正値を確認</small><em>取得・入力値を確認 →</em></button>
-              </div>
-            </div>}
             <AnalysisContainer id="simple-analysis" className="simple-analysis">
             <summary className="chapter-summary">
-              <div className="section-heading"><div className="step-number">2</div><div><h2>地平線・積雪を確認</h2><p>周辺地形の日影とNEDO積雪を確認し、候補地の条件を整理します。</p></div></div>
+              <div className="section-heading"><div><h2>地平線・積雪</h2><p>周辺地形の日影とNEDO積雪を確認し、候補地の条件を整理します。</p></div></div>
               <span className="chapter-toggle">クリックして開く</span>
             </summary>
             <div className="chapter-body">
-              <div className="review-toolbar review-toolbar--standalone no-print">
-          <ReviewRecordsPanel position={position} onSave={saveReviewRecord} onRead={readReviewRecord} pending={pendingRecord} status={recordStatus} recordInfo={recordInfo} onApply={applyPendingRecord} onDismiss={() => { candidateRequests.current.start('record-import'); setPendingRecord(null); setRecordStatus({ message: '', error: false }) }} onUndo={undoOpenedRecord} canUndo={Boolean(undoRecord)} notesCount={gridNotes.length} />
-              </div>
+
             <div className="form-stack">
               <label className="site-name-field">
                 <span>候補地名</span>
@@ -3846,6 +3843,7 @@ function AppWorkspace({ coordinateLink }) {
                     <strong>{formatHorizonSummary(terrain)}</strong>
                     <span>{detailedHorizon ? '10°間隔・36方位を一括分析（詳細）' : '0° / 45° / 90° / 135° / 180° / 225° / 270° / 315°を一括分析'}</span>
                     <small className="terrain-box-note">
+                      樹高は実測ではなく一律{obstructionHeight}mの仮定です。結果内で変更できます。発電量の地形比較には樹高を加えない地形角を使います。<br />
                       DEM解析結果を1°間隔に補間してSolar Pro用CSVに出力します。<br />
                       ※ DEMから作成した参考用の地平線データです。
                     </small>
@@ -4219,7 +4217,7 @@ function AppWorkspace({ coordinateLink }) {
                 )}
               </div>
 
-              <label><span>候補地メモ</span><textarea value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="土地利用、接道、系統連系、周辺施設など" rows="3" /></label>
+              <label><span>候補地メモ</span><textarea value={memo} onChange={(e) => setMemo(e.target.value)} placeholder="土地利用、接道、周辺施設など" rows="3" /></label>
               <label><span>現地確認メモ</span><textarea value={fieldMemo} onChange={(e) => setFieldMemo(e.target.value)} placeholder="樹木・建物などの遮蔽物、傾斜、搬入路、写真番号など" rows="4" /></label>
             </div>
             </div>
@@ -4232,15 +4230,16 @@ function AppWorkspace({ coordinateLink }) {
         <section className="report-section" id="report-section">
           <details className="report-disclosure">
             <summary className="report-disclosure__summary">
-              <div className="section-heading"><div className="step-number">3</div><div><h2>候補地チェックレポート</h2><p>地形・積雪・発電量・系統の結果と未確認事項を整理</p></div></div>
+              <div className="section-heading"><div><h2>レポート・出力</h2><p>地形・積雪・発電量・系統の結果と未確認事項を整理</p></div></div>
               <span className="report-disclosure__toggle">クリックして開く</span>
             </summary>
             <div className="report-disclosure__body">
             {currentTerrainArea && <div className="terrain-report-selector no-print" role="group" aria-label="レポートの種類"><button type="button" aria-pressed={reportView === 'summary'} onClick={() => setReportView('summary')}>候補地チェック</button><button type="button" aria-pressed={reportView === 'terrain'} onClick={() => setReportView('terrain')}>地形図面 · A3</button></div>}
             {reportView !== 'terrain' && <>
-            <div className="report-readiness no-print"><div><strong>出力前に確認する内容</strong><p>発電量：{generation ? '計算済み' : '未計算'} ／ 地平線：{terrain?.samples?.length ? '分析済み' : '未分析'} ／ NEDO積雪：{confirmedSnowStation ? '確認済み' : '未取得'} ／ 系統設備：{powerGrid.data ? '取得済み（接続可否は未確認）' : '未取得'}</p><p>未取得の項目は未確認として出力します。設備確認メモは系統画面で保存すると検討記録とレポートに追加されます。</p></div><div className="report-readiness__actions"><button type="button" className="secondary-button" disabled={!position} onClick={() => openReviewSection('solar-generation')}>発電量を確認</button><button type="button" className="secondary-button" onClick={() => { openReviewSection('site-details'); const analysis = document.getElementById('simple-analysis'); if (analysis) analysis.open = true }}>地形・積雪を確認</button></div></div>
+            <div className="report-readiness no-print"><div><strong>出力前に確認する内容</strong><p>発電量：{generation ? '計算済み' : '未計算'} ／ 地平線：{terrain?.samples?.length ? '分析済み' : '未分析'} ／ NEDO積雪：{confirmedSnowStation ? '確認済み' : '未取得'}</p><p>未取得の項目は未確認として出力します。設備確認メモは系統画面で保存すると検討記録とレポートに追加されます。</p></div><div className="report-readiness__actions"><button type="button" className="secondary-button" disabled={!position} onClick={() => openReviewSection('solar-generation')}>発電量を確認</button><button type="button" className="secondary-button" onClick={() => { openReviewSection('site-details'); const analysis = document.getElementById('simple-analysis'); if (analysis) analysis.open = true }}>地形・積雪を確認</button></div></div>
             </>}
             {reportView === 'terrain' && terrainPreview.layout?.analysisReference === currentTerrainArea && <TerrainDrawingScaleControl value={terrainDrawingScale} onChange={setTerrainDrawingScale} grid={currentTerrainArea?.grid} disabled={terrainPdfStatus.loading}/>}
+            <div className="review-toolbar review-toolbar--standalone no-print"><ReviewRecordsPanel position={position} onSave={saveReviewRecord} onRead={readReviewRecord} pending={pendingRecord} status={recordStatus} recordInfo={recordInfo} onApply={applyPendingRecord} onDismiss={() => { candidateRequests.current.start('record-import'); setPendingRecord(null); setRecordStatus({ message: '', error: false }) }} onUndo={undoOpenedRecord} canUndo={Boolean(undoRecord)} notesCount={gridNotes.length} /></div>
             <div className="action-row no-print">
               <button type="button" className="secondary-button" onClick={downloadCsv}>チェックCSV出力</button>
               <button type="button" className="secondary-button" disabled={!position} onClick={saveReviewRecord}>検討記録を保存</button>
@@ -4310,7 +4309,7 @@ function AppWorkspace({ coordinateLink }) {
             <details className="manual-disclosure">
               <summary className="manual-disclosure__summary">
                 <div className="section-heading">
-                  <div className="step-number">M</div>
+
                   <div>
                     <h2>Solar Pro入力マニュアル</h2>
                     <p>候補地チェック結果、地平線CSV、積雪補正値を使ってSolar Proへ入力するための作業手順</p>
@@ -4399,7 +4398,7 @@ function AppWorkspace({ coordinateLink }) {
           <details className="knowledge-disclosure">
             <summary className="knowledge-disclosure__summary">
               <div className="section-heading">
-                <div className="step-number">4</div>
+
                 <div>
                   <h2>情報・ダウンロード・リンク集</h2>
                   <p>Solar Pro入力前後に使うテンプレート、標準機器メモ、外部確認サイトをまとめます。</p>
@@ -4531,8 +4530,7 @@ function AppWorkspace({ coordinateLink }) {
         </section>
         </div>
         <UseCasesGuide onExample={previewExampleRecord} onReport={() => openReviewSection('report-section')} />
-          </>
-        )}
+        </div>
 
         {activePage === 'pdf' && (
           <Suspense fallback={<div className="route-loading" role="status">PDFツールを準備しています…</div>}>

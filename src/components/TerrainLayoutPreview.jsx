@@ -139,7 +139,7 @@ export default function TerrainLayoutPreview({ analysis, preview, onChange, parc
         <p>1架台：幅 {number(widthFor(options.minColumns), 3)}{options.maxColumns !== options.minColumns ? `〜${number(widthFor(options.maxColumns), 3)}` : ''}m × 水平奥行 {number(rackDepth, 3)}m（パネル面の奥行 {number(rackLength, 3)}m）。前後の空き{number(options.rowGapM)}mを加えた行ピッチは{number(rackDepth+options.rowGapM,3)}m。4段固定・横置きの実寸を地形と同じメートル座標で配置します。初期値はモジュール15°・前後の空き3.3mで、日影を保証する離隔ではありません。</p>
         <p>JKM720N-66HL5-BDVの外形2.384 × 1.303m、モジュール間20mm、地表から最低0.8mの仮条件。地形のセル4点平均の局所勾配が{options.slopeLimitDeg}°未満で、架台全体と空きが有効範囲に収まるものだけを数えます。欠測と除外は使いません。15°・20°の選択は比較用で、施工可否の判定ではありません。</p>
         {layout && <p>対象勾配の参考面積：{layout.stats?.eligibleAreaCalculated === false ? '未計算' : `約${number(layout.eligibleAreaM2, 0)}m²`}。{pool.stats?.autoSearch && `${pool.stats.autoSearch.trials}案を比較、正面${number(pool.options.azimuthDeg, 0)}°。`}</p>}
-        <h4>容量の目安</h4><p>DC＝枚数×720W。AC＝DC÷1.5を標準刻みで丸めた参考値（100kW以下は10kW、超えると50kW）。連系・機器・日影・基礎・造成・施工可否は未判定。高さ2倍は表示だけで、枚数と容量は変わりません。</p>
+        <h4>容量の目安</h4><p>DC＝枚数×720W。AC＝DC÷1.5を標準刻みで丸めた参考値（100kW以下は10kW、超えると50kW）。機器・日影・基礎・造成・施工可否は未判定。高さ2倍は表示だけで、枚数と容量は変わりません。</p>
         {layout?.dcKw > 0 && <p>AC参考帯：{number(layout.acRangeKw?.[0], 0)}〜{number(layout.acRangeKw?.[1], 0)}kW。{layout.acTargetKw < 10 && '換算が10kW未満のため表示は下限10kWです。'}</p>}
         <h4>最適配置と仮フェンス</h4><p>最適配置は基準方位±30°を7.5°刻み・開始位置も比較する参考探索です。最大32案・8秒で、最大枚数を保証しません。</p><p>仮フェンスは選択中の架台全体を囲み、端の空きと同じ距離を外側に取る高さ1.2mの参考表示です。離れた架台の間も一緒に囲みます。有効範囲の外と欠測はつなぎません。実測境界・施工線ではありません。</p>
         <h4>保存と地番</h4><p>{TERRAIN_LAYOUT_SAVE}</p><p>地番は公開資料・読み込んだ筆の実データだけを表示し、住所から推測しません。</p>

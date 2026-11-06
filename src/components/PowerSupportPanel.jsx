@@ -42,7 +42,7 @@ export default function PowerSupportPanel({ controller, variant = 'controls' }) 
       <div className="power-support-card__heading"><h2>{selected.type === 'pole' ? '電柱' : '鉄塔'}の登録情報</h2><button type="button" onClick={controller.clearSelection} aria-label="電柱・鉄塔の選択を閉じる">閉じる</button></div>
       <dl><div><dt>設備番号</dt><dd>{selected.ref || '未記載'}</dd></div><div><dt>登録電圧</dt><dd>{selected.voltageLabel}</dd></div><div><dt>登録事業者</dt><dd>{selected.operator || '未記載'}</dd></div><div><dt>候補地から</dt><dd>{distanceLabel(selected.distanceMeters)} / 直線距離</dd></div><div><dt>取得日時</dt><dd>{state.data?.fetchedAt ? new Date(state.data.fetchedAt).toLocaleString('ja-JP') : '未記録'}</dd></div></dl>
       <a href={selected.sourceUrl} target="_blank" rel="noreferrer">OSMの登録情報を確認 ↗</a>
-      <details><summary>情報の読み方</summary><p>登録事業者は所有権の確認ではありません。電圧の公式確認・接続先・資料更新日は未確認です。取得日時は資料の更新日ではありません。</p></details>
+      <details><summary>情報の読み方</summary><p>登録事業者は所有権の確認ではありません。電圧の公式確認・資料更新日は未確認です。取得日時は資料の更新日ではありません。</p></details>
     </section>
   }
   const message = state.message || (state.retryAt > Date.now() ? '公開地図サーバーの利用制限中です。時間をおいて再試行してください。' : '')
