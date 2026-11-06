@@ -131,17 +131,21 @@ async function fetchElevationEndpoint(lat, lon, options) {
   }
 }
 
-export async function searchAddress(query) {
+export async function searchAddress(query, options = {}) {
   const params = new URLSearchParams({ q: query })
-  const data = await fetchJson(`${ADDRESS_ENDPOINT}?${params}`)
+  const data = await fetchJson(`${ADDRESS_ENDPOINT}?${params}`, 8000, options)
 
   if (!Array.isArray(data)) return []
 
+  // This compares names only. The service does not certify the location of a
+  // parcel/lot, even when its returned title matches the input text.
+  const nameKey = value => typeof value === 'string' ? value.normalize('NFKC').replace(/\s/g, '').replace(/[‐‑–—−]/g, '-') : ''
   return data.slice(0, 6).map((item) => ({
-    title: item.properties?.title || query,
-    lon: Number(item.geometry?.coordinates?.[0]),
-    lat: Number(item.geometry?.coordinates?.[1]),
-  })).filter((item) => Number.isFinite(item.lat) && Number.isFinite(item.lon))
+    title: typeof item?.properties?.title === 'string' ? item.properties.title : '',
+    nameMatchesQuery: Boolean(nameKey(query)) && nameKey(item?.properties?.title) === nameKey(query),
+    lon: Number(item?.geometry?.coordinates?.[0]),
+    lat: Number(item?.geometry?.coordinates?.[1]),
+  })).filter((item) => item.title.trim() && Number.isFinite(item.lat) && Number.isFinite(item.lon))
 }
 
 async function fetchMunicipalityData() {

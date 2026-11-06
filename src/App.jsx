@@ -659,6 +659,7 @@ function AppWorkspace({ coordinateLink }) {
   const [address, setAddress] = useState('')
   const [addressResults, setAddressResults] = useState([])
   const [searchStatus, setSearchStatus] = useState('idle')
+  const [searchSelection, setSearchSelection] = useState(null)
   const [currentLocation, setCurrentLocation] = useState(null)
   const [locationStatus, setLocationStatus] = useState({ status: 'idle', message: '' })
   const [placeInfo, setPlaceInfo] = useState(draftSeed.reviewRecordInfo && draftSeed.recordPlaceLabel ? { status: 'success', data: { label: draftSeed.recordPlaceLabel, source: '検討記録（保存時）' }, message: '', positionKey: analysisPositionKey(draftSeed.position) } : initialPlaceInfo)
@@ -1055,6 +1056,7 @@ function AppWorkspace({ coordinateLink }) {
     setParcelReview(createEmptyParcelReview()); setParcelMode('point'); setParcelReviewStatus('')
     setParcelData(null); setParcelStatus({ status: 'idle', message: '' })
     setPosition(null)
+    setSearchSelection(null)
     setAddress('')
     setAddressResults([])
     setSearchStatus('idle')
@@ -1083,6 +1085,7 @@ function AppWorkspace({ coordinateLink }) {
   }
 
   async function selectPosition(nextPosition, options = {}) {
+    setSearchSelection(options.addressResult || null)
     rearmMapReset()
     candidateRequests.current.invalidateAll()
     setCandidateRevision(current => current + 1)
@@ -1161,7 +1164,7 @@ function AppWorkspace({ coordinateLink }) {
     try {
       const results = await searchAddress(query)
       if (!isCurrent()) return
-      if (results.length === 1) { chooseAddress(results[0]); return }
+      if (results.length === 1 && results[0].nameMatchesQuery) { chooseAddress(results[0]); return }
       setAddressResults(results)
       setSearchStatus(results.length ? 'success' : 'empty')
     } catch {
@@ -1170,10 +1173,10 @@ function AppWorkspace({ coordinateLink }) {
   }
 
   function chooseAddress(result) {
-    setAddress(result.title)
+    if (result.nameMatchesQuery) setAddress(result.title)
     setAddressResults([])
     setSearchStatus('idle')
-    selectPosition({ lat: result.lat, lon: result.lon })
+    selectPosition({ lat: result.lat, lon: result.lon }, { addressResult: result })
   }
 
   function handleUseCurrentLocation() {
@@ -3047,7 +3050,7 @@ function AppWorkspace({ coordinateLink }) {
     setSiteName(candidate.name); setSiteNameTouched(true); setMemo(candidate.memo); setFieldMemo(candidate.fieldMemo)
     setParcelReview(candidate.parcelReview); setParcelMode('point'); setParcelReviewStatus('')
     setSelectedParcel(candidate.parcel); setParcelData(null); setFocusParcelId(null); setParcelQuery(''); setParcelStatus({ status: 'idle', message: '' })
-    setAddress(''); setAddressResults([]); setSearchStatus('idle')
+    setAddress(''); setAddressResults([]); setSearchStatus('idle'); setSearchSelection(null)
     setCurrentLocation(null); setLocationStatus({ status: 'idle', message: '' })
     setPlaceInfo({ status: 'success', data: { label: candidate.placeLabel || candidate.name || '保存記録の候補地', source: '検討記録（保存時）' }, message: '', positionKey: analysisPositionKey(candidate.position) })
     setPlaceApiStatus(initialPlaceApiStatus)
@@ -3069,7 +3072,7 @@ function AppWorkspace({ coordinateLink }) {
   function applyPendingRecord() {
     if (!pendingRecord) return
     try {
-      const previous = { position, elevation, terrain, terrainSection, terrainSectionRange, terrainArea: currentTerrainArea, obstructionHeight, detailedHorizon, snowBase, snowData, solarProMemo, generationInputs, generation, gridNotes, recordInfo, siteName, siteNameTouched, memo, fieldMemo, selectedParcel, parcelReview, parcelMode, parcelReviewStatus, parcelData, focusParcelId, parcelQuery, parcelStatus, powerGrid, placeInfo, placeApiStatus, currentLocation, locationStatus, address, addressResults, searchStatus, gridCapacity, adjacentMeshCompare, generationNotice }
+      const previous = { position, elevation, terrain, terrainSection, terrainSectionRange, terrainArea: currentTerrainArea, obstructionHeight, detailedHorizon, snowBase, snowData, solarProMemo, generationInputs, generation, gridNotes, recordInfo, siteName, siteNameTouched, memo, fieldMemo, selectedParcel, parcelReview, parcelMode, parcelReviewStatus, parcelData, focusParcelId, parcelQuery, parcelStatus, powerGrid, placeInfo, placeApiStatus, currentLocation, locationStatus, address, addressResults, searchStatus, searchSelection, gridCapacity, adjacentMeshCompare, generationNotice }
       restoreReviewRecord(pendingRecord); setUndoRecord(previous)
       setRecordStatus({ message: '記録を開きました。結果は保存当時の値です。新しい条件で計算すると更新されます。', error: false })
     } catch (error) { setRecordStatus({ message: error.message, error: true }) }
@@ -3091,6 +3094,7 @@ function AppWorkspace({ coordinateLink }) {
     setSelectedParcel(prior.selectedParcel); setParcelData(prior.parcelData); setFocusParcelId(prior.focusParcelId); setParcelQuery(prior.parcelQuery); setParcelStatus(settled(prior.parcelStatus))
     setPowerGrid(settled(prior.powerGrid)); setGridCapacity(settled(prior.gridCapacity)); setAdjacentMeshCompare(settled(prior.adjacentMeshCompare)); setGenerationNotice(prior.generationNotice); setPlaceInfo(settled(prior.placeInfo)); setPlaceApiStatus(prior.placeApiStatus)
     setCurrentLocation(prior.currentLocation); setLocationStatus(settled(prior.locationStatus)); setAddress(prior.address); setAddressResults(prior.addressResults); setSearchStatus(prior.searchStatus === 'loading' ? 'idle' : prior.searchStatus)
+    setSearchSelection(prior.searchSelection || null)
     setHorizonPanelOpen(false); setTerrainSectionOpen(false); setHorizonExportMessage(''); setPdfProgress(''); setPointActionStatus('')
     setPendingRecord(null); setUndoRecord(null); openReviewSection('site-details')
     setRecordStatus({ message: '開く前の候補地・条件・結果に戻しました。', error: false })
@@ -3590,7 +3594,7 @@ function AppWorkspace({ coordinateLink }) {
                   <ul className="search-results">
                     {addressResults.map((result) => (
                       <li key={`${result.lat}-${result.lon}`}>
-                        <button type="button" onClick={() => chooseAddress(result)}><span>●</span>{result.title}</button>
+                        <button type="button" onClick={() => chooseAddress(result)}><span>●</span><span>{result.title}<small>{result.nameMatchesQuery ? '地名候補・地番位置は未確認' : '入力名と異なる地名候補・地番位置は未確認'}</small></span></button>
                       </li>
                     ))}
                   </ul>
@@ -3602,6 +3606,7 @@ function AppWorkspace({ coordinateLink }) {
             </div>
             {searchStatus === 'empty' && <p className="inline-message">該当する候補がありません。座標の場合は「34.8617, 133.2433」の形式も使えます。</p>}
             {searchStatus === 'error' && <p className="inline-message inline-message--error">住所検索に接続できませんでした。座標入力または地図クリックを使用してください。</p>}
+            {searchSelection && <p className="inline-message" role="status">{searchSelection.nameMatchesQuery ? '検索した地名の位置です。' : `地名候補「${searchSelection.title}」へ移動しました。`}地番・筆界の位置は未確認です。地図で対象を確認してください。</p>}
 
             <MapPanel
               position={position}
