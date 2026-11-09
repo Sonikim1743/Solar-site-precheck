@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { comprehensiveReview, regulatoryReviewSummary } from '../src/utils/comprehensiveReview.js'
+import { exampleReviewRecord, parseReviewRecord } from '../src/utils/reviewRecord.js'
 import { inspectionPointKey } from '../src/utils/regulatoryPoint.js'
 
 const position = { lat: 35, lon: 135 }
@@ -61,4 +62,22 @@ test('partial area DEM is still a remaining check even with a valid slope median
   assert.equal(result.value, '勾配の中央値 0.0°')
   assert.match(result.detail, /一部欠測/)
   assert.equal(result.pending, true)
+})
+
+
+test('saved and undone manual horizon values retain their provenance after status resets', () => {
+  const record = exampleReviewRecord('1.28.6')
+  record.results.terrain = { position: record.candidate.position, radius: '手動入力', samples: [{ bearing: 0, direction: '北', angle: 8, terrainAngle: 2 }] }
+  const restored = parseReviewRecord(JSON.stringify(record))
+  for (const terrain of [record.results.terrain, restored.results.terrain]) {
+    const summary = comprehensiveReview({ position: record.candidate.position, terrain, terrainStatus: 'success', obstructionHeight: 20 }).find(row => row.id === 'simple-horizon')
+    assert.match(summary.detail, /手動編集あり・入力角 最大 8.0°/)
+    assert.doesNotMatch(summary.detail, /樹高仮定/)
+  }
+})
+
+test('unqueried regulatory copy describes available sources without promising zoning or parcel farmland checks', () => {
+  const summary = regulatoryReviewSummary(null, position)
+  assert.match(summary.detail, /埋蔵文化財・農業地域・洪水・土砂/)
+  assert.doesNotMatch(summary.detail, /用途地域|筆ごとの農地/)
 })

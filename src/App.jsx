@@ -14,6 +14,7 @@ import './components/power-grid-page.css'
 import ReportPreview from './components/ReportPreview.jsx'
 import GenerationPanel from './components/GenerationPanel.jsx'
 import { pageFromHash, hashForPage } from './utils/pageRoutes.js'
+import { focusVisiblePageHeading } from './utils/pageFocus.js'
 import './review-toolbar.css'
 import { createCandidateRequests } from './utils/candidateRequests.js'
 import { currentPlaceLabel, recoverTerrainEvidence, restoreDraftEvidence } from './utils/siteEvidence.js'
@@ -3353,7 +3354,11 @@ function AppWorkspace({ coordinateLink }) {
     [parcelData, parcelQuery],
   )
 
+  const pageFocusCleanup = useRef(() => {})
+  useEffect(() => () => pageFocusCleanup.current(), [])
+
   function switchPage(nextPage) {
+    pageFocusCleanup.current()
     setActivePage(pageFromHash(hashForPage(nextPage)))
     setParcelMode('point')
     setSolarManualActive(false)
@@ -3361,7 +3366,8 @@ function AppWorkspace({ coordinateLink }) {
       const hash = hashForPage(nextPage)
       window.history.replaceState(null, '', hash)
       window.scrollTo({ top: 0, behavior: 'smooth' })
-      window.setTimeout(() => { const title = document.querySelector('main h1, main h2'); if (title) { title.tabIndex = -1; title.focus({ preventScroll: true }) } }, 0)
+      const focusTimer = window.setTimeout(() => { pageFocusCleanup.current = focusVisiblePageHeading() }, 0)
+      pageFocusCleanup.current = () => window.clearTimeout(focusTimer)
     }
   }
 
@@ -3419,7 +3425,7 @@ function AppWorkspace({ coordinateLink }) {
           </button>
           <div>
             <div className="brand-name">Solar Site <strong>Precheck</strong></div>
-            <div className="brand-subtitle">太陽光計画の総合チェック</div>
+            <div className="brand-subtitle">地図から始める3D地形検討</div>
           </div>
         </div>
         <div className="topbar-actions">
@@ -4235,7 +4241,7 @@ function AppWorkspace({ coordinateLink }) {
         <section className="report-section" id="report-section">
           <details className="report-disclosure">
             <summary className="report-disclosure__summary">
-              <div className="section-heading"><div><h2>レポート・出力</h2><p>地形・積雪・発電量・系統の結果と未確認事項を整理</p></div></div>
+              <div className="section-heading"><div><h2>レポート・出力</h2><p>地形・積雪・メモと未確認事項を整理</p></div></div>
               <span className="report-disclosure__toggle">クリックして開く</span>
             </summary>
             <div className="report-disclosure__body">
