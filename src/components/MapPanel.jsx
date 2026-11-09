@@ -812,11 +812,11 @@ export default function MapPanel({
 
   useEffect(() => {
     if (!isDrawing) return
-    setMapInteractionEnabled(true)
+    if (isCompactMap) setMapInteractionEnabled(true)
     mapShellRef.current?.focus({ preventScroll: true })
     const reduceMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
     mapShellRef.current?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' })
-  }, [parcelMode, isDrawing])
+  }, [parcelMode, isDrawing, isCompactMap])
 
   function replaceDraft(vertices) {
     draftRef.current = vertices
@@ -909,7 +909,7 @@ export default function MapPanel({
       <div className="map-draw-controls" role="group" aria-label="地番表示・範囲の作図">
         <button type="button" className={parcelMode === 'boundary' ? 'is-active' : ''} aria-pressed={parcelMode === 'boundary'} onClick={() => onParcelModeChange?.(parcelMode === 'boundary' ? 'point' : 'boundary')} disabled={!onParcelModeChange}>範囲を描く</button>
         <button type="button" className={parcelMode === 'exclusion' ? 'is-active' : ''} aria-pressed={parcelMode === 'exclusion'} onClick={() => onParcelModeChange?.(parcelMode === 'exclusion' ? 'point' : 'exclusion')} disabled={!onParcelModeChange}>除外</button>
-        <button type="button" className={`map-public-parcel-toggle${showPublicParcels ? ' is-active' : ''}`} aria-pressed={showPublicParcels} aria-label="地番選択" title="表示境界を参考領域として選択。原本全筆は未確認。出典情報を参照。" onClick={() => { if(showPublicParcels){mapPickJob.current++;setMapPickBusy(false)}else setMapInteractionEnabled(true);setShowPublicParcels(value => !value) }}>地番選択 {showPublicParcels ? 'ON' : 'OFF'}</button>
+        <button type="button" className={`map-public-parcel-toggle${showPublicParcels ? ' is-active' : ''}`} aria-pressed={showPublicParcels} aria-label="地番選択" title="表示境界を参考領域として選択。原本全筆は未確認。出典情報を参照。" onClick={() => { if(showPublicParcels){mapPickJob.current++;setMapPickBusy(false)}else if(isCompactMap) setMapInteractionEnabled(true);setShowPublicParcels(value => !value) }}>地番選択 {showPublicParcels ? 'ON' : 'OFF'}</button>
       </div>
 
       <button type="button" className="map-interaction-toggle" disabled={isDrawing} aria-pressed={mapInteractionEnabled} onClick={() => setMapInteractionEnabled(value => !value)} title={isCompactMap ? "ページスクロールと地図操作を切り替えます" : "通常はページをスクロール。ONでホイール拡大。＋と−はいつでも使えます。"}>{isCompactMap ? (mapInteractionEnabled ? "地図操作 ON" : "地図操作を有効化") : ("ホイール拡大 " + (mapInteractionEnabled ? "ON" : "OFF"))}</button>

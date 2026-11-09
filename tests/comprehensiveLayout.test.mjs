@@ -23,3 +23,11 @@ test('supplementary checks start closed without hiding the existing 3D function'
   assert.doesNotMatch(tag, /\bopen\b/)
   assert.match(source, /地平線・積雪・規制の補足確認/)
 })
+
+
+test('desktop drawing and parcel selection do not silently enable wheel zoom', async () => {
+  const source = await readFile(new URL('../src/components/MapPanel.jsx', import.meta.url), 'utf8')
+  assert.ok(source.includes('if (isCompactMap) setMapInteractionEnabled(true)'))
+  assert.ok(source.includes('else if(isCompactMap) setMapInteractionEnabled(true);setShowPublicParcels'))
+  assert.equal(source.split(String.fromCharCode(10)).some(line => line.trim() === 'setMapInteractionEnabled(true)'), false)
+})
