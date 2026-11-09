@@ -9,6 +9,7 @@ import { verifyBrowserAssets } from './verifyBrowserAssets.js'
 
 // A release must be made from committed source. Never substitute a dirty-tree bypass.
 const root = process.cwd()
+const webOnly = process.argv.includes('--web-only')
 const run = (file, args = [], env = {}) => execFileSync(process.execPath, [file, ...args], { cwd: root, stdio: 'inherit', env: { ...process.env, ...env } })
 run('work/assert-clean-tree.mjs')
 const sourceCommit = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
@@ -46,7 +47,7 @@ const edgeRuntimeGuard = {
   },
 }
 const packages = []
-for (const target of ['cloudflare', 'portable']) {
+for (const target of (webOnly ? ['cloudflare'] : ['cloudflare', 'portable'])) {
   const directory = join(output, target)
   await mkdir(directory)
   const dist = join(directory, 'dist')
@@ -108,21 +109,23 @@ for (const target of ['cloudflare', 'portable']) {
   const metadata = {
     app: 'Solar Site Precheck', version, buildDate, sourceCommit, target,
     buildId: `${version}-${buildDate}-${packageHash.slice(0, 12)}`, packageName,
-    zipUrl: `https://raw.githubusercontent.com/Sonikim1743/Solar-site-precheck/main/release/latest/${packageName}`,
+    ...(webOnly ? { distribution: 'local-package' } : { zipUrl: `https://raw.githubusercontent.com/Sonikim1743/Solar-site-precheck/main/release/latest/${packageName}` }),
     sha256: packageHash, etag: packageHash.slice(0, 16), bundleName, minRequiredRuntime: '1.2',
-    notes: target === 'portable' ? '除外検討区域の参考表示・岡山文化財/農業地域・広島/山口の古い農地資料・実寸2D DXF保存。資料年/測地系/現行境界は各注記を確認。既存runtime/node.exeは保持。' : '除外検討区域の参考表示・岡山文化財/農業地域・広島/山口の古い農地資料・実寸2D DXF保存。資料年/測地系/現行境界は各注記を確認。dist・functions・sharedを含むルートから配布。',
+    notes: '3D地形を主導線に整理。複数参考領域の合併と住所候補確認を修正。手動地平線の出典表示と画面移動を整合。参考区域は地点照合であり、現行境界・許認可を確定しない。',
     sizeBytes: archive.length,
   }
   await writeFile(join(output, `${target}-metadata.json`), JSON.stringify(metadata, null, 2) + '\n')
   packages.push({ ...metadata, path: relative(root, path).split(sep).join('/') })
 }
 // Do not update tracked release/latest until both targets are successfully verified.
-const portable = packages.find((item) => item.target === 'portable')
-const cloudflare = packages.find((item) => item.target === 'cloudflare')
-await copy(portable.path, join('release/latest', portable.packageName))
-await copy(join(output, 'portable-metadata.json'), 'release/latest/latest-version.json')
-await copy(cloudflare.path, join('release/latest', cloudflare.packageName))
-await copy(join(output, 'cloudflare-metadata.json'), 'release/latest/cloudflare-version.json')
-run('work/verify-release-metadata.mjs')
+if (!webOnly) {
+  const portable = packages.find((item) => item.target === 'portable')
+  const cloudflare = packages.find((item) => item.target === 'cloudflare')
+  await copy(portable.path, join('release/latest', portable.packageName))
+  await copy(join(output, 'portable-metadata.json'), 'release/latest/latest-version.json')
+  await copy(cloudflare.path, join('release/latest', cloudflare.packageName))
+  await copy(join(output, 'cloudflare-metadata.json'), 'release/latest/cloudflare-version.json')
+  run('work/verify-release-metadata.mjs')
+}
 await writeFile(join(output, 'packages.json'), JSON.stringify(packages, null, 2) + '\n')
 console.log(JSON.stringify({ output, packages }, null, 2))

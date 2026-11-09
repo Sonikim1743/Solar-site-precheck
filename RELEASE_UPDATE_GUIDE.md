@@ -1,8 +1,38 @@
+# 更新手順 — Web v1.28.6 / 2026-11-09
+
+[今回の変更](https://github.com/Sonikim1743/Solar-site-precheck/blob/main/docs/RELEASE_v1.28.6_JA.md)と [実際の公開記録](https://github.com/Sonikim1743/Solar-site-precheck/blob/main/docs/DEPLOYED_VERSION.md) を確認してください。GitHubへの反映、オンライン版の公開、各PCのインストール更新は別です。
+
+## オンライン版
+
+既存の https://solar-site-precheck.pages.dev/ を再読み込みし、画面下の Version 1.28.6 / Build 2026-11-09 を確認します。選択・入力・記録を保存してから更新してください。座標リンクからの一時検討は自動保存されません。
+
+地図上部で範囲を描くか参考領域を選択し、「範囲を3Dで見る」へ進みます。補足チェックは必要なときに開きます。保存・再開はツールとレポート内、発電量・系統資料はツール内です。名称不一致の住所候補は地番位置を未確認として利用者が選びます。
+
+## Webパッケージの作成と公開
+
+コミット済みclean sourceから pnpm package:web を実行します。検証済みパッケージのルートにdist・functions・shared・wrangler.tomlがあることを確認し、既存Cloudflare Pagesへ公開します。GitHub pushだけでは公開サイトは更新されません。[配布手順](https://github.com/Sonikim1743/Solar-site-precheck/blob/main/docs/DEPLOYMENT_PACKAGE.md) を参照してください。
+
+## Windows版
+
+公開済みWindows自動更新ZIPはv1.28.3のままです。今回のWeb版v1.28.6を、全PCへインストールしたとは扱いません。自動更新は既存メタデータが指すZIPを使用し、検討記録・既存runtime/node.exe・個人データを保持してください。
+
+## 保存・出力
+
+schema 1/2/3を読み込み、schema 3は範囲・取得済み標高・出典・取得時刻を保持します。参考配置の条件・結果・個別除外・仮フェンスはJSON保存対象外です。適用中の結果は配置図PDF・地形報告書・DXFへ出力できます。元の記録・原資料は別途保管してください。
+
+Mac/Safari実機、実機タッチ、複数タブ保存競合、別環境の記録互換は別途確認が必要です。境界・DEM・規制は参考情報であり、測量・施工・許認可を確定しません。
+
+---
+
+# 以前の更新手順（以下は当時の記録）
+
+以下の版番号・配布名・未対応範囲は当時の状態です。現行版には上の説明を使用してください。
+
 # v1.28.2 更新手順 — 2026-10-13
 
 ## 今回の更新 — 2026-10-15
 
-配置図は左右同じ固定縮尺（初期1:1000・50m＝50mm）に対応。A3横100%で印刷してください。案内を短くし、図面の重複計算と旧SVGを整理しました。境界・DEM・施工可否は参考情報です。詳細な変更は [更新履歴](CHANGELOG.md)、実際の配布状態は [公開記録](docs/DEPLOYED_VERSION.md)を参照してください。
+配置図は左右同じ固定縮尺（初期1:1000・50m＝50mm）に対応。A3横100%で印刷してください。案内を短くし、図面の重複計算と旧SVGを整理しました。境界・DEM・施工可否は参考情報です。詳細な変更は [更新履歴](CHANGELOG.md)、実際の配布状態は [公開記録](https://github.com/Sonikim1743/Solar-site-precheck/blob/main/docs/DEPLOYED_VERSION.md)を参照してください。
 
 
 今回の公開・配布版は **Version 1.28.2 / Build 2026-10-13** です。GitHub main・既存オンライン版を更新し、アプリ・ZIP・manifestを照合しました。ソース・配布ID・ハッシュと確認範囲は [公開記録](https://github.com/Sonikim1743/Solar-site-precheck/blob/main/docs/DEPLOYED_VERSION.md) を参照してください。各PCへのインストール更新は別の作業です。
@@ -21,7 +51,7 @@
 
 ## Cloudflareの更新
 
-`SolarSitePrecheck_v1.28.2_2026-10-13_cloudflare.zip` の展開先ルートを使います。dist・functions・shared・wrangler.tomlをそろえ、認証済みWranglerで既存プロジェクト `solar-site-precheck` のmainへ配布します。詳しくは [配布手順](docs/DEPLOYMENT_PACKAGE.md) を参照してください。GitHubへのpushとCloudflareへの公開は別の操作です。
+`SolarSitePrecheck_v1.28.2_2026-10-13_cloudflare.zip` の展開先ルートを使います。dist・functions・shared・wrangler.tomlをそろえ、認証済みWranglerで既存プロジェクト `solar-site-precheck` のmainへ配布します。詳しくは [配布手順](https://github.com/Sonikim1743/Solar-site-precheck/blob/main/docs/DEPLOYMENT_PACKAGE.md) を参照してください。GitHubへのpushとCloudflareへの公開は別の操作です。
 
 ## 記録と確認範囲
 
@@ -35,7 +65,7 @@ Mac/Safari実機、複数タブの保存衝突、異なる実行環境へ記録�
 
 # 過去の更新履歴（以下は当時の記録）
 
-以下のバージョン名・起動先・schema・作成命令は過去の記録です。今回の更新には上記v1.28.2手順を使用してください。2026-10-08のv1.28.1変更・公開履歴は [更新履歴](CHANGELOG.md) と [公開記録](docs/DEPLOYED_VERSION.md) に保持しています。
+以下のバージョン名・起動先・schema・作成命令は過去の記録です。今回の更新には上記v1.28.2手順を使用してください。2026-10-08のv1.28.1変更・公開履歴は [更新履歴](CHANGELOG.md) と [公開記録](https://github.com/Sonikim1743/Solar-site-precheck/blob/main/docs/DEPLOYED_VERSION.md) に保持しています。
 
 ## v1.27.2 更新完了 — 2026-09-24
 
@@ -63,7 +93,7 @@ GitHub、既存Cloudflare Pages、Windowsローカル実行版を更新しまし
 
 最新の配布物は、変更をコミットして作業ツリーをクリーンにした後、`node build/packageDeployment.js` で作成します。テスト・CSP・同梱PDF/OCR・ZIP内SHA-256を検証し、`outputs/v1.23-日付-…/` にCloudflare用とローカル更新用のZIPを別々に出力します。GitHubへのpushや本番への配布は行いません。
 
-OpenClawには **cloudflare.zip** と [配布手順](docs/DEPLOYMENT_PACKAGE.md) を渡してください。ビルド対象によってPDFサイズ制限などが異なるため、ローカル更新版をCloudflareへ配布しないでください。`release/latest` には従来どおりローカル更新版とメタデータが配置されます。
+OpenClawには **cloudflare.zip** と [配布手順](https://github.com/Sonikim1743/Solar-site-precheck/blob/main/docs/DEPLOYMENT_PACKAGE.md) を渡してください。ビルド対象によってPDFサイズ制限などが異なるため、ローカル更新版をCloudflareへ配布しないでください。`release/latest` には従来どおりローカル更新版とメタデータが配置されます。
 
 ## 2026-08-31 修正時の確認事項
 

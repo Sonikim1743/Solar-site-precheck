@@ -16,8 +16,8 @@ function dateText(value) {
   return value && Number.isFinite(date.getTime()) ? date.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '未記録'
 }
 
-export default function TerrainAreaPanel({ geometry, metrics, analysis, status = 'idle', progress, error, onAnalyze, onCancel, onClear, position, onDrawBoundary, onOpenReport, onOpenDrawing, parcels = [], publicParcels = [], publicParcelsLimited = false, preview, onPreviewChange, outputBlocked = false, dxfReport }) {
-  const [view, setView] = useState('plan')
+export default function TerrainAreaPanel({ geometry, metrics, analysis, status = 'idle', progress, error, onAnalyze, onCancel, onClear, position, onDrawBoundary, onOpenReport, onOpenDrawing, parcels = [], publicParcels = [], publicParcelsLimited = false, preview, onPreviewChange, outputBlocked = false, dxfReport, preferredView = 'plan' }) {
+  const [view, setView] = useState(preferredView === '3d' ? '3d' : 'plan')
   const id = `terrain-area-${useId().replace(/:/g, '')}`
   const state = typeof status === 'string' ? status : status?.status || 'idle'
   const loading = ['loading', 'fetching', 'calculating'].includes(state)
@@ -38,7 +38,7 @@ export default function TerrainAreaPanel({ geometry, metrics, analysis, status =
     <p>架台をクリックで除外・点線で戻す</p>
   </div>
   const shownParcels = preview?.labels ? parcelOverlay : null
-  useEffect(() => { setView('plan') }, [analysis?.geometryKey, analysis?.fetchedAt])
+  useEffect(() => { setView(preferredView === '3d' ? '3d' : 'plan') }, [analysis?.geometryKey, analysis?.fetchedAt, preferredView])
 
   return <section className="terrain-area-panel" aria-labelledby={`${id}-heading`}>
     <h3 id={`${id}-heading`} className="terrain-area-panel-heading">範囲の地形</h3>

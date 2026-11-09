@@ -120,7 +120,7 @@ function MapController({ position, viewport, onViewportChange, resetRequest }) {
   return null
 }
 
-function MapInteractionController({ locked, drawing, preserveViewport, resetRequest }) {
+function MapInteractionController({ locked, drawing, preserveViewport, resetRequest, wheelEnabled }) {
   const map = useMap()
 
   useEffect(() => {
@@ -133,14 +133,15 @@ function MapInteractionController({ locked, drawing, preserveViewport, resetRequ
       map.doubleClickZoom,
       map.boxZoom,
       map.keyboard,
-      map.scrollWheelZoom,
     ].filter(Boolean)
     handlers.forEach((handler) => {
       if (locked) handler.disable()
       else handler.enable()
     })
+    if (locked || !wheelEnabled) map.scrollWheelZoom.disable()
+    else map.scrollWheelZoom.enable()
     if (drawing) map.doubleClickZoom.disable()
-  }, [map, locked, drawing, preserveViewport, resetRequest])
+  }, [map, locked, drawing, preserveViewport, resetRequest, wheelEnabled])
 
   return null
 }
@@ -161,7 +162,7 @@ function SiteMarker({ position, placeInfo, suppressPopup = false }) {
   if (!position) return null
 
   return (
-    <Marker ref={markerRef} position={[position.lat, position.lon]} icon={markerIcon}>
+    <Marker ref={markerRef} position={[position.lat, position.lon]} icon={markerIcon} alt="選択地点" title="選択地点">
       <Popup closeButton={false} className="site-popup">
         <div className="site-popup__content">
           <span>選択地点</span>
@@ -676,6 +677,8 @@ function ReviewGeometryLayers({ review, vertices, onClose, locked = false, dimme
 
 export default function MapPanel({
   position,
+  regulatoryRequest = 0,
+  onInspectionState,
   onSelect,
   onUseCurrentLocation,
   onResetWorkspace,
@@ -764,6 +767,13 @@ export default function MapPanel({
   const [showPlaceNames, setShowPlaceNames] = useState(true)
   const [hazardSettings, setHazardSettings] = useState(initialHazardSettings)
   const [regulatoryDetailsOpen, setRegulatoryDetailsOpen] = useState(false)
+  const previousRegulatoryRequest = useRef(regulatoryRequest)
+  useEffect(() => {
+    if (previousRegulatoryRequest.current === regulatoryRequest) return
+    previousRegulatoryRequest.current = regulatoryRequest
+    setHazardSettings(previous => changeHazardSettings(previous, { enabled: true }))
+    setRegulatoryDetailsOpen(true)
+  }, [regulatoryRequest])
   const regulatoryDetailsId = useId()
   const regulatoryDetailsButtonRef = useRef(null)
   const closeRegulatoryDetails = () => {
@@ -789,6 +799,7 @@ export default function MapPanel({
   const [publicParcelStatus, setPublicParcelStatus] = useState({ state: 'off', message: '' })
   const [placeNameStatus, setPlaceNameStatus] = useState(null)
   useEffect(() => setShowTerrainArea(true), [terrainArea?.geometryKey, terrainArea?.fetchedAt])
+  const [tileStatus, setTileStatus] = useState({ status: 'loading', failures: 0 })
   const [isCompactMap, setIsCompactMap] = useState(false)
   const [mapInteractionEnabled, setMapInteractionEnabled] = useState(false)
   const [draftVertices, setDraftVertices] = useState([])
@@ -801,11 +812,11 @@ export default function MapPanel({
 
   useEffect(() => {
     if (!isDrawing) return
-    setMapInteractionEnabled(true)
+    if (isCompactMap) setMapInteractionEnabled(true)
     mapShellRef.current?.focus({ preventScroll: true })
     const reduceMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
     mapShellRef.current?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' })
-  }, [parcelMode, isDrawing])
+  }, [parcelMode, isDrawing, isCompactMap])
 
   function replaceDraft(vertices) {
     draftRef.current = vertices
@@ -889,6 +900,21 @@ export default function MapPanel({
 
   return (
     <>
+    <div className="map-toolbar no-print" aria-label="地図の操作と表示">
+      <div className="map-display-controls" aria-label="地図の表示切替">
+        <button type="button" className="map-base-toggle" aria-label={`${baseMap === 'photo' ? '等高線地図' : '航空写真'}へ切り替える`} aria-pressed={baseMap === 'std'} title={baseMap === 'photo' ? '等高線のある国土地理院標準地図へ切り替え' : '航空写真へ切り替え'} onClick={() => setBaseMap(value => value === 'photo' ? 'std' : 'photo')}>{baseMap === 'photo' ? '等高線地図' : '航空写真'}</button>
+        <RegulatoryToggle enabled={hazardSettings.enabled} detailsOpen={regulatoryDetailsOpen} detailsId={regulatoryDetailsId} detailsButtonRef={regulatoryDetailsButtonRef} onDetailsToggle={() => setRegulatoryDetailsOpen(value => !value)} onToggle={() => { setRegulatoryDetailsOpen(!hazardSettings.enabled); setHazardSettings(previous => changeHazardSettings(previous,{enabled:!previous.enabled})); setHazardStatuses({}); setHazardRegion({state:'idle',prefecture:''}) }} />
+        <details ref={displayOptionsRef} className="map-display-options" onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus() } }}><summary aria-label="地図の表示設定" title="地図の表示設定">⋯</summary><div><button type="button" className="map-place-names-toggle" aria-label="地名を表示" aria-pressed={showPlaceNames} title="重ねて表示する地名の設定。標準地図に含まれる文字は残ります。" onClick={() => setShowPlaceNames(value => !value)}>地名 <span aria-hidden="true">{showPlaceNames ? 'ON' : 'OFF'}</span></button><MapRegulatoryControls settings={hazardSettings} onChange={patch => { setHazardSettings(previous => changeHazardSettings(previous, patch)); if(patch.enabled !== undefined) setHazardStatuses({}) }} statuses={hazardStatuses} region={hazardRegion} storedStatus={storedHazardStatus} referenceStatus={referenceStatus} includeHistorical={includeHistoricalFarmland} onHistoricalChange={setIncludeHistoricalFarmland} onRetry={() => { setHazardStatuses({}); setHazardRetry(value => value + 1) }} /></div></details>
+      </div>
+      <div className="map-draw-controls" role="group" aria-label="地番表示・範囲の作図">
+        <button type="button" className={parcelMode === 'boundary' ? 'is-active' : ''} aria-pressed={parcelMode === 'boundary'} onClick={() => onParcelModeChange?.(parcelMode === 'boundary' ? 'point' : 'boundary')} disabled={!onParcelModeChange}>範囲を描く</button>
+        <button type="button" className={parcelMode === 'exclusion' ? 'is-active' : ''} aria-pressed={parcelMode === 'exclusion'} onClick={() => onParcelModeChange?.(parcelMode === 'exclusion' ? 'point' : 'exclusion')} disabled={!onParcelModeChange}>除外</button>
+        <button type="button" className={`map-public-parcel-toggle${showPublicParcels ? ' is-active' : ''}`} aria-pressed={showPublicParcels} aria-label="地番選択" title="表示境界を参考領域として選択。原本全筆は未確認。出典情報を参照。" onClick={() => { if(showPublicParcels){mapPickJob.current++;setMapPickBusy(false)}else if(isCompactMap) setMapInteractionEnabled(true);setShowPublicParcels(value => !value) }}>地番選択 {showPublicParcels ? 'ON' : 'OFF'}</button>
+      </div>
+
+      <button type="button" className="map-interaction-toggle" disabled={isDrawing} aria-pressed={mapInteractionEnabled} onClick={() => setMapInteractionEnabled(value => !value)} title={isCompactMap ? "ページスクロールと地図操作を切り替えます" : "通常はページをスクロール。ONでホイール拡大。＋と−はいつでも使えます。"}>{isCompactMap ? (mapInteractionEnabled ? "地図操作 ON" : "地図操作を有効化") : ("ホイール拡大 " + (mapInteractionEnabled ? "ON" : "OFF"))}</button>
+    </div>
+    <p className={"map-load-status" + (tileStatus.status === "error" ? " is-error" : "")} role="status">{tileStatus.status === "loading" ? "地図画像を読み込み中…" : tileStatus.status === "error" ? "地図画像の一部を取得できません。移動・再読み込みして確認してください。" : ""}</p>
     <div ref={mapShellRef} tabIndex={-1} data-basemap={baseMap} className={`map-shell${isDrawing ? ' map-shell--parcel-drawing' : ''}`} onKeyDown={(event) => {
       if (!isDrawing || event.target.closest?.('input, textarea, select, button, a, summary')) return
       if (event.key === 'Escape') { event.preventDefault(); cancelDrawing() }
@@ -899,7 +925,7 @@ export default function MapPanel({
         zoom={viewport?.zoom ?? INITIAL_MAP_ZOOM}
         minZoom={4}
         maxZoom={Math.max(NORMAL_MAX_ZOOM, viewport?.zoom || 0)}
-        scrollWheelZoom
+        scrollWheelZoom={false}
         className="map"
       >
         <TileLayer
@@ -907,6 +933,11 @@ export default function MapPanel({
           url={baseMap === 'photo' ? 'https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg' : 'https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png'}
           maxZoom={DRAWING_MAX_ZOOM}
           maxNativeZoom={18}
+          eventHandlers={{
+            loading: () => setTileStatus({ status: 'loading', failures: 0 }),
+            tileerror: () => setTileStatus(previous => ({ ...previous, status: 'error', failures: previous.failures + 1 })),
+            load: () => setTileStatus(previous => ({ ...previous, status: previous.failures ? 'error' : 'ready' })),
+          }}
         />
         <HazardRegionController enabled={hazardSettings.enabled} onRegion={handleHazardRegion} retry={hazardRetry} />
         <MapStoredHazards enabled={hazardSettings.enabled} region={hazardRegion} opacity={hazardSettings.opacity} retry={hazardRetry} onStatus={setStoredHazardStatus} />
@@ -917,7 +948,7 @@ export default function MapPanel({
         <MapDistanceScale position="bottomleft" />
         <ClickHandler onPublicParcelPick={pickPublicReference} onSelect={onSelect} mode={parcelMode} locked={mapLocked} onAddVertex={addDraftVertex} onFinish={finishDrawing} />
         <MapController position={position} viewport={viewport} onViewportChange={onViewportChange} resetRequest={mapViewResetRequest} />
-        <MapInteractionController locked={mapLocked} drawing={isDrawing} preserveViewport={preserveViewport} resetRequest={mapViewResetRequest} />
+        <MapInteractionController wheelEnabled={mapInteractionEnabled} locked={mapLocked} drawing={isDrawing} preserveViewport={preserveViewport} resetRequest={mapViewResetRequest} />
         <ParcelLayer
           data={parcelData}
           selectedParcelId={selectedParcelId}
@@ -941,29 +972,9 @@ export default function MapPanel({
         <ReviewGeometryLayers review={parcelReview} vertices={draftVertices} onClose={finishDrawing} locked={mapLocked} dimmed={isDrawing} />
       </MapContainer>
       <MapRegionLabel position={position} placeInfo={placeInfo} />
-      <div className="map-display-controls" aria-label="地図の表示切替">
-        <button type="button" className="map-base-toggle" aria-label={`${baseMap === 'photo' ? '等高線地図' : '航空写真'}へ切り替える`} aria-pressed={baseMap === 'std'} title={baseMap === 'photo' ? '等高線のある国土地理院標準地図へ切り替え' : '航空写真へ切り替え'} onClick={() => setBaseMap(value => value === 'photo' ? 'std' : 'photo')}>{baseMap === 'photo' ? '等高線地図' : '航空写真'}</button>
-        <RegulatoryToggle enabled={hazardSettings.enabled} detailsOpen={regulatoryDetailsOpen} detailsId={regulatoryDetailsId} detailsButtonRef={regulatoryDetailsButtonRef} onDetailsToggle={() => setRegulatoryDetailsOpen(value => !value)} onToggle={() => { setRegulatoryDetailsOpen(!hazardSettings.enabled); setHazardSettings(previous => changeHazardSettings(previous,{enabled:!previous.enabled})); setHazardStatuses({}); setHazardRegion({state:'idle',prefecture:''}) }} />
-        <details ref={displayOptionsRef} className="map-display-options" onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus() } }}><summary aria-label="地図の表示設定" title="地図の表示設定">⋯</summary><div><button type="button" className="map-place-names-toggle" aria-label="地名を表示" aria-pressed={showPlaceNames} title="重ねて表示する地名の設定。標準地図に含まれる文字は残ります。" onClick={() => setShowPlaceNames(value => !value)}>地名 <span aria-hidden="true">{showPlaceNames ? 'ON' : 'OFF'}</span></button><MapRegulatoryControls settings={hazardSettings} onChange={patch => { setHazardSettings(previous => changeHazardSettings(previous, patch)); if(patch.enabled !== undefined) setHazardStatuses({}) }} statuses={hazardStatuses} region={hazardRegion} storedStatus={storedHazardStatus} referenceStatus={referenceStatus} includeHistorical={includeHistoricalFarmland} onHistoricalChange={setIncludeHistoricalFarmland} onRetry={() => { setHazardStatuses({}); setHazardRetry(value => value + 1) }} /></div></details>
-      </div>
-      <div className="map-draw-controls" role="group" aria-label="地番表示・範囲の作図">
-        <button type="button" className={parcelMode === 'boundary' ? 'is-active' : ''} aria-pressed={parcelMode === 'boundary'} onClick={() => onParcelModeChange?.(parcelMode === 'boundary' ? 'point' : 'boundary')} disabled={!onParcelModeChange}>範囲を描く</button>
-        <button type="button" className={parcelMode === 'exclusion' ? 'is-active' : ''} aria-pressed={parcelMode === 'exclusion'} onClick={() => onParcelModeChange?.(parcelMode === 'exclusion' ? 'point' : 'exclusion')} disabled={!onParcelModeChange}>除外</button>
-        <button type="button" className={`map-public-parcel-toggle${showPublicParcels ? ' is-active' : ''}`} aria-pressed={showPublicParcels} aria-label="地番選択" title="表示境界を参考領域として選択。原本全筆は未確認。出典情報を参照。" onClick={() => { if(showPublicParcels){mapPickJob.current++;setMapPickBusy(false)}else setMapInteractionEnabled(true);setShowPublicParcels(value => !value) }}>地番選択 {showPublicParcels ? 'ON' : 'OFF'}</button>
-      </div>
       {isDrawing && <div className="map-hint">{PARCEL_MODE_HINTS[parcelMode]}</div>}
-      {isCompactMap && (
-        <button
-          type="button"
-          className={`map-touch-toggle ${mapInteractionEnabled ? 'map-touch-toggle--active' : ''}`} disabled={isDrawing}
-          onClick={() => setMapInteractionEnabled((value) => !value)}
-          aria-pressed={mapInteractionEnabled}
-        >
-          {mapInteractionEnabled ? '地図操作ON' : '地図操作を有効化'}
-        </button>
-      )}
       {parcelData && <div className="parcel-map-badge">地番レイヤー {parcelData.features.length.toLocaleString()}筆</div>}
-      <RegulatoryPointInspector id={regulatoryDetailsId} open={regulatoryDetailsOpen} onClose={closeRegulatoryDetails} position={position} settings={hazardSettings} includeHistorical={includeHistoricalFarmland} isDrawing={isDrawing} region={hazardRegion} />
+      <RegulatoryPointInspector onInspectionState={onInspectionState} id={regulatoryDetailsId} open={regulatoryDetailsOpen} onClose={closeRegulatoryDetails} position={position} settings={hazardSettings} includeHistorical={includeHistoricalFarmland} isDrawing={isDrawing} region={hazardRegion} />
     </div>
       <MapHazardSummary settings={hazardSettings} statuses={hazardStatuses} region={hazardRegion} storedStatus={storedHazardStatus} referenceStatus={referenceStatus} />
       {locationBar || <div className="map-location-control">

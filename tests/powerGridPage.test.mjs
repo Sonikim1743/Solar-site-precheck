@@ -10,8 +10,8 @@ test('power grid remains available from tools with its route, candidate and save
   const navigation = app.match(/<nav className="workspace-nav"[\s\S]*?<\/nav>/)?.[0]
   const tools = navigation?.match(/<details className="workspace-tools">[\s\S]*?<\/details>/)?.[0]
   assert.ok(tools, 'the tools menu is available')
-  assert.match(tools, /onClick=\{\(\) => switchPage\('power'\)\}>系統確認<\/button>/)
-  assert.doesNotMatch(navigation.replace(tools, ''), /系統確認/, 'power grid is not an always-visible header action')
+  assert.match(tools, /onClick=\{\(\) => switchPage\('power'\)\}>系統資料<\/button>/)
+  assert.doesNotMatch(navigation.replace(tools, ''), /系統資料/, 'power grid is not an always-visible header action')
   assert.doesNotMatch(app, /className="power-page-link"|この地点の系統を確認/, 'there is no duplicate action beneath the map')
   const page = app.match(/<PowerGridPage\b[\s\S]*?\/>\s*<\/Suspense>/)?.[0]
   assert.ok(page, 'the existing grid page remains mounted on its route')

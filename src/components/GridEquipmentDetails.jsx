@@ -23,7 +23,7 @@ export default function GridEquipmentDetails({ record, compact = false }) {
     <h4>{record.name}</h4>
     <dl>{(compact ? rows.slice(0, 4) : rows).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
     {compact && <details><summary>潮流・出力制御などの公表条件</summary><dl>{rows.slice(4).map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl></details>}
-    <p className="power-grid-note">{flow.reversed ? '予想潮流が負値のため、公表の正方向と逆向きです。' : ''} 空容量の「記載なし」は0 MWではありません。空容量だけで接続可否は判定できません。</p>
+    <p className="power-grid-note">{flow.reversed ? '予想潮流が負値のため、公表の正方向と逆向きです。' : ''} 空容量の「記載なし」は0 MWではありません。</p>
     {record.notes && <p>備考：{record.notes}</p>}
     <small>{record.areaLabel} / {record.updatedAt || '更新日未記載'}</small>
     <div>{record.pdfUrl && <a href={record.pdfUrl} target="_blank" rel="noreferrer">出典PDF</a>}{record.mappingUrl && <> · <a href={record.mappingUrl} target="_blank" rel="noreferrer">系統図</a></>}</div>

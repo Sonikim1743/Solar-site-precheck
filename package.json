@@ -1,7 +1,7 @@
 {
   "name": "solar-site-precheck",
   "private": true,
-  "version": "1.28.5",
+  "version": "1.28.6",
   "type": "module",
   "scripts": {
     "dev": "vite build --configLoader runner && vite preview --configLoader runner --host 127.0.0.1 --port 5173",
@@ -16,6 +16,7 @@
     "verify:csp": "node work/verify-csp-hosts.mjs",
     "verify:assets": "node build/verifyBrowserAssets.js",
     "package:deployment": "node build/packageDeployment.js",
+    "package:web": "node build/packageDeployment.js --web-only",
     "verify:release": "node work/verify-release-metadata.mjs"
   },
   "dependencies": {

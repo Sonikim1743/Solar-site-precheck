@@ -161,5 +161,5 @@ export function reviewRecordFilename(record) {
 }
 
 export function exampleReviewRecord(appVersion) {
-  return createReviewRecord({ report: { appVersion, position: { lat: 34.9, lon: 133.5 }, siteName: '操作練習用の候補地（仮条件）', placeLabel: '岡山県内の練習用座標・実案件ではありません', memo: '仮条件：DC 50kWp、南向き、傾斜20°、損失14%。実際の設備条件に変更して計算してください。', fieldMemo: '接道・樹木・建物・系統接続は未確認。現地確認で追記する例です。', elevation: null, obstructionHeight: 20, snowBase: .95 }, generationDraft: { peakpower: 50, angle: 20, aspect: 0, loss: 14 }, kind: 'example' })
+  return createReviewRecord({ report: { appVersion, position: { lat: 34.9, lon: 133.5 }, siteName: '操作練習用の候補地（仮条件）', placeLabel: '岡山県内の練習用座標・実案件ではありません', memo: '仮条件：DC 50kWp、南向き、傾斜20°、損失14%。実際の設備条件に変更して計算してください。', fieldMemo: '接道・樹木・建物は未確認。現地確認で追記する例です。', elevation: null, obstructionHeight: 20, snowBase: .95 }, generationDraft: { peakpower: 50, angle: 20, aspect: 0, loss: 14 }, kind: 'example' })
 }
