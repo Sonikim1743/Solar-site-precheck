@@ -1,3 +1,32 @@
+# 公開更新 — 3Dを中心とした操作と整合レビュー / 2026-11-09
+
+利用者の公開更新依頼に基づき、PR #9・#10の試用版を基準に、地図外の操作、3Dを先に表示する導線、複数参考領域の結合、住所候補の確認、手動地平線の出典表示、遅延読込画面へのフォーカスを整理した。別の規制相談・記録連携のPR #8は含めない。[v1.28.6の更新内容](RELEASE_v1.28.6_JA.md)を参照。
+
+- 運用URL：https://solar-site-precheck.pages.dev/
+- Production ID：`e7b258a8-7594-497d-829b-76758d7a299f` / branch main / 配布完了
+- 固定URL：https://e7b258a8.solar-site-precheck.pages.dev/
+- 配布ソース：`f6bc65e12ae452f176b8a7fccdc4ab597d68c882` / [PR #11](https://github.com/Sonikim1743/Solar-site-precheck/pull/11)
+- main統合：`4f24b6b4e839ccc936bdfb6988f2cafa834e7db7`。配布ソースとmain統合コミット、公開確認後の記録更新は区別する。
+- [ソースCI 42542766665](https://github.com/Sonikim1743/Solar-site-precheck/actions/runs/42542766665)・[main統合CI 42543277519](https://github.com/Sonikim1743/Solar-site-precheck/actions/runs/42543277519)：success
+- Version 1.28.6 / Build 2026-11-09 / JS：`index-D0RplGHF.js` / CSS：`index-Y_4Xlidg.css`
+- 検証済みCloudflare ZIP：`SolarSitePrecheck_v1.28.6_2026-11-09_cloudflare.zip` / 303,576,728 bytes / SHA-256 `020636a2fc4c885746721abc92bf7bf00b3775932d8c372309c4250bb8dbe730`
+- HTTP検証完了：`2026-11-09T01:15:36.228Z`
+- 旧production：`c794895b-2982-4502-8743-f07f3001d190` を復旧用に保持
+
+全693テスト、Webビルド、CSP、同梱資産、Functionsのedge依存検査、正式パッケージ作成とZIP整合性検証が成功した。コミット済みソースの検証済みパッケージルートから、dist・Functions・sharedを既存Pagesへ配布した。Git ProviderはNoであり、GitHubの更新だけで配布したものではない。
+
+公開HTTPのSHA-256照合は15項目：HTML・主要JS・CSSの3件、保存資料のcurrent・manifestの2件、10データセットから各先頭断片の10件。全件HTTP 200でローカル配布物と一致した。currentとmanifest、各断片はpublic原本とも一致し、断片はgzipヘッダー、manifest記載のハッシュ、圧縮前後のバイト数、展開後のFeature件数も一致した。保存資料は`r2025-cf5c8704b2b2`、manifest SHA-256は`7a5b24d5eba3bc0e04629afe31fc1ed8630984daea5572552a71cc381e3ade38`、current SHA-256は`fe55914dd0e9f497ccde0eba3f8271ede371a21931e687ee981ceb93d030f922`。全公開ファイルの独立HTTP比較ではない。
+
+上記15項目とは別に、公開preflightの6項目が成功した。メインHTML、操作マニュアルのPDF形式、power-gridの不正入力に対するJSON HTTP 400、nedo-monsolaの正常HTTP 200・不正mesh HTTP 400、inheritance-pdfのGET HTTP 405を確認した。個人PDFのPOST送信は実施していない。
+
+公開版の実デスクトップブラウザーで、合成の検討範囲の作図から実DEMの取得、3Dの初期表示と視点回転までを確認した。作図前・作図中・取消後・確定後も「ホイール拡大 OFF」を保持した。PDFツールの遅延読込後は、表示先の「PDFツール」見出しへフォーカスが移った。発電量画面との往復では、地点・範囲・地形結果・3D視点・入力値が保持された。メイン画面はclientWidth/scrollWidthとも1,513px、PDF画面はとも1,528pxで横はみ出しがなかった。両画面の幅差はスクロールバーによる。地番ONでもホイール拡大OFFを保つこと、PDF遅延読込時のフォーカスと画面往復時の3D視点保持は配布前のローカル版でも確認した。
+
+公開UIでは住所の外部照会が最初の1回に失敗し、座標で選択する代替案内が表示された。再読込後の再照会では日本の行政住所が表示され、成功した。初回失敗の原因は未確定だが、範囲・3Dの主要操作には影響せず、継続的な障害は確認されていない。最終版の375px画面、Mac/Safari、実機タッチ、記録JSONのブラウザー通し操作、全PDF操作・印刷は未検証。合成範囲での画面確認を、実測精度、現行の法定境界、許認可、全候補地の安全確認と解釈しない。
+
+今回の配布はWebとソースのみ。既存Windows自動更新ZIP、`latest-version.json` と `cloudflare-version.json` はv1.28.3のまま維持し、実際のWeb版を `web-version.json` に記録する。約304MBの新ZIPはGitHubの通常ファイルへ追加していない。各PCのインストール更新とは別であり、個別案件・個人資料・認証情報・非公開検証ログは公開していない。
+
+---
+
 # 公開更新 — 座標リンクと地点操作 / 2026-11-04
 
 Excel等の `?lat=緯度&lon=経度` から指定地点と地形検討を開く。リンクは自動保存しない一時検討で、既存候補地の保存読み書きを拒否し、メモ・範囲・結果の混在を防ぐ。範囲選択・地形取得は利用者が行う。[リンク仕様・保存の注意](COORDINATE_LINKS_JA.md)を参照。
