@@ -73,6 +73,25 @@ function ClickHandler({ onSelect, mode, locked, onAddVertex, onFinish, onPublicP
   return null
 }
 
+// The public parcel layer paints every parcel in the viewport, so a wide
+// view renders far more parcels than anyone can inspect and stalls the map.
+// Below this zoom the toggle is switched off automatically instead; parcel
+// picking already requires zoom 16, so no usable range is lost.
+const PUBLIC_PARCEL_AUTO_OFF_ZOOM = 15
+
+function PublicParcelAutoOff({ enabled, onAutoOff }) {
+  const map = useMap()
+  useMapEvents({
+    zoomend() {
+      if (enabled && map.getZoom() < PUBLIC_PARCEL_AUTO_OFF_ZOOM) onAutoOff()
+    },
+  })
+  useEffect(() => {
+    if (enabled && map.getZoom() < PUBLIC_PARCEL_AUTO_OFF_ZOOM) onAutoOff()
+  }, [map, enabled, onAutoOff])
+  return null
+}
+
 function MapController({ position, viewport, onViewportChange, resetRequest }) {
   const map = useMap()
   const lastPosition = useRef(viewport ? position : undefined)
@@ -726,6 +745,13 @@ export default function MapPanel({
   const [regionalDirty,setRegionalDirty] = useState(false)
   const [mapPickBusy,setMapPickBusy] = useState(false)
   const mapPickJob=useRef(0)
+  const [publicParcelAutoOff, setPublicParcelAutoOff] = useState(false)
+  const handlePublicParcelAutoOff = useCallback(() => {
+    mapPickJob.current++
+    setMapPickBusy(false)
+    setShowPublicParcels(false)
+    setPublicParcelAutoOff(true)
+  }, [])
   const selectionEpoch=useRef(selectionResetRequest)
   selectionEpoch.current=selectionResetRequest
   const handledSelectionReset=useRef(selectionResetRequest)
@@ -909,7 +935,7 @@ export default function MapPanel({
       <div className="map-draw-controls" role="group" aria-label="地番表示・範囲の作図">
         <button type="button" className={parcelMode === 'boundary' ? 'is-active' : ''} aria-pressed={parcelMode === 'boundary'} onClick={() => onParcelModeChange?.(parcelMode === 'boundary' ? 'point' : 'boundary')} disabled={!onParcelModeChange}>範囲を描く</button>
         <button type="button" className={parcelMode === 'exclusion' ? 'is-active' : ''} aria-pressed={parcelMode === 'exclusion'} onClick={() => onParcelModeChange?.(parcelMode === 'exclusion' ? 'point' : 'exclusion')} disabled={!onParcelModeChange}>除外</button>
-        <button type="button" className={`map-public-parcel-toggle${showPublicParcels ? ' is-active' : ''}`} aria-pressed={showPublicParcels} aria-label="地番選択" title="表示境界を参考領域として選択。原本全筆は未確認。出典情報を参照。" onClick={() => { if(showPublicParcels){mapPickJob.current++;setMapPickBusy(false)}else if(isCompactMap) setMapInteractionEnabled(true);setShowPublicParcels(value => !value) }}>地番選択 {showPublicParcels ? 'ON' : 'OFF'}</button>
+        <button type="button" className={`map-public-parcel-toggle${showPublicParcels ? ' is-active' : ''}`} aria-pressed={showPublicParcels} aria-label="地番選択" title="表示境界を参考領域として選択。原本全筆は未確認。出典情報を参照。" onClick={() => { setPublicParcelAutoOff(false); if(showPublicParcels){mapPickJob.current++;setMapPickBusy(false)}else if(isCompactMap) setMapInteractionEnabled(true);setShowPublicParcels(value => !value) }}>地番選択 {showPublicParcels ? 'ON' : 'OFF'}</button>
       </div>
 
       <button type="button" className="map-interaction-toggle" disabled={isDrawing} aria-pressed={mapInteractionEnabled} onClick={() => setMapInteractionEnabled(value => !value)} title={isCompactMap ? "ページスクロールと地図操作を切り替えます" : "通常はページをスクロール。ONでホイール拡大。＋と−はいつでも使えます。"}>{isCompactMap ? (mapInteractionEnabled ? "地図操作 ON" : "地図操作を有効化") : ("ホイール拡大 " + (mapInteractionEnabled ? "ON" : "OFF"))}</button>
@@ -948,6 +974,7 @@ export default function MapPanel({
         <MapDistanceScale position="bottomleft" />
         <ClickHandler onPublicParcelPick={pickPublicReference} onSelect={onSelect} mode={parcelMode} locked={mapLocked} onAddVertex={addDraftVertex} onFinish={finishDrawing} />
         <MapController position={position} viewport={viewport} onViewportChange={onViewportChange} resetRequest={mapViewResetRequest} />
+        <PublicParcelAutoOff enabled={showPublicParcels} onAutoOff={handlePublicParcelAutoOff} />
         <MapInteractionController wheelEnabled={mapInteractionEnabled} locked={mapLocked} drawing={isDrawing} preserveViewport={preserveViewport} resetRequest={mapViewResetRequest} />
         <ParcelLayer
           data={parcelData}
@@ -990,6 +1017,7 @@ export default function MapPanel({
         )}
       </div>}
     <PublicParcelOverlayStatus status={publicParcelStatus} />
+    {publicParcelAutoOff && !showPublicParcels && <p className="public-parcel-overlay-status" role="status">表示範囲が広いため、地番表示を自動でOFFにしました。地図を拡大してからONにしてください。</p>}
     {showPublicParcels && <div className="public-parcel-selected regional-parcel-selection" aria-label="地図境界の選択">
       <strong>選択中 {regionalDraft.length}区域 / 適用済み {confirmedRegional.length}区域</strong>
       {regionalDraft.map(f=><button key={f.id} type="button" disabled={mapPickBusy} onClick={()=>toggleRegional(f)}>{f.properties['地番']} ×</button>)}
