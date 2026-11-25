@@ -90,6 +90,29 @@ test('SSR drawing uses the same 50m bar and extent in both views; overflow emits
  const control=renderToStaticMarkup(React.createElement(Control,{value:1000,grid:grid(250,200)}))
  assert.match(control,/role="alert"/);assert.match(control,/100%/);assert.match(control,/50m = 50mm/)
 })
+test('choosing aerial for the layout drawing preserves its overlays and the complete right-hand figure', () => {
+ const analysis = {grid:{...grid(),width:3,height:3,step:5,xMin:0,yMin:0,slopes:Array(9).fill(0),elevations:Array(9).fill(100)},
+  geometryKey:'synthetic-background',contours:[{level:100,paths:[[[0,0],[5,5],[10,5]]]}]}
+ const layout = {rackCount:1,racks:[{modules:[{id:'module-1',corners:[[0,0],[0,2],[1,2],[1,0]]}]}]}
+ const render = options => {
+  const markup = renderToStaticMarkup(React.createElement(Pair, {analysis,layout,parcels:[],...options}))
+  return [...markup.matchAll(/<svg[\s\S]*?<\/svg>/g)].map(match => match[0])
+ }
+ for (const drawingScale of ['auto',1000]) {
+  const standard = render({drawingScale})
+  assert.deepEqual(render({drawingScale,layoutBackground:'std'}), standard)
+  const aerial = render({drawingScale,layoutBackground:'seamlessphoto'})
+  assert.equal(standard.length, 2)
+  assert.equal(aerial.length, 2)
+  assert.match(standard[0], /data-context-layer="std"/)
+  assert.match(aerial[0], /data-context-layer="seamlessphoto"/)
+  assert.match(aerial[0], /data-layout-racks="1"/)
+  assert.equal(aerial[0].match(/data-viewport="[^"]+"/)[0], standard[0].match(/data-viewport="[^"]+"/)[0])
+  assert.deepEqual(aerial[0].match(/<path\b[^>]*>/g), standard[0].match(/<path\b[^>]*>/g))
+  assert.match(standard[1], /data-context-layer="seamlessphoto"/)
+  assert.equal(aerial[1], standard[1])
+ }
+})
 test('context caches separate scales, keep both fixed viewports equal and request nothing for overflow',async()=>{
  const oldFetch=globalThis.fetch,oldReader=globalThis.FileReader,requests=[]
  globalThis.FileReader=class{readAsDataURL(blob){this.result=`data:${blob.type};base64,AA==`;queueMicrotask(()=>this.onload())}}

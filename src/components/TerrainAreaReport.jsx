@@ -61,6 +61,6 @@ export default function TerrainAreaReport({ report, id = 'terrain-area-report', 
     <Sheet title="注記・計算条件" report={report} analysis={analysis} page={layoutReport.totalPages} total={layoutReport.totalPages}>
       <div className="terrain-report-footnotes">{notes.map(note => <section key={note.id} className="terrain-report-footnote" data-note={note.id}><h3>注{note.id}　{note.title}</h3><p>{note.body}</p></section>)}</div>
     </Sheet>
-    {layoutReport.current && <TerrainDrawingPair analysis={analysis} layout={layoutReport.current} fence={layoutReport.fence} parcels={report.parcelReview.parcels} drawingScale={drawingScale} />}
+    {layoutReport.current && <TerrainDrawingPair analysis={analysis} layout={layoutReport.current} fence={layoutReport.fence} parcels={report.parcelReview.parcels} drawingScale={drawingScale} layoutBackground={report.layoutBackground} />}
   </section>
 }

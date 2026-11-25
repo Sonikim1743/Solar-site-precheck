@@ -8,13 +8,16 @@ const dataUrl=blob=>new Promise((resolve,reject)=>{const reader=new FileReader()
 
 // Small bounded requests to the existing public GSI basemap. The map context
 // supplies roads/labels, never elevations or an enlarged calculation boundary.
-export function loadTerrainDrawingContext(analysis,kind='map',{drawingScale='auto'}={}) {
+export function loadTerrainDrawingContext(analysis,kind='map',{drawingScale='auto',view=kind==='photo'?'terrain':'layout'}={}) {
   if(!['map','photo'].includes(kind))throw Error('周辺画像の種類が不正です。')
-  const scale=normalizeTerrainDrawingScale(drawingScale),key=`${kind}:${scale}`
+  const scale=normalizeTerrainDrawingScale(drawingScale)
+  // At a fixed print scale both panels cover the same area and can reuse the tiles.
+  const viewIndex=scale==='auto' && view==='terrain'?1:0
+  const key=`${kind}:${scale}:${viewIndex}`
   const cached=cache.get(analysis)||new Map()
   if(cached.has(key))return cached.get(key)
   const task=(async()=>{
-    const g=analysis.grid,v=terrainDrawingPrintViewports(g,scale)[kind==='photo'?1:0],projection=proj4('EPSG:4326',`+proj=aeqd +lat_0=${g.origin.lat} +lon_0=${g.origin.lon} +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs`)
+    const g=analysis.grid,v=terrainDrawingPrintViewports(g,scale)[viewIndex],projection=proj4('EPSG:4326',`+proj=aeqd +lat_0=${g.origin.lat} +lon_0=${g.origin.lon} +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs`)
     const corners=[[v.west,v.south],[v.east,v.south],[v.east,v.north],[v.west,v.north]].map(p=>projection.inverse(p))
     if(!corners.flat().every(Number.isFinite))throw Error('周辺地図の投影座標が不正です。')
     let z=18,b

@@ -18,7 +18,7 @@ import './simple-review.css'
 export const initialSimpleReview = () => ({ status: 'idle', progress: null, pending: null, result: null, error: '', layoutSettings: { tiltDeg: 15, direction: 'south' } })
 const release = result => { for (const pdf of result?.pdfs || []) URL.revokeObjectURL(pdf.url) }
 
-export default function SimpleReviewPanel({ review, referenceCount = 0, siteName, appVersion, terrainArea, state, onChange, onDraw, onRepresentativeChange, visible = true, run = runSimpleReview, exporter, drawingScale = 1000, onDrawingScaleChange, layoutOptions, layoutSettings, onLayoutSettingsChange, layoutPreview, onApplied, onBusyChange, outputBlocked = false }) {
+export default function SimpleReviewPanel({ review, referenceCount = 0, siteName, appVersion, terrainArea, state, onChange, onDraw, onRepresentativeChange, visible = true, run = runSimpleReview, exporter, drawingScale = 1000, onDrawingScaleChange, layoutBackground = 'std', onLayoutBackgroundChange, layoutOptions, layoutSettings, onLayoutSettingsChange, layoutPreview, onApplied, onBusyChange, outputBlocked = false }) {
   const job = useRef({ id: 0, controller: null }), latest = useRef(null), source = useRef(null), stateRef = useRef(state)
   const [settingsOpen, setSettingsOpen] = useState(false), settingsId = useId(), settingsButton = useRef(null)
   stateRef.current = state
@@ -28,7 +28,11 @@ export default function SimpleReviewPanel({ review, referenceCount = 0, siteName
   // Geometry alone is insufficient: old PDFs must never represent new conditions.
   const analysisKeyFor = (area, preview) => JSON.stringify([key, defaults.layout, selected.direction,
     area?.geometryKey === key ? terrainLayoutAnalysisKey(area) : '', preview?.disabledRackIds || [], preview?.activeRackCount ?? null, Boolean(preview?.fence)])
-  const requestKeyFor = (area, preview) => JSON.stringify([analysisKeyFor(area, preview), drawingScale, siteName, appVersion])
+  const requestKeyFor = (area, preview) => {
+    const parts = [analysisKeyFor(area, preview), drawingScale, siteName, appVersion]
+    if (layoutBackground !== 'std') parts.push(layoutBackground)
+    return JSON.stringify(parts)
+  }
   const analysisKey = analysisKeyFor(terrainArea, layoutPreview), requestKey = requestKeyFor(terrainArea, layoutPreview)
   const sharedPool = useRef(layoutPreview?.layout)
   sharedPool.current = layoutPreview?.layout
@@ -72,7 +76,7 @@ export default function SimpleReviewPanel({ review, referenceCount = 0, siteName
     onBusyChange?.(true)
     onChange(previous => ({ ...previous, status: 'running', pending: null, progress: null, error: '' }))
     try {
-      // Only a scale/title change reuses analysis; new placement conditions always recalculate.
+      // Drawing and title changes can reuse analysis; new placement conditions recalculate.
       const snapshot = cached && !result ? cached.snapshot : await run(review, { signal: controller.signal, terrainArea, layoutOptions: defaults.layout, layoutSettings: selected, layoutPreview, onProgress: value => current() && onChange(previous => ({ ...previous, progress: value })) })
       if (!current()) return
       if (!snapshot.results.area || !snapshot.results.layout) {
@@ -94,7 +98,7 @@ export default function SimpleReviewPanel({ review, referenceCount = 0, siteName
         comparison: rebind(layoutPreview?.comparison), southComparison: rebind(layoutPreview?.southComparison),
         enabled: true, calculating: false, fence: Boolean(layoutPreview?.fence), disabledRackIds: reused ? layoutPreview.disabledRackIds : [], activeRackCount: reused ? layoutPreview.activeRackCount : null,
         simpleReview: true, layout: { ...(reused || layout), analysisReference: area, analysisKey: terrainLayoutAnalysisKey(area) } }
-      const report = { siteName, appVersion, drawingScale, position: snapshot.position, parcelReview: snapshot.review, terrainArea: area, simpleReview: snapshot, terrainPreview: preview }
+      const report = { siteName, appVersion, drawingScale, layoutBackground, position: snapshot.position, parcelReview: snapshot.review, terrainArea: area, simpleReview: snapshot, terrainPreview: preview }
       onChange(previous => ({ ...previous, status: 'pdf', pending: { report, snapshot, key, analysisKey, requestKey, outputAnalysisKey: analysisKeyFor(area, preview), outputRequestKey: requestKeyFor(area, preview), inputPool, id }, progress: { name: 'PDFを作成中', steps: snapshot.steps } }))
     } catch (error) {
       if (current()) { job.current.controller = null; onBusyChange?.(false); onChange(previous => ({ ...previous, status: 'error', error: error.message || '解析を開始できません。再試行してください。', pending: null, progress: null })) }
@@ -144,7 +148,7 @@ export default function SimpleReviewPanel({ review, referenceCount = 0, siteName
         <label>パネル傾斜 <select aria-label="パネル傾斜" value={selected.tiltDeg} onChange={e => changeSetting({ tiltDeg: Number(e.target.value) })}>{[...new Set([10, 15, 20, selected.tiltDeg])].sort((a,b)=>a-b).map(value => <option key={value} value={value}>{value}°</option>)}</select></label>
         <label>配置方向 <select value={selected.direction} onChange={e => changeSetting({ direction: e.target.value })}><option value="south">真南</option><option value="optimized">最適（参考）</option>{selected.direction === 'manual' && <option value="manual">入力方位を維持</option>}</select></label></div>
       <p className="simple-settings-hint">地形勾配は配置対象にするDEMの局所勾配、パネル傾斜は水平からの角度です。地形勾配の選択は比較用で、施工可否の判定ではありません。</p>
-      <details><summary>縮尺・配置条件</summary><TerrainDrawingScaleControl value={drawingScale} onChange={onDrawingScaleChange} grid={terrainArea?.grid || cached?.snapshot.results.area.grid} disabled={busy || !onDrawingScaleChange}/><p>真南は北0°・時計回り180°固定。最適（参考）は基準方位{defaults.layout.azimuthDeg}°±30°を7.5°刻みと開始位置で比較（最大32試行・24,000候補・8秒）。全域最適は保証しません。</p><p>地形勾配{defaults.layout.slopeLimitDeg}°未満・4段×{defaults.layout.minColumns}〜{defaults.layout.maxColumns}列・720W。左右{defaults.layout.rackGapM}m・前後の空き{defaults.layout.rowGapM}m・境界離隔{defaults.layout.setbackM}m。詳細モードの間隔等を引き継ぎます。</p></details>
+      <details><summary>縮尺・配置条件</summary><TerrainDrawingScaleControl value={drawingScale} onChange={onDrawingScaleChange} layoutBackground={layoutBackground} onLayoutBackgroundChange={onLayoutBackgroundChange} grid={terrainArea?.grid || cached?.snapshot.results.area.grid} disabled={busy || !onDrawingScaleChange}/><p>真南は北0°・時計回り180°固定。最適（参考）は基準方位{defaults.layout.azimuthDeg}°±30°を7.5°刻みと開始位置で比較（最大32試行・24,000候補・8秒）。全域最適は保証しません。</p><p>地形勾配{defaults.layout.slopeLimitDeg}°未満・4段×{defaults.layout.minColumns}〜{defaults.layout.maxColumns}列・720W。左右{defaults.layout.rackGapM}m・前後の空き{defaults.layout.rowGapM}m・境界離隔{defaults.layout.setbackM}m。詳細モードの間隔等を引き継ぎます。</p></details>
     </div>
     {busy && <p role="status">{state.progress?.name || '開始中…'} <progress aria-label="配置図作成の進捗" value={state.progress?.steps?.length || 0} max={6}/></p>}
     {!!state.error && <p role="alert">{state.error}</p>}

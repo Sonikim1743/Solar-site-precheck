@@ -34,14 +34,51 @@ test('standard map and real aerial JPEG use separate bounded caches with a wider
  }finally{globalThis.fetch=previousFetch;if(previousReader===undefined)delete globalThis.FileReader;else globalThis.FileReader=previousReader}
 })
 
+test('left aerial uses JPEG tiles over the original layout extent and the right aerial keeps its own extent', async t => {
+ const analysis = {grid:{origin:{lat:35,lon:135},boundary:[[ring]]}}
+ const originalReader = globalThis.FileReader
+ t.after(() => {
+  if (originalReader === undefined) delete globalThis.FileReader
+  else globalThis.FileReader = originalReader
+ })
+ globalThis.FileReader = class {
+  readAsDataURL(blob) {
+   this.result = `data:${blob.type};base64,AA==`
+   queueMicrotask(() => this.onload())
+  }
+ }
+ const requests = []
+ t.mock.method(globalThis, 'fetch', async url => {
+  requests.push(url)
+  const type = url.endsWith('.jpg') ? 'image/jpeg' : 'image/png'
+  return new Response(new Uint8Array([0]), {headers:{'content-type':type}})
+ })
+ const standard = await loadTerrainDrawingContext(analysis)
+ const right = await loadTerrainDrawingContext(analysis,'photo')
+ requests.length = 0
+ const left = await loadTerrainDrawingContext(analysis,'photo',{view:'layout'})
+ assert.deepEqual(left.viewport, standard.viewport)
+ assert.notDeepEqual(left.viewport, right.viewport)
+ assert.equal(left.status, 'ready')
+ assert.ok(left.tiles.length > 0)
+ assert.ok(left.tiles.every(tile => tile.layer === 'seamlessphoto' && tile.href.startsWith('data:image/jpeg;base64,')))
+ assert.ok(requests.every(url => url.includes('/seamlessphoto/') && url.endsWith('.jpg')))
+ assert.equal(await loadTerrainDrawingContext(analysis,'photo'), right)
+ assert.equal(await loadTerrainDrawingContext(analysis), standard)
+})
+
 test('failed aerial coverage cannot be cached as ready or substituted with a standard map, and can retry',async()=>{
  const previousFetch=globalThis.fetch,previousReader=globalThis.FileReader;let available=false;const requests=[]
  globalThis.FileReader=class {readAsDataURL(blob){this.result=`data:${blob.type};base64,AA==`;queueMicrotask(()=>this.onload())}}
  globalThis.fetch=async url=>{requests.push(url);return available?new Response(new Uint8Array([0]),{headers:{'content-type':'image/jpeg'}}):new Response('',{status:404})}
  try{
-  const a={grid:{origin:{lat:35,lon:135},boundary:[[ring]]}},failed=loadTerrainDrawingContext(a,'photo'),r=await failed
-  assert.equal(r.status,'unavailable');assert.equal(r.tiles.length,0);available=true
-  const retry=loadTerrainDrawingContext(a,'photo');assert.notEqual(retry,failed);assert.equal((await retry).status,'ready')
+  const a={grid:{origin:{lat:35,lon:135},boundary:[[ring]]}}
+  for(const options of [{},{view:'layout'}]){
+   available=false
+   const failed=loadTerrainDrawingContext(a,'photo',options),r=await failed
+   assert.equal(r.status,'unavailable');assert.equal(r.tiles.length,0);available=true
+   const retry=loadTerrainDrawingContext(a,'photo',options);assert.notEqual(retry,failed);assert.equal((await retry).status,'ready')
+  }
   assert.ok(requests.every(u=>u.includes('/seamlessphoto/')))
  }finally{globalThis.fetch=previousFetch;if(previousReader===undefined)delete globalThis.FileReader;else globalThis.FileReader=previousReader}
 })

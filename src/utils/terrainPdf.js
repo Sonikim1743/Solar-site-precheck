@@ -328,7 +328,7 @@ export function drawTerrainDrawingPdfPage(ctx, model, images) {
     drawText(ctx, label, x+3, y+1.4, 60, { size: 3.05, weight: 700, maxLines: 1 })
     drawText(ctx, value, x+69, y+1.4, 129, { size: 3.3, maxLines: 1 })
   }))
-  drawText(ctx,`出典：国土地理院 DEM・標準地図・航空写真${model.mapReference?' / AMX公開地図2024 https://source.coop/smartmaps/amx-2024-04':' / 範囲・地番資料は報告書の出典参照'} 。${sheet.fenceOn?'一点鎖線＝仮フェンス（1.2m）。':''}`,11,276,397,{size:2.65,maxLines:1})
+  drawText(ctx,`出典：国土地理院 DEM・${model.layoutBackground==='seamlessphoto'?'航空写真':'標準地図・航空写真'}${model.mapReference?' / AMX公開地図2024 https://source.coop/smartmaps/amx-2024-04':' / 範囲・地番資料は報告書の出典参照'} 。${sheet.fenceOn?'一点鎖線＝仮フェンス（1.2m）。':''}`,11,276,397,{size:2.65,maxLines:1})
   drawText(ctx,`平面距離の参考図（斜面距離・測量図ではありません）。「用紙に合わせる」・別用紙への拡大縮小で縮尺が変わります。セル${model.gridStep}m・4点平均勾配の交差面積。五区分＋未確認＝100%。標高は範囲内DEMの推定値。`,11,281,397,{size:2.65,maxLines:1})
   const missing=[model.contextStatus!=='ready'?'周辺地図の一部または全部が未取得。':'',model.noParcelMetadata?'地番資料なし・地番未取得。':'',model.missingParcels?`地番未記載 ${model.missingParcels}区域。`:'',model.unplacedParcels?`図上に収まらない地番：${model.unplacedParcels}。`:''].join('')
   drawText(ctx,`${missing}参考図・施工可否未確認。矢印はDEM高→低の参考方向で、現地の排水計画ではありません。モジュール傾斜は水平から。取得日は標高の測量日ではありません。`,11,286,397,{size:2.65,maxLines:1,ellipsis:true})
@@ -466,8 +466,17 @@ export async function exportTerrainAreaPdf({ report, element, drawingOnly = fals
       if(plans.length!==2 || plans.some(p=>p.dataset.geometryKey!==report.terrainArea.geometryKey) || plans[1].querySelector('[data-layout-racks]')) fail('2つの図の対象範囲・配置を確認できません。')
       const expectedViews=terrainDrawingPrintViewports(report.terrainArea.grid,requestedScale)
       if(plans.some((p,i)=>{const v=expectedViews[i],bar=terrainDrawingPrintScaleBar(v,requestedScale,expectedViews[0]),m=Number(p.dataset.scaleM),px=Number(p.dataset.scalePx);return p.dataset.drawingScale!==String(requestedScale)||p.dataset.viewport!==JSON.stringify([v.west,v.south,v.east,v.north])||!Number.isFinite(m)||!Number.isFinite(px)||m<=0||px<=0||Math.abs(m-bar.meters)>1e-7||Math.abs(px-bar.pixelLength)>1e-7||(requestedScale!=='auto'&&Math.abs(px*TERRAIN_DRAWING_PRINT_WIDTH_MM/800-50000/requestedScale)>1e-7)})) fail('各図の表示範囲と印刷縮尺が一致しません。')
-      const photos=[...plans[1].querySelectorAll('image')]
-      if(pair.dataset.photoContextStatus!=='ready'||plans[1].dataset.contextLayer!=='seamlessphoto'||!photos.length||photos.some(image=>image.getAttribute('data-context-layer')!=='seamlessphoto'||!/^data:image\/jpeg;base64,/.test(image.getAttribute('href')||'')))fail('右図の周辺航空写真が準備できていません。再試行してください。')
+      const layoutBackground=report.layoutBackground ?? 'std'
+      for(const [index,layer] of [layoutBackground,'seamlessphoto'].entries()){
+        const plan=plans[index],tiles=[...plan.querySelectorAll('image')]
+        const status=index===0?pair.dataset.mapContextStatus:pair.dataset.photoContextStatus
+        const mime=layer==='seamlessphoto'?'image/jpeg':'image/png'
+        if(status!=='ready'||plan.dataset.contextLayer!==layer||!tiles.length||
+          tiles.some(tile=>tile.getAttribute('data-context-layer')!==layer||!tile.getAttribute('href')?.startsWith(`data:${mime};base64,`))){
+          fail(index===0?'左図の選択した背景が準備できていません。再試行してください。':'右図の周辺航空写真が準備できていません。再試行してください。')
+        }
+      }
+      model.layoutBackground = layoutBackground
       model.snapshots = plans.map(plan=>snapshotSvg(plan, TERRAIN_DRAWING_PRINT_WIDTH_MM, checkDeadline, true))
       model.drawingScale = requestedScale
       model.drawingDistribution = terrainSlopeDistribution(report.terrainArea)

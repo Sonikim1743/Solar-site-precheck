@@ -745,6 +745,7 @@ function AppWorkspace({ coordinateLink }) {
   const [terrainPdfDownload, setTerrainPdfDownload] = useState(null)
   const [terrainPdfStatus, setTerrainPdfStatus] = useState({ loading: false, message: '', error: false })
   const [terrainDrawingScale, setTerrainDrawingScale] = useState(1000)
+  const [layoutBackground, setLayoutBackground] = useState('std')
   const terrainAreaJob = useRef({ id: 0, controller: null, key: '' })
   const terrainAreaAttemptedKeys = useRef(new Set())
   const autoLayoutOfferedKeys = useRef(new Set())
@@ -2974,7 +2975,7 @@ function AppWorkspace({ coordinateLink }) {
     elevationSource: elevation.source || (elevation.status === 'error' ? '手動確認が必要' : '—'),
     terrain,
     terrainSection,
-    terrainArea: currentTerrainArea, terrainPreview: terrainReportPreview,
+    terrainArea: currentTerrainArea, terrainPreview: terrainReportPreview, layoutBackground,
     siteName,
     parcel: selectedParcel,
     parcelReview,
@@ -2998,13 +2999,13 @@ function AppWorkspace({ coordinateLink }) {
     gridCapacity: gridCapacity.data,
     capacityMatches,
     placeCapacityCandidates,
-  }), [position, elevation, terrain, terrainSection, currentTerrainArea, terrainReportPreview, siteName, selectedParcel, parcelReview, parcelMetrics, confirmedSnowStation, expectedSnowMesh, meshBoundary, snowBase, obstructionHeight, solarReference, selectedPlaceLabel, memo, fieldMemo, solarProMemo, generation, gridNotes, recordInfo, powerGrid.data, powerGrid.stale, gridCapacity.data, capacityMatches, placeCapacityCandidates])
+  }), [position, elevation, terrain, terrainSection, currentTerrainArea, terrainReportPreview, layoutBackground, siteName, selectedParcel, parcelReview, parcelMetrics, confirmedSnowStation, expectedSnowMesh, meshBoundary, snowBase, obstructionHeight, solarReference, selectedPlaceLabel, memo, fieldMemo, solarProMemo, generation, gridNotes, recordInfo, powerGrid.data, powerGrid.stale, gridCapacity.data, capacityMatches, placeCapacityCandidates])
   // PDF validity follows the fields used by the terrain sheets. Unrelated
   // checks and render state must not discard a completed download.
   const terrainPdfReport = useMemo(() => ({
-    terrainArea: currentTerrainArea, terrainPreview: terrainReportPreview, parcelReview, position, siteName, drawingScale:terrainDrawingScale,
+    terrainArea: currentTerrainArea, terrainPreview: terrainReportPreview, parcelReview, position, siteName, drawingScale:terrainDrawingScale, layoutBackground,
     placeLabel: selectedPlaceLabel, fieldMemo, appVersion: APP_VERSION,
-  }), [currentTerrainArea, terrainReportPreview, parcelReview, position, siteName, selectedPlaceLabel, fieldMemo,terrainDrawingScale])
+  }), [currentTerrainArea, terrainReportPreview, parcelReview, position, siteName, selectedPlaceLabel, fieldMemo,terrainDrawingScale,layoutBackground])
   const terrainPdfReportRef = useRef(terrainPdfReport)
   terrainPdfReportRef.current = terrainPdfReport
   const terrainPdfJob = useRef(0)
@@ -3862,7 +3863,7 @@ function AppWorkspace({ coordinateLink }) {
               )}
               {terrainSectionOpen && <TerrainSectionPreview analysis={terrainSection} />}
             </section>
-            <SimpleReviewPanel visible={simpleDesign} review={simpleReviewInput} referenceCount={publicParcelReferences.length} siteName={siteName} appVersion={APP_VERSION} terrainArea={simpleTerrainArea} layoutOptions={terrainPreview.options} layoutSettings={sharedLayoutSettings} onLayoutSettingsChange={changeSharedLayoutSettings} layoutPreview={terrainPreview} onApplied={applySimpleLayout} onBusyChange={setSharedLayoutBusy} outputBlocked={['loading', 'fetching', 'calculating'].includes(terrainAreaStatus)} drawingScale={terrainDrawingScale} onDrawingScaleChange={setTerrainDrawingScale} state={simpleWorkflow} onChange={setSimpleWorkflow} onRepresentativeChange={setSimpleRepresentative} onDraw={() => openReviewSection('site-select', 'boundary')} />
+            <SimpleReviewPanel visible={simpleDesign} review={simpleReviewInput} referenceCount={publicParcelReferences.length} siteName={siteName} appVersion={APP_VERSION} terrainArea={simpleTerrainArea} layoutOptions={terrainPreview.options} layoutSettings={sharedLayoutSettings} onLayoutSettingsChange={changeSharedLayoutSettings} layoutPreview={terrainPreview} onApplied={applySimpleLayout} onBusyChange={setSharedLayoutBusy} outputBlocked={['loading', 'fetching', 'calculating'].includes(terrainAreaStatus)} drawingScale={terrainDrawingScale} onDrawingScaleChange={setTerrainDrawingScale} layoutBackground={layoutBackground} onLayoutBackgroundChange={setLayoutBackground} state={simpleWorkflow} onChange={setSimpleWorkflow} onRepresentativeChange={setSimpleRepresentative} onDraw={() => openReviewSection('site-select', 'boundary')} />
 
             <CandidateWorkflow position={position} terrainArea={currentTerrainArea} terrain={terrain} terrainStatus={terrainStatus} obstructionHeight={obstructionHeight} snowStation={confirmedSnowStation} snowStatus={snowData.status} inspection={inspectionState} onOpen={target => {
               if (target === 'regulatory') { setRegulatoryRequest(value => value + 1); openReviewSection('site-select'); return }
@@ -4322,7 +4323,7 @@ function AppWorkspace({ coordinateLink }) {
             {reportView !== 'terrain' && <>
             <div className="report-readiness no-print"><div><strong>出力前に確認する内容</strong><p>発電量：{generation ? '計算済み' : '未計算'} ／ 地平線：{terrain?.samples?.length ? '分析済み' : '未分析'} ／ NEDO積雪：{confirmedSnowStation ? '確認済み' : '未取得'}</p><p>未取得の項目は未確認として出力します。設備確認メモは系統画面で保存すると検討記録とレポートに追加されます。</p></div><div className="report-readiness__actions"><button type="button" className="secondary-button" disabled={!position} onClick={() => openReviewSection('solar-generation')}>発電量を確認</button><button type="button" className="secondary-button" onClick={() => { openReviewSection('site-details'); const analysis = document.getElementById('simple-analysis'); if (analysis) analysis.open = true }}>地形・積雪を確認</button></div></div>
             </>}
-            {reportView === 'terrain' && terrainPreview.layout?.analysisReference === currentTerrainArea && <TerrainDrawingScaleControl value={terrainDrawingScale} onChange={setTerrainDrawingScale} grid={currentTerrainArea?.grid} disabled={terrainPdfStatus.loading}/>}
+            {reportView === 'terrain' && terrainPreview.layout?.analysisReference === currentTerrainArea && <TerrainDrawingScaleControl value={terrainDrawingScale} onChange={setTerrainDrawingScale} layoutBackground={layoutBackground} onLayoutBackgroundChange={setLayoutBackground} grid={currentTerrainArea?.grid} disabled={terrainPdfStatus.loading}/>}
             <div className="review-toolbar review-toolbar--standalone no-print"><ReviewRecordsPanel position={position} onSave={saveReviewRecord} onRead={readReviewRecord} pending={pendingRecord} status={recordStatus} recordInfo={recordInfo} onApply={applyPendingRecord} onDismiss={() => { candidateRequests.current.start('record-import'); setPendingRecord(null); setRecordStatus({ message: '', error: false }) }} onUndo={undoOpenedRecord} canUndo={Boolean(undoRecord)} notesCount={gridNotes.length} /></div>
             <div className="action-row no-print">
               <button type="button" className="secondary-button" onClick={downloadCsv}>チェックCSV出力</button>
