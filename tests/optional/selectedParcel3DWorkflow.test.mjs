@@ -395,54 +395,147 @@ test('reopening a review JSON restores terrain and waits for manual layout', asy
 })
 
 
-test('the app tour follows real layout actions and keeps the slope hint separate', async () => {
-  await mount()
-  const tourKey = 'solar-site-precheck-ui-terrain-tour-v1'
-  const guide = () => document.querySelector('.terrain-guide-tour-callout')
-  const step = expected => assert.match(guide()?.textContent ?? '', new RegExp(expected + ' *[/] *6'))
+const tourKey = 'solar-site-precheck-ui-terrain-tour-v1'
+const guide = () => document.querySelector('.terrain-guide-tour-callout')
 
+function expectGuideStep(expected) {
+  assert.match(guide()?.textContent ?? '', new RegExp(expected + ' *[/] *6'))
+}
+
+function expectGuideButton(label, disabled) {
+  const button = [...guide().querySelectorAll('button')].find(node => node.textContent.trim() === label)
+  assert.ok(button, label)
+  assert.equal(button.disabled, disabled)
+  return button
+}
+
+async function waitForGuideStep(expected) {
+  const stepPattern = new RegExp(expected + ' *[/] *6')
+  for (let attempt = 0; attempt < 30 && !stepPattern.test(guide()?.textContent ?? ''); attempt++) {
+    await React.act(async () => new Promise(resolve => setTimeout(resolve, 40)))
+  }
+  expectGuideStep(expected)
+}
+
+test('the app tour verifies every action before advancing and suppresses the slope coachmark', async () => {
+  await mount()
   await click('チュートリアル')
-  step(1)
+  expectGuideStep(1)
+  const skip = expectGuideButton('次へ', true)
+  await React.act(async () => skip.click())
+  expectGuideStep(1)
+  assert.match(guide().textContent, /操作/)
+
   await click('合成地番を選ぶ')
-  step(2)
+  assert.match(guide().textContent, /できました/)
+  await waitForGuideStep(2)
+  expectGuideButton('次へ', true)
 
   let completeTerrain
   analyze = geometry => new Promise(resolve => {
     completeTerrain = () => resolve(flatTerrain(geometry))
   })
   await click('選択完了 → 3D')
-  step(3)
+  await waitForGuideStep(3)
+  expectGuideButton('次へ', true)
   assert.equal(acquisitions.length, 1)
   assert.equal(workers.length, 0)
   await React.act(async () => completeTerrain())
-  step(4)
+  await waitForGuideStep(4)
   assert.equal(workers.length, 1)
+  expectGuideButton('次へ', true)
   await React.act(async () => { workers[0].complete() })
-  assert.ok(slopeGuide(), 'The one-time prompt can appear independently of the tour')
+  assert.equal(slopeGuide(), null, 'The one-time hint stays hidden throughout the tour')
+  expectGuideStep(4)
+  expectGuideButton('次へ', true)
 
   await click('モジュール配置を3Dで表示', panel())
-  step(5)
-  assert.equal(slopeGuide(), null)
-  await click('次へ', guide())
-  step(6)
-  assert.ok(slopeGuide(), 'The prompt returns outside step five if it was never dismissed')
+  await waitForGuideStep(5)
   await click('戻る', guide())
-  step(5)
-  assert.equal(slopeGuide(), null)
-  await changeSlope(15)
-  step(6)
-  assert.equal(slopeGuide(), null, 'Direct slope interaction dismisses the prompt')
-  assert.equal(workers.length, 2)
-  await React.act(async () => { workers[1].complete() })
+  expectGuideStep(4)
+  expectGuideButton('次へ', false)
+  await click('次へ', guide())
+  expectGuideStep(5)
+  expectGuideButton('次へ', true)
+  await changeSlope(10)
+  if (slopeControl().disabled) await React.act(async () => { workers.at(-1).complete() })
+  expectGuideStep(5)
+  expectGuideButton('次へ', true)
 
+  await changeSlope(15)
+  await waitForGuideStep(6)
+  assert.equal(slopeGuide(), null)
+  await React.act(async () => { workers.at(-1).complete() })
+  expectGuideButton('完了', true)
   await click('レポート', panel())
+  expectGuideStep(6)
+  expectGuideButton('完了', false)
+  await click('完了', guide())
   assert.equal(guide(), null)
   assert.equal(window.localStorage.getItem(tourKey), 'completed')
-  assert.equal(window.localStorage.getItem(slopeGuideKey), 'seen')
 
   await click('チュートリアル')
-  step(5)
+  expectGuideStep(5)
+  await React.act(async () => document.activeElement.dispatchEvent(
+    new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+  ))
+  assert.equal(guide(), null)
+  assert.equal(window.localStorage.getItem(tourKey), 'ended')
+})
+
+test('analyzed areas skip completed steps and zero modules can be resolved with an early slope change', async () => {
+  await mount()
+  await click('選択完了 → 3D')
+  const { analysis } = workers[0].message
+  const steepArea = { ...analysis, grid: { ...analysis.grid, slopes: analysis.grid.slopes.map(() => 17) } }
+  let layout
+  await React.act(async () => { layout = workers[0].complete(steepArea) })
+  assert.equal(layout.moduleCount, 0)
+  assert.ok(slopeGuide())
+  await click('チュートリアル')
+  expectGuideStep(4)
+  assert.equal(slopeGuide(), null)
+  assert.equal(panel().querySelector('.terrain-layout-toggle').disabled, true)
+  expectGuideButton('次へ', true)
+
+  await changeSlope(20)
+  expectGuideStep(4)
+  expectGuideButton('次へ', true)
+  await React.act(async () => { layout = workers.at(-1).complete(steepArea) })
+  assert.ok(layout.moduleCount > 0)
+  await click('レポート', panel())
+  expectGuideStep(4)
+  await click('モジュール配置を3Dで表示', panel())
+  await waitForGuideStep(6)
+  expectGuideButton('完了', false)
   await click('終了', guide())
+  assert.equal(guide(), null)
+  assert.equal(window.localStorage.getItem(tourKey), 'ended')
+})
+
+test('cancelled and failed terrain acquisitions never satisfy the waiting step', async () => {
+  await mount()
+  await click('チュートリアル')
+  await click('合成地番を選ぶ')
+  await waitForGuideStep(2)
+  let finishCancelled
+  analyze = geometry => new Promise(resolve => {
+    finishCancelled = () => resolve(flatTerrain(geometry))
+  })
+  await click('選択完了 → 3D')
+  await waitForGuideStep(3)
+  await click('中止', panel())
+  await React.act(async () => finishCancelled())
+  expectGuideStep(3)
+  expectGuideButton('次へ', true)
+
+  analyze = async () => { throw new Error('test terrain failure') }
+  await click('地形を確認', panel())
+  assert.match(panel().textContent, /test terrain failure/)
+  expectGuideStep(3)
+  expectGuideButton('次へ', true)
+
+  await React.act(async () => window.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape' })))
   assert.equal(guide(), null)
   assert.equal(window.localStorage.getItem(tourKey), 'ended')
 })

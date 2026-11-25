@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { JSDOM } from 'jsdom'
 import react from '@vitejs/plugin-react'
 import { createServer } from 'vite'
-import { advanceTerrainGuide, TERRAIN_GUIDE_STEPS } from '../../src/utils/terrainGuideTour.js'
+import { TERRAIN_GUIDE_STEPS } from '../../src/utils/terrainGuideTour.js'
 
 let dom, React, createRoot, server, Tour
 const scrolls = []
@@ -75,7 +75,7 @@ const chooseButton = (scope, label) => {
   return button
 }
 
-test('tour targets remain available, manual controls work, and starting again is possible', async () => {
+test('tour controls respect verified conditions without trapping focus or outside actions', async () => {
   const h = React.createElement
   const endings = []
   let outsideClicks = 0, selected = false
@@ -85,22 +85,23 @@ test('tour targets remain available, manual controls work, and starting again is
   anchorRects.set(next, [40, 220, 190, 36])
   function Harness() {
     const [step, setStep] = React.useState(null)
+    const [satisfied, setSatisfied] = React.useState(false)
     const applyStep = nextStep => {
-      if (nextStep < TERRAIN_GUIDE_STEPS.length) setStep(nextStep)
+      if (nextStep < TERRAIN_GUIDE_STEPS.length) { setStep(nextStep); setSatisfied(false) }
       else { endings.push('completed'); setStep(null) }
     }
     return h(React.Fragment, null,
-      h('button', { onClick: () => setStep(0) }, 'チュートリアル'),
+      h('button', { onClick: () => applyStep(0) }, 'チュートリアル'),
       h('button', { onClick: () => { outsideClicks++ } }, '別の操作'),
       h('button', {
         'data-terrain-tour-anchor': first,
-        onClick: () => { selected = true; applyStep(advanceTerrainGuide(step, 'parcel-selected')) },
+        onClick: () => { selected = true; setSatisfied(true) },
       }, '地番を選ぶ'),
       h('button', { 'data-terrain-tour-anchor': next }, '選択を確定'),
       h(Tour, {
-        step, steps: TERRAIN_GUIDE_STEPS,
+        step, steps: TERRAIN_GUIDE_STEPS, satisfied,
         onNext: () => applyStep(step + 1),
-        onBack: () => setStep(step - 1),
+        onBack: () => applyStep(step - 1),
         onEnd: () => { endings.push('ended'); setStep(null) },
       }),
     )
@@ -128,13 +129,20 @@ test('tour targets remain available, manual controls work, and starting again is
     assert.ok(pointer?.querySelector('.terrain-guide-tour-pointer-arrow'))
     assert.equal(window.getComputedStyle(pointer).pointerEvents, 'none')
 
+    assert.equal(chooseButton(callout(), '次へ').disabled, true)
+    await click('次へ', callout())
+    assert.match(callout().textContent, /1\s*\/\s*6/)
     await click('別の操作')
     assert.equal(outsideClicks, 1)
     await click('地番を選ぶ')
     assert.equal(selected, true)
+    assert.match(callout().textContent, /できました/)
+    assert.equal(chooseButton(callout(), '次へ').disabled, false)
+    await click('次へ', callout())
     assert.match(callout().textContent, /2\s*\/\s*6/)
     await click('戻る', callout())
     assert.match(callout().textContent, /1\s*\/\s*6/)
+    await click('地番を選ぶ')
     await click('次へ', callout())
     assert.match(callout().textContent, /2\s*\/\s*6/)
     anchorRects.set(next, [235, 235, 78, 46])
@@ -148,14 +156,11 @@ test('tour targets remain available, manual controls work, and starting again is
     assert.equal(callout(), null)
 
     await click('チュートリアル')
-    for (let step = 0; step < 5; step++) {
-      assert.match(callout().textContent, new RegExp(`${step + 1}\\s*\\/\\s*6`))
-      await click('次へ', callout())
-    }
-    assert.match(callout().textContent, /6\s*\/\s*6/)
-    await click('完了', callout())
+    await React.act(async () => document.activeElement.dispatchEvent(
+      new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+    ))
     assert.equal(callout(), null)
-    assert.deepEqual(endings, ['ended', 'completed'])
+    assert.deepEqual(endings, ['ended', 'ended'])
   } finally {
     await React.act(async () => root.unmount())
   }

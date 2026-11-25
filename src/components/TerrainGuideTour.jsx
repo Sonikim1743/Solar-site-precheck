@@ -59,7 +59,7 @@ function sameRect(a, b) {
   return a === b || Boolean(a && b && a.left === b.left && a.top === b.top && a.width === b.width && a.height === b.height)
 }
 
-export default function TerrainGuideTour({ step, steps, onNext, onBack, onEnd }) {
+export default function TerrainGuideTour({ step, steps, satisfied = false, onNext, onBack, onEnd }) {
   const current = step == null ? null : steps[step]
   const overlay = useRef(null)
   const bubble = useRef(null)
@@ -127,6 +127,15 @@ export default function TerrainGuideTour({ step, steps, onNext, onBack, onEnd })
     }
   }, [current, step])
 
+  useEffect(() => {
+    if (!current) return
+    const exitOnEscape = event => {
+      if (event.key === 'Escape') onEnd()
+    }
+    window.addEventListener('keydown', exitOnEscape, true)
+    return () => window.removeEventListener('keydown', exitOnEscape, true)
+  }, [current, onEnd])
+
   if (!current || typeof document === 'undefined') return null
   const state = position?.step === step ? position : null
   const outline = state?.outline
@@ -147,11 +156,12 @@ export default function TerrainGuideTour({ step, steps, onNext, onBack, onEnd })
           <span>{step + 1} / {steps.length}</span>
         </div>
         <p>{current.message}</p>
+        <p>{satisfied ? '✓ できました' : step === 2 ? '分析の完了を待っています。' : '実際に操作すると進めます。'}</p>
       </div>
       <div className="terrain-guide-tour-actions" role="group" aria-label="チュートリアルの操作">
         <button type="button" className="terrain-guide-tour-end" onClick={onEnd}>終了</button>
         <button type="button" onClick={onBack} disabled={step === 0}>戻る</button>
-        <button type="button" className="terrain-guide-tour-next" onClick={onNext}>{step === steps.length - 1 ? '完了' : '次へ'}</button>
+        <button type="button" className="terrain-guide-tour-next" disabled={!satisfied} onClick={onNext}>{step === steps.length - 1 ? '完了' : '次へ'}</button>
       </div>
     </aside>
   </div>, document.body)

@@ -181,7 +181,7 @@ export default function TerrainLayoutPreview({ analysis, preview, onChange, parc
     dismissSlopeCoachmark()
     changeOptions({ slopeLimitDeg: value })
     if (pool) calculate({ slopeLimitDeg: value })
-    onSlopeChanged?.()
+    if (value !== options.slopeLimitDeg) onSlopeChanged?.(options.slopeLimitDeg, value)
   }
   const columns = options.minColumns === options.maxColumns ? `${options.maxColumns}列` : `${options.minColumns}〜${options.maxColumns}列`
   const widthFor = columns => columns * options.moduleWidthM + (columns - 1) * options.moduleGapM

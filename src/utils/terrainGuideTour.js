@@ -9,7 +9,7 @@ export const TERRAIN_GUIDE_STEPS = Object.freeze([
     title: '選択した範囲を確定する',
     anchor: 'confirm-parcels',
     fallbackAnchor: ['parcel-map', 'parcel-select', 'site-map'],
-    message: '選択を確認したら「選択完了 → 3D」を押します。選んだ範囲で地形を取得します。',
+    message: '選択を確認したら「選択完了 → 3D」を押します。取得を中止した場合は「範囲の地形」で再取得できます。',
   },
   {
     title: '範囲の地形を取得する',
@@ -21,7 +21,7 @@ export const TERRAIN_GUIDE_STEPS = Object.freeze([
     title: '3Dでモジュールを確認する',
     anchor: 'layout-reveal',
     fallbackAnchor: ['layout-calculate', 'terrain-3d-view', 'terrain-section'],
-    message: '未計算なら「参考配置を計算」を押します。計算後、「モジュール配置を3Dで表示」で地形にモジュールを重ねます。',
+    message: '未計算なら「参考配置を計算」を押します。計算後、「モジュール配置を3Dで表示」で地形にモジュールを重ねます。0枚の場合は勾配条件や範囲を見直してください。',
   },
   {
     title: '地形の勾配条件を変更する',
@@ -37,17 +37,20 @@ export const TERRAIN_GUIDE_STEPS = Object.freeze([
   },
 ])
 
-const TERRAIN_GUIDE_ACTIONS = [
-  'parcel-selected', 'parcel-confirmed', 'terrain-ready', 'modules-shown', 'slope-changed', 'results-opened',
-]
-
-export function terrainGuideStartingStep({ draftSelected, confirmedSelection, analyzing, hasTerrain, hasLayout, modulesVisible }) {
-  if (draftSelected) return 1
-  if (hasTerrain) return hasLayout && modulesVisible ? 4 : 3
-  if (confirmedSelection || analyzing) return 2
-  return 0
+export function terrainGuideConditions({ parcelSelected, pendingSelection, panelOpen, analyzing, hasTerrain, modulesVisible, slopeChanged, reportOpen }) {
+  return [
+    Boolean(parcelSelected),
+    Boolean(parcelSelected && !pendingSelection && panelOpen && (analyzing || hasTerrain)),
+    Boolean(!pendingSelection && hasTerrain),
+    Boolean(!pendingSelection && hasTerrain && modulesVisible),
+    Boolean(!pendingSelection && hasTerrain && slopeChanged),
+    Boolean(reportOpen),
+  ]
 }
 
-export function advanceTerrainGuide(step, action) {
-  return TERRAIN_GUIDE_ACTIONS[step] === action && Number.isInteger(step) && step >= 0 ? step + 1 : step
+export function terrainGuideStartingStep(conditions, from = 0) {
+  const last = TERRAIN_GUIDE_STEPS.length - 1
+  let step = from
+  while (step < last && conditions[step]) step += 1
+  return Math.min(step, last)
 }

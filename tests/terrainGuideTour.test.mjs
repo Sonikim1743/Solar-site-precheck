@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
-  advanceTerrainGuide,
+  terrainGuideConditions,
   terrainGuideStartingStep,
   TERRAIN_GUIDE_STEPS,
 } from '../src/utils/terrainGuideTour.js'
@@ -15,36 +15,27 @@ test('the terrain tour provides six guided steps with a real target at each step
   }
 })
 
-test('starting the tour skips completed prerequisites and leaves the 3D controls discoverable', () => {
+test('a pending selection, an open panel and finished analysis unlock distinct steps', () => {
   const cases = [
     [{}, 0],
-    [{ draftSelected: true }, 1],
-    [{ confirmedSelection: true }, 2],
-    [{ analyzing: true }, 2],
-    [{ confirmedSelection: true, analyzing: true }, 2],
-    [{ confirmedSelection: true, hasTerrain: true }, 3],
-    [{ confirmedSelection: true, hasTerrain: true, hasLayout: true }, 3],
-    [{ confirmedSelection: true, hasTerrain: true, hasLayout: true, modulesVisible: true }, 4],
-    [{ draftSelected: true, confirmedSelection: true, hasTerrain: true, modulesVisible: true }, 1],
+    [{ parcelSelected: true, pendingSelection: true }, 1],
+    [{ parcelSelected: true, panelOpen: false, analyzing: true }, 1],
+    [{ parcelSelected: true, panelOpen: true }, 1],
+    [{ parcelSelected: true, panelOpen: true, analyzing: true }, 2],
+    [{ parcelSelected: true, panelOpen: true, hasTerrain: true }, 3],
+    [{ parcelSelected: true, panelOpen: true, hasTerrain: true, modulesVisible: true }, 4],
   ]
-  for (const [status, expected] of cases) {
-    assert.equal(terrainGuideStartingStep(status), expected, JSON.stringify(status))
+  for (const [snapshot, expected] of cases) {
+    assert.equal(terrainGuideStartingStep(terrainGuideConditions(snapshot)), expected, JSON.stringify(snapshot))
   }
 })
 
-test('only the current tutorial action advances the guide and finishing reaches the end', () => {
-  const actions = [
-    'parcel-selected',
-    'parcel-confirmed',
-    'terrain-ready',
-    'modules-shown',
-    'slope-changed',
-    'results-opened',
-  ]
-  assert.equal(advanceTerrainGuide(null, 'parcel-selected'), null)
-  for (const [step, expectedAction] of actions.entries()) {
-    for (const action of [...actions, 'unrelated-action']) {
-      assert.equal(advanceTerrainGuide(step, action), step + Number(action === expectedAction), action)
-    }
-  }
+test('the next unfinished condition can skip a later action already completed by the user', () => {
+  const analysis = { parcelSelected: true, panelOpen: true, hasTerrain: true }
+  const conditions = terrainGuideConditions({ ...analysis, slopeChanged: true, reportOpen: true })
+  assert.deepEqual(conditions, [true, true, true, false, true, true])
+  assert.equal(terrainGuideStartingStep(conditions), 3)
+  assert.equal(terrainGuideStartingStep(conditions, 4), 5)
+  assert.equal(terrainGuideStartingStep(conditions, 5), 5)
+  assert.equal(terrainGuideStartingStep(Array(6).fill(true)), 5, 'completion remains an explicit action')
 })

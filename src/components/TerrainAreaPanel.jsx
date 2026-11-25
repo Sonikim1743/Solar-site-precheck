@@ -18,16 +18,13 @@ function dateText(value) {
   return value && Number.isFinite(date.getTime()) ? date.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '未記録'
 }
 
-export default function TerrainAreaPanel({ geometry, metrics, analysis, status = 'idle', progress, error, onAnalyze, onCancel, onClear, position, onDrawBoundary, onOpenReport, onOpenDrawing, parcels = [], publicParcels = [], publicParcelsLimited = false, preview, onPreviewChange, outputBlocked = false, dxfReport, preferredView = 'plan', autoLayoutKey, geometryKey = analysis?.geometryKey ?? '', onTutorialAction, suppressSlopeCoachmark }) {
+export default function TerrainAreaPanel({ geometry, metrics, analysis, status = 'idle', progress, error, onAnalyze, onCancel, onClear, position, onDrawBoundary, onOpenReport, onOpenDrawing, parcels = [], publicParcels = [], publicParcelsLimited = false, preview, onPreviewChange, outputBlocked = false, dxfReport, preferredView = 'plan', autoLayoutKey, geometryKey = analysis?.geometryKey ?? '', onModulesVisibleChange, onSlopeChanged, suppressSlopeCoachmark }) {
   const [layoutNotice, setLayoutNotice] = useState(null)
   const [view, setView] = useState(preferredView === '3d' ? '3d' : 'plan')
   const [shownGeometryKey, setShownGeometryKey] = useState(null)
   const showModules = shownGeometryKey === geometryKey
   useEffect(() => setShownGeometryKey(null), [geometryKey])
-  const toggleModules = () => {
-    setShownGeometryKey(showModules ? null : geometryKey)
-    if (!showModules) onTutorialAction?.('modules-shown')
-  }
+  const toggleModules = () => setShownGeometryKey(showModules ? null : geometryKey)
   const id = `terrain-area-${useId().replace(/:/g, '')}`
   const state = typeof status === 'string' ? status : status?.status || 'idle'
   const loading = ['loading', 'fetching', 'calculating'].includes(state)
@@ -43,6 +40,11 @@ export default function TerrainAreaPanel({ geometry, metrics, analysis, status =
   const showLayout = view === '3d' ? showModules : preview?.enabled
   const layoutPool = showLayout ? appliedPool : null
   const layout = showLayout ? appliedLayout : null
+  const visibleModulesKey = view === '3d' && layout?.moduleCount > 0 ? geometryKey : null
+  useEffect(() => {
+    onModulesVisibleChange?.(visibleModulesKey)
+    return () => onModulesVisibleChange?.(null)
+  }, [visibleModulesKey, onModulesVisibleChange])
   const waitingForLayout = onPreviewChange && autoLayoutKey === analysisKey && preview?.autoCalculatedKey !== analysisKey && !appliedPool
   const terrainAcquired = `地形を取得しました（図形面積 約${number(summary?.polygonAreaM2, 0)} m²・高低差 約${number(summary?.heightRange)} m）。`
   let feedback = terrainAcquired
@@ -85,7 +87,7 @@ export default function TerrainAreaPanel({ geometry, metrics, analysis, status =
       </p>}
       <dl className="terrain-area-summary"><div><dt>図形面積</dt><dd>約{number(summary?.polygonAreaM2, 0)} <small>m²</small></dd></div><div><dt>高低差</dt><dd>約{number(summary?.heightRange)} <small>m</small></dd></div><div><dt title="10m幅で見た局所勾配の中央値">勾配の中央値</dt><dd>{Number.isFinite(summary?.medianSlope) ? `${number(summary.medianSlope)}°` : '未取得'}</dd></div></dl>
       {partial && <p className="terrain-area-warning" role="status">標高・勾配に未確認部分があります。集計は取得部分の参考値です。</p>}
-      {onPreviewChange && <TerrainLayoutPreview analysis={analysis} preview={preview} onChange={onPreviewChange} moduleVisibility={view === '3d' ? { shown: showModules, onToggle: toggleModules } : null} autoCalculateKey={autoLayoutKey} suppressSlopeCoachmark={suppressSlopeCoachmark} onSlopeChanged={() => onTutorialAction?.('slope-changed')} onNoticeChange={setLayoutNotice} parcelCount={parcelOverlay.labels.length} onShow3D={() => setView('3d')} onReacquire={onAnalyze} onBoundary={onDrawBoundary} />}
+      {onPreviewChange && <TerrainLayoutPreview analysis={analysis} preview={preview} onChange={onPreviewChange} moduleVisibility={view === '3d' ? { shown: showModules, onToggle: toggleModules } : null} autoCalculateKey={autoLayoutKey} suppressSlopeCoachmark={suppressSlopeCoachmark} onSlopeChanged={onSlopeChanged} onNoticeChange={setLayoutNotice} parcelCount={parcelOverlay.labels.length} onShow3D={() => setView('3d')} onReacquire={onAnalyze} onBoundary={onDrawBoundary} />}
       {view === 'plan' ? <TerrainAreaPlan analysis={analysis} position={position} layout={layout} layoutCandidates={layoutPool} onToggleRack={toggleRack} fence={fence} parcelOverlay={shownParcels} rackControls={rackControls} /> : <TerrainArea3D analysis={analysis} position={position} layout={layout} layoutCandidates={layoutPool} onToggleRack={toggleRack} fence={fence} parcelOverlay={shownParcels} rackControls={rackControls} fitOnLayoutReveal interactive />}
       {fence?.truncated && <p className="terrain-layout-footnote" role="status">フェンスは表示上限のため一部だけを描いています。</p>}
       {shownParcels?.truncated && <p className="terrain-layout-footnote" role="status">地番の表示数を制限しています。</p>}
