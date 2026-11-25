@@ -8,7 +8,7 @@
 - 配布ソース：`5afd14bd0ac6a7d08774890901dfc0f7f4f93881`
 - Version 1.28.6 / JS：`index-8qHfqBrt.js`
 - 検証済みCloudflare ZIP：`SolarSitePrecheck_release.zip` / 303,577,603 bytes / SHA-256 `bdff0a42d0557254d1930b2711166cd21494dc8377bf1ec70fefcf5d036b1f42`
-- 公開preflightは全項目OK（メインHTML、操作マニュアルPDF 6,095,628 bytes、power-grid 400 JSON、nedo-monsola 200・異常mesh 400、inheritance-pdf GET 405）。個人PDFのPOST送信は実施していない。全テスト等の検証数値は実装報告の確認後に追記する。
+- 公開preflightは全項目OK（メインHTML、操作マニュアルPDF 6,095,628 bytes、power-grid 400 JSON、nedo-monsola 200・異常mesh 400、inheritance-pdf GET 405）。個人PDFのPOST送信は実施していない。実装報告（2026-11-25、ChatGPTプロジェクト会話）で基本テスト698/698・選択実行テスト25/25の通過と、pnpm build・verify:csp・verify:assetsの成功を確認した。
 - 旧production：`40dfb652-1889-4db3-b47a-757b8f58b9c1` を復旧用に保持
 
 ---
