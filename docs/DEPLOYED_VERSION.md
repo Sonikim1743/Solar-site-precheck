@@ -1,3 +1,33 @@
+# 公開更新 — 地番表示の最小ズームを17へ統一 / 2026-11-25
+
+利用者の依頼に基づき、地番が密集する範囲で地図が重くなる問題への対応として、地番表示の基準をズーム17以上へ統一した。公開地番ソースの minZoom を14から17へ引き上げ、地番レイヤーの自動OFFと選択可否の案内文も同じ基準を参照するようにした。ズーム16以下では地番は表示されず、拡大を促す案内が表示される。
+
+- 運用URL：https://solar-site-precheck.pages.dev/
+- Production ID：`c6a7fb13-f27c-4afa-b6e8-32f4a4c7d1f1` / branch main / 配布完了
+- 固定URL：https://c6a7fb13.solar-site-precheck.pages.dev/
+- 配布ソース：`8d9ea37a0d0b4747c570d14a8a0a9aef988a4ad2`（内容は `ba86f100a5ffb21048ae8e03213ec07b593c26b9`「Align public parcel rendering and selection at zoom 17」と同一tree）
+- Version 1.28.6 / JS：`index-DnuJ5hDy.js` / CSS：`index-Y_4Xlidg.css`
+- 検証済みCloudflare ZIP：`SolarSitePrecheck_release.zip` / 303,575,734 bytes / SHA-256 `73d00e41cc61c1479fea0b8cd4e77ab126473a0cc21203cb2054950a4c577271`
+- 全693テスト、Webビルド、CSP・同梱資産の検証、正式パッケージ作成が成功。公開preflightは全項目OK（メインHTML、操作マニュアルPDF 6,095,628 bytes、power-grid 400 JSON、nedo-monsola 200・異常mesh 400、inheritance-pdf GET 405）。個人PDFのPOST送信は実施していない。
+- 旧production：`9321fbb1-8b8f-49c4-a3c9-3ccbf2404bfa` を復旧用に保持
+
+---
+
+# 公開更新 — 地番表示の自動OFFを追加 / 2026-11-25
+
+公開地番の表示をONにしたまま広域へ縮小すると全筆描画で地図が重くなるため、ズーム15未満では地番表示を自動でOFFにし、案内を表示するようにした。この配布は同日のズーム17統一（上記）で置き換えられた。
+
+- 運用URL：https://solar-site-precheck.pages.dev/
+- Production ID：`9321fbb1-8b8f-49c4-a3c9-3ccbf2404bfa` / branch main / 配布完了
+- 固定URL：https://9321fbb1.solar-site-precheck.pages.dev/
+- 配布ソース：`d98353a728cdeaf018a82260f3ebafd93cad035f`
+- Version 1.28.6 / JS：`index-D0RplGHF.js`
+- 検証済みCloudflare ZIP：SHA-256 `ae1eae69a3f92f2739a8fc5e9eb91076fc1e9758bc0b6730572e2557e818eae2`
+- 全693テスト、Webビルド、CSP・同梱資産の検証、正式パッケージ作成が成功し、公開preflightも全項目OK。実サービスでズーム15ではONを維持し、14では案内とともに自動OFFになることを確認した。個人PDFのPOST送信は実施していない。
+- 旧production：`e7b258a8-7594-497d-829b-76758d7a299f` を復旧用に保持
+
+---
+
 # 公開更新 — 3Dを中心とした操作と整合レビュー / 2026-11-09
 
 利用者の公開更新依頼に基づき、PR #9・#10の試用版を基準に、地図外の操作、3Dを先に表示する導線、複数参考領域の結合、住所候補の確認、手動地平線の出典表示、遅延読込画面へのフォーカスを整理した。別の規制相談・記録連携のPR #8は含めない。[v1.28.6の更新内容](RELEASE_v1.28.6_JA.md)を参照。
