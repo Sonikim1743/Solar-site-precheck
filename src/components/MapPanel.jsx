@@ -1017,12 +1017,12 @@ export default function MapPanel({
     {showPublicParcels && <div className="public-parcel-selected regional-parcel-selection" aria-label="地図境界の選択">
       <strong>選択中 {regionalDraft.length}区域 / 適用済み {confirmedRegional.length}区域</strong>
       {regionalDraft.map(f=><button key={f.id} type="button" disabled={mapPickBusy} onClick={()=>toggleRegional(f)}>{f.properties['地番']} ×</button>)}
-      <button type="button" className="regional-parcel-complete" disabled={mapPickBusy||isDrawing||(!regionalDraft.length&&!confirmedRegional.length)} onClick={()=>{if(onConfirmRegionalParcels?.(regionalDraft)){setRegionalDirty(false);setRegionalMessage('表示境界を参考領域として適用しました。下の3D・シンプル解析に同じ選択形状を使います。');setRegionalCandidates([])}}}>選択完了 → 3D</button>
+      <button type="button" className="regional-parcel-complete" disabled={mapPickBusy||isDrawing||(!regionalDraft.length&&!confirmedRegional.length)} onClick={()=>{if(onConfirmRegionalParcels?.(regionalDraft)){setRegionalDirty(false);setRegionalMessage(regionalDraft.length ? '表示境界を参考領域として適用しました。3D地形と参考配置は「範囲の地形」で確認できます。' : '適用済みの地図境界を解除しました。');setRegionalCandidates([])}}}>選択完了 → 3D</button>
       <button type="button" onClick={()=>{mapPickJob.current++;setMapPickBusy(false);setRegionalDirty(false);setRegionalDraft(confirmedDraft());setRegionalCandidates([]);setRegionalMessage('未適用の選択変更を中止しました。適用済み領域と結果は保持しています。')}}>選択を中止</button>
       <MapParcelNotice message={regionalMessage} drawing={isDrawing} />
       {mapPickBusy&&<p role="status">選択境界を取得中…</p>}{regionalMessage&&!isMapParcelJoinNotice(regionalMessage)&&<p role="status">{regionalMessage}</p>}{regionalConfirmError&&<p role="alert">{regionalConfirmError}</p>}
       {regionalDraft.some(f=>f.properties.__selectionLimited)&&<p role="alert">連続境界を確認できない区域があります。表示境界の欠落があり得ます。プレビューした範囲だけを参考領域に使います。</p>}
-      <details><summary>選択・出典の扱い</summary><p>現在の地図と同じAMX公開2024 PMTilesを使用。同じID・地番・地図名の隣接タイル断片のみ結合し、穴・分離領域を保持します。別の区域を地番文字だけで結合しません。未収録・量子化・離れた部分の欠落を元の境界として保証しません。別途の原本ファイル準備は不要です。既存の手描き範囲・除外・他資料の対象は保存したまま、選択区域の3Dとシンプル解析は対象の合併形状を使います。</p></details>
+      <details><summary>選択・出典の扱い</summary><p>現在の地図と同じAMX公開2024 PMTilesを使用。同じID・地番・地図名の隣接タイル断片のみ結合し、穴・分離領域を保持します。別の区域を地番文字だけで結合しません。未収録・量子化・離れた部分の欠落を元の境界として保証しません。別途の原本ファイル準備は不要です。手描き範囲・除外・他資料の対象は保持します。「範囲の地形」ではそれらを反映した検討範囲を使用します。</p></details>
       {regionalCandidates.length>0&&<div role="group" aria-label="重なる地図境界の候補"><p>表示境界が重なっています。選択する地番を確認してください。</p>{regionalCandidates.map((c,i)=><button key={i} type="button" disabled={mapPickBusy} onClick={()=>beginMapPick(c)}>{c.number} / {c.mapName}</button>)}</div>}
       {referenceSelections.length>0&&<p>以前の仮選択 {referenceSelections.map(p=>p.number).join('・')} はまだ計算外です。同じ境界を地図で選び直すと参考領域として使えます。以前の選択は保持しています。</p>}
     </div>}

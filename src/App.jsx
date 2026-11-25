@@ -30,7 +30,7 @@ import TerrainAreaPanel from './components/TerrainAreaPanel.jsx'
 import TerrainAreaReport from './components/TerrainAreaReport.jsx'
 import TerrainDrawingScaleControl from './components/TerrainDrawingScaleControl.jsx'
 import TerrainDxfButton from './components/TerrainDxfButton.jsx'
-import SelectedParcel3D, { selectedParcelUnionReview } from './components/SelectedParcel3D.jsx'
+import { selectedParcelUnionReview } from './utils/selectedParcelReview.js'
 import { REGIONAL_PARCEL_SOURCE } from './services/regionalParcels.js'
 import { MAP_PARCEL_SOURCE } from './utils/mapParcelSelection.js'
 import SimpleReviewPanel, { initialSimpleReview } from './components/SimpleReviewPanel.jsx'
@@ -671,7 +671,7 @@ function AppWorkspace({ coordinateLink }) {
   const [focusParcelId, setFocusParcelId] = useState(null)
   const [parcelReview, setParcelReview] = useState(() => { try { return normalizeParcelReview(draftSeed.parcelReview) } catch { return createEmptyParcelReview() } })
   const [parcelMode, setParcelMode] = useState('point')
-  const [regional3DRequest,setRegional3DRequest] = useState(0)
+  const [confirmedTerrainKey, setConfirmedTerrainKey] = useState('')
   // Terrain cached for simple mode, including the parcel union when it differs from the review area.
   const [simpleModeTerrain, setSimpleModeTerrain] = useState(null)
   const [parcelReviewStatus, setParcelReviewStatus] = useState('')
@@ -715,6 +715,7 @@ function AppWorkspace({ coordinateLink }) {
   const [terrainPdfStatus, setTerrainPdfStatus] = useState({ loading: false, message: '', error: false })
   const [terrainDrawingScale, setTerrainDrawingScale] = useState(1000)
   const terrainAreaJob = useRef({ id: 0, controller: null, key: '' })
+  const terrainAreaAttemptedKeys = useRef(new Set())
   const terrainAreaKeyRef = useRef(terrainAreaKey)
   terrainAreaKeyRef.current = terrainAreaKey
   const [siteName, setSiteName] = useState(typeof draftSeed.siteName === 'string' ? draftSeed.siteName : '')
@@ -831,6 +832,13 @@ function AppWorkspace({ coordinateLink }) {
       setReportView('summary')
     }
   }, [terrainAreaKey])
+
+  useEffect(() => {
+    if (!confirmedTerrainKey) return
+    setConfirmedTerrainKey('')
+    if (confirmedTerrainKey !== terrainAreaKey || currentTerrainArea || terrainAreaAttemptedKeys.current.has(terrainAreaKey)) return
+    void handleTerrainAreaAnalysis()
+  }, [confirmedTerrainKey, terrainAreaKey, currentTerrainArea])
 
   useEffect(() => () => terrainAreaJob.current.controller?.abort(), [])
   useEffect(() => () => { if (recordDownload) URL.revokeObjectURL(recordDownload.url) }, [recordDownload])
@@ -1043,7 +1051,6 @@ function AppWorkspace({ coordinateLink }) {
     setSelectionResetRequest(current => current + 1)
     setPublicParcelReferences([])
     setSimpleModeTerrain(null)
-    setRegional3DRequest(0)
     setLocationStatus({ status: 'idle', message: '' })
     setGenerationNotice('')
     setGenerationScenarioDraft(null)
@@ -1271,8 +1278,8 @@ function AppWorkspace({ coordinateLink }) {
       }
       setParcelReview(valid)
       setParcelReviewStatus('')
-      return true
-    } catch (error) { setParcelReviewStatus(error.message); return false }
+      return { terrainKey: nextKey }
+    } catch (error) { setParcelReviewStatus(error.message); return null }
   }
 
   function confirmRegionalParcels(features) {
@@ -1280,8 +1287,14 @@ function AppWorkspace({ coordinateLink }) {
       let next={...parcelReview,parcels:parcelReview.parcels.filter(p=>!(p.role==='target'&&p.source.fileName===MAP_PARCEL_SOURCE))}
       for(const feature of features)next=setReviewParcel(next,feature,'target',{fileName:MAP_PARCEL_SOURCE,importedAt:new Date().toISOString()})
       if(features.length){const geometry=measureParcelReview(selectedParcelUnionReview(next)).geometry;if(!geometry)throw Error('選択区域の合併形状を確認できません。');validatePolygonGeometry(geometry)}
-      if(!updateParcelReview(next))return false
-      if(features.length)setRegional3DRequest(n=>n+1)
+      const applied = updateParcelReview(next)
+      if (!applied) return false
+      if (features.length) {
+        setTerrainAreaOpen(true)
+        openReviewSection('terrain-area')
+        // Wait for the committed review to supply the accepted geometry to the analysis.
+        setConfirmedTerrainKey(applied.terrainKey)
+      }
       return true
     }catch(error){setParcelReviewStatus(`選択は未確定です。${error.message} 前回の筆・結果は保持しています。`);return false}
   }
@@ -1323,7 +1336,7 @@ function AppWorkspace({ coordinateLink }) {
 
   function receiveReviewGeometry(geometry, kind) {
     const next = kind === 'exclusion' ? { ...parcelReview, exclusions: [...parcelReview.exclusions, geometry] } : { ...parcelReview, boundary: geometry }
-    const accepted = updateParcelReview(next)
+    const accepted = Boolean(updateParcelReview(next))
     if (accepted) setParcelMode('point')
     return accepted
   }
@@ -1394,6 +1407,7 @@ function AppWorkspace({ coordinateLink }) {
     job.controller?.abort()
     job.controller = null
     job.key = ''
+    setConfirmedTerrainKey('')
     setTerrainAreaProgress(null)
   }
 
@@ -1409,6 +1423,7 @@ function AppWorkspace({ coordinateLink }) {
     const controller = new AbortController()
     const id = terrainAreaJob.current.id
     const key = terrainAreaKey
+    terrainAreaAttemptedKeys.current.add(key)
     terrainAreaJob.current = { id, key, controller }
     const isCurrent = () => terrainAreaJob.current.id === id && terrainAreaKeyRef.current === key && !controller.signal.aborted
     setTerrainAreaStatus('loading')
@@ -3787,7 +3802,6 @@ function AppWorkspace({ coordinateLink }) {
               )}
               {terrainSectionOpen && <TerrainSectionPreview analysis={terrainSection} />}
             </section>
-            <SelectedParcel3D review={parcelReview} referenceCount={publicParcelReferences.length} request={regional3DRequest} onAcquired={setSimpleModeTerrain} initialAnalysis={simpleModeTerrain} />
             <SimpleReviewPanel visible={simpleDesign} review={simpleReviewInput} referenceCount={publicParcelReferences.length} siteName={siteName} appVersion={APP_VERSION} terrainArea={simpleTerrainArea} layoutOptions={terrainPreview.options} layoutSettings={sharedLayoutSettings} onLayoutSettingsChange={changeSharedLayoutSettings} layoutPreview={terrainPreview} onApplied={applySimpleLayout} onBusyChange={setSharedLayoutBusy} outputBlocked={['loading', 'fetching', 'calculating'].includes(terrainAreaStatus)} drawingScale={terrainDrawingScale} onDrawingScaleChange={setTerrainDrawingScale} state={simpleWorkflow} onChange={setSimpleWorkflow} onRepresentativeChange={setSimpleRepresentative} onDraw={() => openReviewSection('site-select', 'boundary')} />
 
             <CandidateWorkflow position={position} terrainArea={currentTerrainArea} terrain={terrain} terrainStatus={terrainStatus} obstructionHeight={obstructionHeight} snowStation={confirmedSnowStation} snowStatus={snowData.status} inspection={inspectionState} onOpen={target => {
