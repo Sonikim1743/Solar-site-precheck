@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useId, useRef, useState } from 'react'
 import { appliedTerrainPreview, terrainLayoutAnalysisKey } from '../utils/terrainLayoutComparison.js'
 import { normalizeTerrainLayoutOptions } from '../utils/terrainLayout.js'
 import { selectedTerrainLayout } from '../utils/terrainLayoutSelection.js'
@@ -19,12 +19,13 @@ export function TerrainLayoutErrorNotice({ error, onRetry, onRefresh, onReacquir
   return <div className="terrain-area-warning terrain-layout-error" role="alert"><strong>{error.message}</strong><p>{error.hint}</p><div><button type="button" onClick={action} disabled={!action}>{label}</button><button type="button" onClick={onRetry} disabled={!onRetry}>再試行</button></div></div>
 }
 
-export default function TerrainLayoutPreview({ analysis, preview, onChange, parcelCount, onShow3D, onReacquire, onBoundary }) {
+export default function TerrainLayoutPreview({ analysis, preview, onChange, parcelCount, onShow3D, onReacquire, onBoundary, autoCalculateKey, onNoticeChange }) {
   const [localBusy, setBusy] = useState(false)
   const busy = localBusy || Boolean(preview?.calculating)
   const [error, setError] = useState('')
   const workerRef = useRef(null)
   const retryRef = useRef(null)
+  const autoCalculatedKeys = useRef(new Set())
   const [conditionsOpen, setConditionsOpen] = useState(false)
   const conditionsRef = useRef(null)
   const conditionsId = `layout-conditions-${useId().replace(/:/g, '')}`
@@ -33,6 +34,9 @@ export default function TerrainLayoutPreview({ analysis, preview, onChange, parc
   onChangeRef.current = onChange
   latestAnalysisRef.current = analysis
   const key = terrainLayoutAnalysisKey(analysis)
+  const autoRequested = Boolean(autoCalculateKey && autoCalculateKey === key)
+  const autoHandled = preview?.autoCalculatedKey === key
+  const autoCalculated = autoRequested ? { autoCalculatedKey: key } : {}
   const options = { ...normalizeTerrainLayoutOptions(), ...preview?.options }
   const draftChanged = layoutOutputState(analysis, preview).blocked && !preview?.calculating
   const requestKey = layoutRequestKey(preview), latestRequest = useRef(requestKey)
@@ -56,20 +60,31 @@ export default function TerrainLayoutPreview({ analysis, preview, onChange, parc
     }
   }, [requestKey])
 
+  const clearNotice = () => { setError(''); onNoticeChange?.(null) }
+  const showError = (kind, message) => {
+    const guidance = terrainLayoutErrorGuidance(kind, message)
+    setError(guidance)
+    onNoticeChange?.({ key, message: guidance.message })
+  }
+  const claimAutomaticRequest = () => {
+    if (autoRequested) autoCalculatedKeys.current.add(key)
+  }
   const changeOptions = patch => {
+    claimAutomaticRequest()
     retryRef.current = null
     workerRef.current?.terminate(); workerRef.current = null
-    setBusy(false); setError('')
-    onChangeRef.current(previous => ({ ...previous, options: { ...options, ...patch }, ...(Object.hasOwn(patch, 'azimuthDeg') ? { layoutMode: 'manual' } : {}), calculating: false }))
+    setBusy(false); clearNotice()
+    onChangeRef.current(previous => ({ ...previous, ...autoCalculated, options: { ...options, ...patch }, ...(Object.hasOwn(patch, 'azimuthDeg') ? { layoutMode: 'manual' } : {}), calculating: false }))
   }
   const calculate = (patch = {}, optimized = false, compareSlopes = false, fixedSouth = false) => {
+    claimAutomaticRequest()
     const runOptions = normalizeTerrainLayoutOptions({ ...options, ...patch })
     const mode = compareSlopes || fixedSouth ? terrainLayoutMode(preview) : optimized ? 'optimized' : 'manual'
     retryRef.current = { options: runOptions, optimized, compareSlopes, fixedSouth }
     workerRef.current?.terminate()
     workerRef.current = null
-    setBusy(true); setError('')
-    onChangeRef.current(previous => ({ ...previous, options: runOptions, layoutMode: mode, calculating: true }))
+    setBusy(true); clearNotice()
+    onChangeRef.current(previous => ({ ...previous, ...autoCalculated, options: runOptions, layoutMode: mode, calculating: true }))
     try {
       const worker = new Worker(new URL('../workers/terrainLayoutWorker.js', import.meta.url), { type: 'module' })
       workerRef.current = worker
@@ -77,10 +92,10 @@ export default function TerrainLayoutPreview({ analysis, preview, onChange, parc
       worker.onmessage = ({ data }) => {
         if (workerRef.current !== worker || latestAnalysisRef.current !== analysis || latestRequest.current !== worker.layoutRequestKey) { worker.terminate(); return }
         worker.terminate(); workerRef.current = null; setBusy(false)
-        if (data.error) { setError(terrainLayoutErrorGuidance(data.code || 'calculation', data.error)); onChangeRef.current(previous => ({ ...previous, calculating: false })); return }
-        if (compareSlopes ? !(data.comparison?.layouts?.length === 2 && data.comparison.layouts.every((result, index) => terrainLayoutResultMatchesOptions(result, { ...runOptions, slopeLimitDeg: [15,20][index] }))) : !terrainLayoutResultMatchesOptions(data.result, fixedSouth ? { ...runOptions, azimuthDeg:180 } : runOptions, optimized)) { setError(terrainLayoutErrorGuidance('worker')); onChangeRef.current(previous => ({ ...previous, calculating: false })); return }
+        if (data.error) { showError(data.code || 'calculation', data.error); onChangeRef.current(previous => ({ ...previous, calculating: false })); return }
+        if (compareSlopes ? !(data.comparison?.layouts?.length === 2 && data.comparison.layouts.every((result, index) => terrainLayoutResultMatchesOptions(result, { ...runOptions, slopeLimitDeg: [15,20][index] }))) : !terrainLayoutResultMatchesOptions(data.result, fixedSouth ? { ...runOptions, azimuthDeg:180 } : runOptions, optimized)) { showError('worker'); onChangeRef.current(previous => ({ ...previous, calculating: false })); return }
         if (fixedSouth) {
-          if(data.result.options.azimuthDeg!==180 || data.result.stats?.autoSearch?.mode!=='south-fixed'){setError(terrainLayoutErrorGuidance('worker'));onChangeRef.current(previous=>({...previous,calculating:false}));return}
+          if(data.result.options.azimuthDeg!==180 || data.result.stats?.autoSearch?.mode!=='south-fixed'){showError('worker');onChangeRef.current(previous=>({...previous,calculating:false}));return}
           onChangeRef.current(previous=>({...previous,southComparison:{...data.result,requestedOptions:runOptions,analysisKey:key,analysisReference:analysis},calculating:false}));return
         }
         if (compareSlopes) {
@@ -94,22 +109,39 @@ export default function TerrainLayoutPreview({ analysis, preview, onChange, parc
       worker.onerror = event => {
         if (workerRef.current !== worker) return
         worker.terminate(); workerRef.current = null; setBusy(false)
-        setError(terrainLayoutErrorGuidance('worker', event.message))
+        showError('worker', event.message)
         onChangeRef.current(previous => ({ ...previous, calculating: false }))
       }
       worker.postMessage({ analysis, options: runOptions, optimized, compareSlopes, fixedSouth, baseline: optimized || fixedSouth ? pool : null })
     } catch (failure) {
       workerRef.current?.terminate(); workerRef.current = null
-      setBusy(false); setError(terrainLayoutErrorGuidance(failure?.name === 'DataCloneError' ? 'data' : 'startup'))
+      setBusy(false); showError(failure?.name === 'DataCloneError' ? 'data' : 'startup')
       onChangeRef.current(previous => ({ ...previous, calculating: false }))
     }
   }
+  const startAutomaticLayout = useEffectEvent(() => {
+    if (!autoRequested || autoHandled || busy || pool || autoCalculatedKeys.current.has(key)) return
+    calculate(normalizeTerrainLayoutOptions())
+  })
+  useEffect(() => {
+    if (!autoRequested || autoHandled || busy || pool || autoCalculatedKeys.current.has(key)) return
+    // Defer until this effect remains mounted through StrictMode's cleanup.
+    let current = true
+    queueMicrotask(() => { if (current) startAutomaticLayout() })
+    return () => { current = false }
+  }, [autoRequested, autoHandled, busy, pool, key])
+
   const toggle = () => {
     if (!layout) { calculate(); return }
     onChangeRef.current(previous => ({ ...previous, enabled: !enabled }))
     if (!enabled) onShow3D?.()
   }
-  const cancel = () => { workerRef.current?.terminate(); workerRef.current = null; setBusy(false); onChangeRef.current(previous => ({ ...previous, calculating: false })) }
+  const cancel = () => {
+    workerRef.current?.terminate(); workerRef.current = null
+    setBusy(false)
+    onChangeRef.current(previous => ({ ...previous, calculating: false }))
+    onNoticeChange?.({ key, message: '参考配置の計算を中止しました。' })
+  }
   const changeSlope = value => {
     changeOptions({ slopeLimitDeg: value })
     if (pool) calculate({ slopeLimitDeg: value })
@@ -121,7 +153,7 @@ export default function TerrainLayoutPreview({ analysis, preview, onChange, parc
 
   return <div className="terrain-layout-preview">
     <div className="terrain-layout-bar">
-      <button type="button" className="terrain-layout-toggle" aria-pressed={enabled} disabled={busy} onClick={toggle}>{pool ? `参考配置 ${enabled ? 'ON' : 'OFF'}` : '自動で参考配置'}</button>
+      <button type="button" className="terrain-layout-toggle" aria-pressed={pool ? enabled : undefined} disabled={busy} onClick={toggle}>{pool ? `参考配置の表示 ${enabled ? 'ON' : 'OFF'}` : '参考配置を計算'}</button>
       <button type="button" disabled={busy} onClick={() => calculate({}, false, true)}>地形勾配15° / 20°を比較</button>
       {pool && <button type="button" className="terrain-layout-optimize" disabled={busy} onClick={() => calculate({}, true)}>方位も最適化して適用（±30°）</button>}
       <button type="button" className="terrain-layout-optimize" disabled={busy} onClick={()=>calculate({},false,false,true)}>真南固定・最大配置を比較</button>
@@ -147,7 +179,7 @@ export default function TerrainLayoutPreview({ analysis, preview, onChange, parc
       </TerrainHelpDialog>
       </div>
     </div>
-    {draftChanged && <p className="terrain-layout-footnote" role="status">条件は未適用です。図は前回の結果です。PDFは現在の条件で再計算してから出力してください。</p>}
+    {draftChanged && <p className="terrain-layout-footnote" role="status">条件は未適用です。図は前回の結果です。PDFを出力する前に「配置条件」の「この条件で再計算」を押してください。</p>}
     {preview?.comparison?.analysisReference === analysis && <div className="terrain-layout-comparison"><p>地形の局所勾配のみ変更。パネル傾斜・方位・開始位置・間隔・範囲は同一。個別除外なしの自動案です。</p><table><thead><tr><th>地形勾配</th><th>架台</th><th>枚数</th><th>DC kW</th><th>表示</th></tr></thead><tbody>{preview.comparison.layouts.map(result => <tr key={result.options.slopeLimitDeg}><th>{result.options.slopeLimitDeg}°未満</th><td>{result.rackCount}</td><td>{result.moduleCount}</td><td>{number(result.dcKw)}</td><td><button type="button" disabled={busy||comparisonDraftChanged} onClick={() => { if(comparisonDraftChanged)return; onChangeRef.current(previous => ({ ...previous, options: result.options, appliedOptions: result.options, layoutMode: 'manual', appliedMode: 'manual', layout: { ...result, analysisKey: key, analysisReference: analysis }, disabledRackIds: [], activeRackCount: null, enabled: true })); onShow3D?.() }}>この案を見る</button></td></tr>)}</tbody></table><p>{comparisonDraftChanged && <span role="status">条件を変更しました。比較を再計算してから適用してください。 </span>}差（20° − 15°）：{preview.comparison.layouts[1].rackCount - preview.comparison.layouts[0].rackCount}架台 / {preview.comparison.layouts[1].moduleCount - preview.comparison.layouts[0].moduleCount}枚 / {number(preview.comparison.layouts[1].dcKw - preview.comparison.layouts[0].dcKw)} kW。案の切替・再計算成功時は個別除外を初期化します。</p></div>}
     {preview?.southComparison?.analysisReference===analysis && <div className="terrain-layout-comparison terrain-layout-south-comparison"><p><strong>真南180°固定 · 探索候補内の最多配置</strong> / モジュール傾斜{preview.southComparison.options.tiltDeg}°、間隔・離隔・地形条件は入力時の値を維持。開始位置を{preview.southComparison.stats.autoSearch.trials}案比較。全域最大は未保証。</p><table><thead><tr><th>案</th><th>架台</th><th>枚数</th><th>DC kW</th></tr></thead><tbody>{[['現在の適用案',layout],['真南固定案',preview.southComparison]].filter(([,result])=>result).map(([label,result])=><tr key={label}><th>{label}</th><td>{result.rackCount}</td><td>{result.moduleCount}</td><td>{number(result.dcKw)}</td></tr>)}</tbody></table><button type="button" disabled={busy||southDraftChanged} onClick={()=>{if(southDraftChanged)return;const result=preview.southComparison;onChangeRef.current(previous=>({...previous,options:result.options,appliedOptions:result.options,layoutMode:'south',appliedMode:'south',layout:result,activeRackCount:null,disabledRackIds:[],enabled:true}));onShow3D?.()}}>真南固定案を適用</button>{southDraftChanged&&<p role="status">比較後に配置条件を変更しました。入力条件を保つため、もう一度「真南固定」を比較してください。</p>}<p>比較だけでは現在の結果・個別除外を変えません。適用すると架台の個別除外を初期化します。描いた除外領域は引き続き配置対象外です。</p></div>}
     {localBusy && <div className="terrain-layout-status" role="status"><span>{options.slopeLimitDeg}°未満の地形と除外範囲を確認して配置中…</span><button type="button" onClick={cancel}>中止</button></div>}

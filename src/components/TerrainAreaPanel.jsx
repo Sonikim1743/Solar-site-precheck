@@ -7,6 +7,8 @@ import { toggleTerrainRackSelection, adjustTerrainRackSelection } from '../utils
 import TerrainHelpDialog from './TerrainHelpDialog.jsx'
 import { buildTerrainFence } from '../utils/terrainFence.js'
 import { buildTerrainParcelOverlay } from '../utils/terrainParcelOverlay.js'
+import { appliedTerrainPreview } from '../utils/terrainLayoutComparison.js'
+import { isMapParcel, MAP_PARCEL_NOTICE } from '../utils/mapParcelSelection.js'
 import './terrain-area.css'
 
 const number = (value, digits = 1) => Number.isFinite(value) ? value.toLocaleString('ja-JP', { maximumFractionDigits: digits }) : '—'
@@ -16,7 +18,8 @@ function dateText(value) {
   return value && Number.isFinite(date.getTime()) ? date.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '未記録'
 }
 
-export default function TerrainAreaPanel({ geometry, metrics, analysis, status = 'idle', progress, error, onAnalyze, onCancel, onClear, position, onDrawBoundary, onOpenReport, onOpenDrawing, parcels = [], publicParcels = [], publicParcelsLimited = false, preview, onPreviewChange, outputBlocked = false, dxfReport, preferredView = 'plan' }) {
+export default function TerrainAreaPanel({ geometry, metrics, analysis, status = 'idle', progress, error, onAnalyze, onCancel, onClear, position, onDrawBoundary, onOpenReport, onOpenDrawing, parcels = [], publicParcels = [], publicParcelsLimited = false, preview, onPreviewChange, outputBlocked = false, dxfReport, preferredView = 'plan', autoLayoutKey }) {
+  const [layoutNotice, setLayoutNotice] = useState(null)
   const [view, setView] = useState(preferredView === '3d' ? '3d' : 'plan')
   const id = `terrain-area-${useId().replace(/:/g, '')}`
   const state = typeof status === 'string' ? status : status?.status || 'idle'
@@ -26,8 +29,26 @@ export default function TerrainAreaPanel({ geometry, metrics, analysis, status =
   const sourceLayers = analysis?.source?.layers || []
   const message = typeof error === 'string' ? error : error?.message || (state === 'error' ? status?.message : '')
   const parcelOverlay = useMemo(() => buildTerrainParcelOverlay(analysis, [...parcels, ...publicParcels]), [analysis, parcels, publicParcels])
-  const layoutPool = preview?.enabled && preview?.layout?.analysisKey === terrainLayoutAnalysisKey(analysis) && preview.layout.analysisReference === analysis && preview.layout.options?.rows === 4 && Number.isInteger(preview.layout.options?.minColumns) ? preview.layout : null
-  const layout = useMemo(() => layoutPool ? selectedTerrainLayout(layoutPool, preview) : null, [layoutPool, preview?.activeRackCount, preview?.disabledRackIds])
+  const analysisKey = terrainLayoutAnalysisKey(analysis)
+  const applied = analysis ? appliedTerrainPreview(analysis, preview) : null
+  const appliedPool = applied?.options?.rows === 4 && Number.isInteger(applied.options.minColumns) ? applied : null
+  const appliedLayout = useMemo(() => selectedTerrainLayout(appliedPool, preview), [appliedPool, preview?.activeRackCount, preview?.disabledRackIds])
+  const layoutPool = preview?.enabled ? appliedPool : null
+  const layout = preview?.enabled ? appliedLayout : null
+  const waitingForLayout = onPreviewChange && autoLayoutKey === analysisKey && preview?.autoCalculatedKey !== analysisKey && !appliedPool
+  const terrainAcquired = `地形を取得しました（図形面積 約${number(summary?.polygonAreaM2, 0)} m²・高低差 約${number(summary?.heightRange)} m）。`
+  let feedback = terrainAcquired
+  if (preview?.calculating || waitingForLayout) {
+    feedback += '参考配置を計算しています…'
+  } else if (layoutNotice?.key === analysisKey) {
+    feedback += layoutNotice.message
+  } else if (appliedLayout?.moduleCount > 0) {
+    feedback = `地形と参考配置を確認しました。モジュール ${number(appliedLayout.moduleCount, 0)}枚・DC 約${number(appliedLayout.dcKw)} kW（参考）。`
+  } else if (appliedLayout) {
+    feedback += appliedPool.moduleCount
+      ? '現在の選択は0枚です。架台を復元すると配置を表示できます。'
+      : '参考配置は0枚です。現在の範囲・除外・間隔の条件では配置できません。'
+  }
   const toggleRack = layoutPool && onPreviewChange && !preview?.calculating ? id => onPreviewChange(previous => previous.layout === layoutPool ? { ...previous, disabledRackIds: toggleTerrainRackSelection(layoutPool, previous, id), activeRackCount: null } : previous) : undefined
   const fence = useMemo(() => preview?.fence && layout ? buildTerrainFence(analysis, { racks: layout.racks, marginM: layout.options.setbackM }) : null, [analysis, layout, preview?.fence])
   const adjustRack = delta => onPreviewChange?.(previous => previous.layout === layoutPool ? { ...previous, disabledRackIds: adjustTerrainRackSelection(layoutPool, previous, delta), activeRackCount: null } : previous)
@@ -51,9 +72,10 @@ export default function TerrainAreaPanel({ geometry, metrics, analysis, status =
     {!loading && message && <div className="terrain-area-warning" role="alert"><p>{message}</p></div>}
     {!loading && ['cancelled', 'canceled'].includes(state) && !message && <p className="terrain-area-scope" role="status">取得を中止しました。範囲は保持されています。</p>}
     {analysis && <>
+      {!loading && <p className="terrain-area-feedback" role="status">{feedback}</p>}
       <dl className="terrain-area-summary"><div><dt>図形面積</dt><dd>約{number(summary?.polygonAreaM2, 0)} <small>m²</small></dd></div><div><dt>高低差</dt><dd>約{number(summary?.heightRange)} <small>m</small></dd></div><div><dt title="10m幅で見た局所勾配の中央値">勾配の中央値</dt><dd>{Number.isFinite(summary?.medianSlope) ? `${number(summary.medianSlope)}°` : '未取得'}</dd></div></dl>
       {partial && <p className="terrain-area-warning" role="status">標高・勾配に未確認部分があります。集計は取得部分の参考値です。</p>}
-      {onPreviewChange && <TerrainLayoutPreview analysis={analysis} preview={preview} onChange={onPreviewChange} parcelCount={parcelOverlay.labels.length} onShow3D={() => setView('3d')} onReacquire={onAnalyze} onBoundary={onDrawBoundary} />}
+      {onPreviewChange && <TerrainLayoutPreview analysis={analysis} preview={preview} onChange={onPreviewChange} autoCalculateKey={autoLayoutKey} onNoticeChange={setLayoutNotice} parcelCount={parcelOverlay.labels.length} onShow3D={() => setView('3d')} onReacquire={onAnalyze} onBoundary={onDrawBoundary} />}
       {view === 'plan' ? <TerrainAreaPlan analysis={analysis} position={position} layout={layout} layoutCandidates={layoutPool} onToggleRack={toggleRack} fence={fence} parcelOverlay={shownParcels} rackControls={rackControls} /> : <TerrainArea3D analysis={analysis} position={position} layout={layout} layoutCandidates={layoutPool} onToggleRack={toggleRack} fence={fence} parcelOverlay={shownParcels} rackControls={rackControls} interactive />}
       {fence?.truncated && <p className="terrain-layout-footnote" role="status">フェンスは表示上限のため一部だけを描いています。</p>}
       {shownParcels?.truncated && <p className="terrain-layout-footnote" role="status">地番の表示数を制限しています。</p>}
@@ -65,7 +87,7 @@ export default function TerrainAreaPanel({ geometry, metrics, analysis, status =
         <div><dt>3Dの底面</dt><dd>高さを見やすくする表示用です。地層・土量は示さず、除外・欠測部分は地表と同じ範囲で空けています。</dd></div>
         <div><dt>取得範囲</dt><dd>標高 約{number(summary?.coveragePercent)}% ／ 勾配 約{number(summary?.slopeCoveragePercent)}%</dd></div>
         <div><dt>取得</dt><dd>{dateText(analysis.fetchedAt)}</dd></div>
-      </dl><p>黄色線は測量で確認した筆界ではありません。樹木・建物・擁壁や造成の細部は現地・図面で確認してください。</p><p>地番・筆の線は読み込んだ資料／公開地番の参考表示です。公開データは2024年資料のタイル片で、測量筆界ではありません。</p><button type="button" className="terrain-area-quiet-button" onClick={onClear} disabled={!onClear}>地形の結果をクリア</button></TerrainHelpDialog></div>
+      </dl><p>黄色線は測量で確認した筆界ではありません。樹木・建物・擁壁や造成の細部は現地・図面で確認してください。</p><p>地番・筆の線は読み込んだ資料／公開地番の参考表示です。公開データは2024年資料のタイル片で、測量筆界ではありません。</p><p>この地形・配置の検討範囲には、指定範囲と除外図形が反映されます。シンプルモードで地図から選んだ対象を分析するときは、指定範囲や除外図形で切り取る前の合併形状を使います。{parcels.some(isMapParcel) && MAP_PARCEL_NOTICE}</p><button type="button" className="terrain-area-quiet-button" onClick={onClear} disabled={!onClear}>地形の結果をクリア</button></TerrainHelpDialog></div>
     </>}
   </section>
 }

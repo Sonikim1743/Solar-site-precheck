@@ -107,7 +107,10 @@ test('report uses applied geometry and excluded quantities, emits four sheets, a
  report.terrainPreview={options:{...pool.options,tiltDeg:55,rackGapM:9},layout:pool,disabledRackIds:[pool.racks[0].id],comparison:{...buildTerrainSlopeComparison(analysis,pool.options),analysisReference:analysis,analysisKey:terrainLayoutAnalysisKey(analysis)}}
  const Report=(await server.ssrLoadModule('/src/components/TerrainAreaReport.jsx')).default
  const {renderToStaticMarkup}=await import('react-dom/server')
- const html=renderToStaticMarkup(React.createElement(Report,{report})),document=new JSDOM(html).window.document
+ const blocked = renderToStaticMarkup(React.createElement(Report, { report, drawingScale: 2000 }))
+ assert.match(blocked, /配置条件または地形が更新されています/)
+ report.terrainPreview.options = pool.options
+ const html=renderToStaticMarkup(React.createElement(Report,{report,drawingScale:2000})),document=new JSDOM(html).window.document
  assert.equal(document.querySelectorAll('.terrain-report-sheet').length,4)
  assert.equal(document.querySelectorAll('.terrain-area-figure svg').length,5)
  const drawing=document.querySelector('.terrain-layout-report')
@@ -129,7 +132,7 @@ test('report consolidates the terrain/configuration evidence in final notes and 
  report.terrainPreview={layout:pool,fence:true,disabledRackIds:[pool.racks[0].id],comparison:{...buildTerrainSlopeComparison(analysis,pool.options),analysisReference:analysis,analysisKey:terrainLayoutAnalysisKey(analysis)}}
  const Report=(await server.ssrLoadModule('/src/components/TerrainAreaReport.jsx')).default
  const {renderToStaticMarkup}=await import('react-dom/server')
- const html=renderToStaticMarkup(React.createElement(Report,{report})),doc=new JSDOM(html).window.document,sheets=[...doc.querySelectorAll('.terrain-report-sheet')]
+ const html=renderToStaticMarkup(React.createElement(Report,{report,drawingScale:2000})),doc=new JSDOM(html).window.document,sheets=[...doc.querySelectorAll('.terrain-report-sheet')]
  assert.equal(sheets.length,4)
  assert.ok(sheets[1].textContent.includes('実DEM地形 · 配置前'))
  assert.ok(sheets[1].textContent.includes('参考配置3D · 適用済み'))

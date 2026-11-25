@@ -2,7 +2,7 @@ import { terrainReportTitleLines } from '../utils/terrainReportTitle.js'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import polygonClipping from 'polygon-clipping'
 import { terrainPointToLocal, pointInTerrainBoundary } from '../utils/terrainArea.js'
-import { createTerrainProjection, dragTerrainView, normalizeTerrainView, zoomTerrainView, terrainFaceVisible, stepTerrainView, panTerrainOffset, stepTerrainOffset } from '../utils/terrainView.js'
+import { createTerrainProjection, dragTerrainView, fitTerrainLayoutZoom, normalizeTerrainView, zoomTerrainView, terrainFaceVisible, stepTerrainView, panTerrainOffset, stepTerrainOffset } from '../utils/terrainView.js'
 import { terrainElevationLabel } from '../utils/terrainElevationLabel.js'
 import { buildTerrainSolid } from '../utils/terrainSolid.js'
 import { TERRAIN_SLOPE_LABELS, terrainSlopeIndex } from '../utils/terrainSlopeClasses.js'
@@ -19,6 +19,7 @@ import './terrain-area.css'
 const COLORS = TERRAIN_SLOPE_COLORS
 const LABELS = TERRAIN_SLOPE_LABELS
 const W = 800, H = 520
+const TERRAIN_3D_VIEWPORT = { x: 25, y: 35, width: 750, height: 395 }
 const finite = Number.isFinite
 const colorIndex = terrainSlopeIndex
 const n = (value) => Number(value.toFixed(2))
@@ -276,6 +277,7 @@ export function TerrainArea3D({ analysis, position, reportMode = false, compactR
   const canvasRef = useRef(null), modelRef = useRef(null), dragRef = useRef(null), frameRef = useRef(null), pendingView = useRef(null), pendingPan = useRef(null), navigationFrame = useRef(null)
   const latestView = useRef(view)
   const latestPan = useRef(pan)
+  const fitPending = useRef(true)
   latestView.current = view
   latestPan.current = pan
   const applyPan = next => { latestPan.current = next; setPan(next) }
@@ -293,7 +295,9 @@ export function TerrainArea3D({ analysis, position, reportMode = false, compactR
     pendingPan.current = null
   }
   useEffect(() => {
-    releaseDrag(); discardFrame(); setView(normalizeTerrainView({ azimuth, pitch: 32 })); applyPan({ x: 0, y: 0 }); setViewMode('rotate'); setDisplayHeightScale(heightScale === 2 ? 2 : 1)
+    const next = normalizeTerrainView({ azimuth, pitch: 32 })
+    fitPending.current = true
+    releaseDrag(); discardFrame(); latestView.current = next; setView(next); applyPan({ x: 0, y: 0 }); setViewMode('rotate'); setDisplayHeightScale(heightScale === 2 ? 2 : 1)
   }, [analysis, azimuth, canRotate, heightScale])
   useEffect(() => () => { releaseDrag(); discardFrame() }, [])
   const camera = canRotate ? view : initialView
@@ -359,8 +363,23 @@ export function TerrainArea3D({ analysis, position, reportMode = false, compactR
       }
       return { ...face, color, index, visible: terrainFaceVisible(face.normal, camera, verticalScale), depth: projection.transform(face.centroid)[2] }
     }).sort((a,b) => a.depth - b.depth)
-    return { ...mesh, ...projection, faces, faceCount: mesh.faces.length, outlinePaths: mesh.outlines.map(points => pathOf(points, projection.project)) }
+    return { ...mesh, ...projection, maxElevation: maximum, faces, faceCount: mesh.faces.length, outlinePaths: mesh.outlines.map(points => pathOf(points, projection.project)) }
   }, [mesh, camera.azimuth, camera.pitch, camera.zoom, pan.x, pan.y, canRotate, verticalScale, layout, layoutCandidates, fence, reportMode, reportLayout])
+  // Fit once when modules first appear. Later rack edits and visibility toggles
+  // keep the camera at the user's zoom.
+  useEffect(() => {
+    if (!canRotate || !fitPending.current || !drawing || !layout?.racks.length) return
+    fitPending.current = false
+    const current = latestView.current
+    const { x, y } = latestPan.current
+    const zoom = fitTerrainLayoutZoom({
+      ...current, bounds: drawing.bounds, base: drawing.base, maxElevation: drawing.maxElevation,
+      heightScale: verticalScale, panX: x, panY: y,
+    }, layout.racks.flatMap(rack => rack.corners), TERRAIN_3D_VIEWPORT)
+    const next = { ...current, zoom }
+    latestView.current = next
+    setView(next)
+  }, [canRotate, drawing, layout, verticalScale])
   const projectedFence = useMemo(() => {
     if ((reportMode && !reportLayout) || !fence || !drawing) return null
     const visible = createTerrainOverlayVisibility(drawing.faces.filter(face => face.kind !== 'module'), drawing)
@@ -405,7 +424,8 @@ export function TerrainArea3D({ analysis, position, reportMode = false, compactR
     if (!context) return
     context.setTransform(ratio, 0, 0, ratio, 0, 0)
     context.clearRect(0,0,W,modelHeight)
-    context.save(); context.beginPath(); context.rect(25,35,750,395); context.clip()
+    const viewport = TERRAIN_3D_VIEWPORT
+    context.save(); context.beginPath(); context.rect(viewport.x, viewport.y, viewport.width, viewport.height); context.clip()
     const trace = rings => {
       context.beginPath()
       for (const ring of rings) { ring.forEach((p,index) => { const [x,y] = drawing.project(p); if (index) context.lineTo(x,y); else context.moveTo(x,y) }); context.closePath() }
@@ -457,11 +477,12 @@ export function TerrainArea3D({ analysis, position, reportMode = false, compactR
   }
   const keyDown = event => {
     if (!canRotate || !['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','+','=','-'].includes(event.key)) return
-    event.preventDefault(); releaseDrag(); discardFrame()
+    event.preventDefault()
     if (event.key === 'Home') { resetView(); return }
+    if (['+', '=', '-'].includes(event.key)) { zoomView(event.key === '-' ? 1 / 1.2 : 1.2); return }
+    releaseDrag(); discardFrame()
     if (fixed && event.key.startsWith('Arrow')) { applyPan(stepTerrainOffset(latestPan.current, event.key)); return }
-    const current = latestView.current
-    const next = ['+','=','-'].includes(event.key) ? zoomTerrainView(current, event.key === '-' ? 1/1.2 : 1.2) : stepTerrainView(current,'orbit',event.key)
+    const next = stepTerrainView(latestView.current, 'orbit', event.key)
     latestView.current = next; setView(next)
   }
   const moveView = key => { releaseDrag(); discardFrame(); if (fixed) { applyPan(stepTerrainOffset(latestPan.current,key)); return } const next=stepTerrainView(latestView.current,'orbit',key); latestView.current=next; setView(next) }
@@ -484,7 +505,12 @@ export function TerrainArea3D({ analysis, position, reportMode = false, compactR
   }
   const changeViewMode = mode => { releaseDrag(); discardFrame(); setViewMode(mode) }
   const changeHeightScale = scale => { releaseDrag(); discardFrame(); setDisplayHeightScale(scale) }
-  const zoomView = factor => { releaseDrag(); discardFrame(); const next = zoomTerrainView(latestView.current, factor); latestView.current = next; setView(next) }
+  const zoomView = factor => {
+    fitPending.current = false
+    releaseDrag(); discardFrame()
+    const next = zoomTerrainView(latestView.current, factor)
+    latestView.current = next; setView(next)
+  }
   useEffect(() => {
     const target = modelRef.current
     if (!canRotate || !drawing || !target) return
@@ -492,9 +518,7 @@ export function TerrainArea3D({ analysis, position, reportMode = false, compactR
       event.preventDefault()
       const pixels = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? H : 1)
       if (!finite(pixels) || pixels === 0) return
-      releaseDrag(); discardFrame()
-      const next = zoomTerrainView(latestView.current, Math.exp(-Math.max(-200, Math.min(200, pixels)) * .002))
-      latestView.current = next; setView(next)
+      zoomView(Math.exp(-Math.max(-200, Math.min(200, pixels)) * .002))
     }
     target.addEventListener('wheel', wheel, { passive: false })
     return () => target.removeEventListener('wheel', wheel)
@@ -526,7 +550,7 @@ export function TerrainArea3D({ analysis, position, reportMode = false, compactR
       <title id={`${id}-title`}>参考範囲の実DEM地形3D</title>
       <desc id={`${id}-desc`}>等高線図と同じ標高データ・参考範囲を用いた立体図。{verticalScale === 2 ? '横1：縦2の高さ強調表示。標高・勾配の数値と色は実DEMのままです。' : '高さ強調なし、縦横同尺度。'}黄色線は地表に沿う対象範囲。側面・底面は表示用で、地層・土量を示しません。樹木、建物、擁壁、造成後の形状は含みません。欠測や除外の部分を面で埋めません。</desc>
       {!canRotate && <rect width={W} height={H} fill="#fbfcfa" />}
-      <defs><clipPath id={`${id}-viewport`}><rect x="25" y="35" width="750" height="395" /></clipPath></defs>
+      <defs><clipPath id={`${id}-viewport`}><rect {...TERRAIN_3D_VIEWPORT} /></clipPath></defs>
       <text x="44" y="25" className="terrain-area-svg-caption">実DEM地形　{verticalScale === 2 ? '高さ2倍（横1：縦2）' : '高さ強調なし（1:1）'}</text>
       <text x="756" y="25" textAnchor="end" className="terrain-area-svg-note">視点：北から時計回り{Math.round(camera.azimuth)}°{canRotate ? ` ／ 見下ろし${Math.round(camera.pitch)}°` : ''}</text>
       <g clipPath={`url(#${id}-viewport)`}>
@@ -546,7 +570,7 @@ export function TerrainArea3D({ analysis, position, reportMode = false, compactR
       <g className="terrain-area-3d-cardinals">{[['N', north], ['S', south], ['E', east], ['W', west]].map(([label, p]) => <text key={label} x={p[0]} y={p[1] + (label === 'N' ? -9 : 18)} textAnchor="middle">{label}</text>)}</g>
       </g>
       {!canRotate && <><text x="44" y="443" className="terrain-area-svg-note">{compactReport ? `${noteRef}（最終ページ）` : '地表面と黄色線は同じ標高データ。樹木・建物・造成後の形状は含みません。'}</text><Legend analysis={analysis} /></>}
-      {canRotate && <rect ref={modelRef} className="terrain-area-drag-target" x="25" y="35" width="750" height="395" fill="transparent" onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerEnd} onPointerCancel={pointerEnd} onLostPointerCapture={pointerEnd} />}
+      {canRotate && <rect ref={modelRef} className="terrain-area-drag-target" {...TERRAIN_3D_VIEWPORT} fill="transparent" onPointerDown={pointerDown} onPointerMove={pointerMove} onPointerUp={pointerEnd} onPointerCancel={pointerEnd} onLostPointerCapture={pointerEnd} />}
     </svg>
     </div>
     </div>

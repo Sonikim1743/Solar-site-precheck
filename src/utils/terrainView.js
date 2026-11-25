@@ -94,6 +94,25 @@ export function createTerrainProjection({ bounds, base, maxElevation, azimuth, p
   const minU = Math.min(...us), maxU = Math.max(...us), minV = Math.min(...vs), maxV = Math.max(...vs)
   const scale = Math.min(675 / Math.max(1, maxU - minU), 335 / Math.max(1, maxV - minV)) * camera.zoom
   const offset = panTerrainOffset({ x: panX, y: panY })
+  const screenOrigin = [400 + offset.x, 225 + offset.y]
   const project = point => { const [u, v] = transform(point); return [400 + (u - (minU + maxU) / 2) * scale + offset.x, 225 + (v - (minV + maxV) / 2) * scale + offset.y] }
-  return { ...camera, heightScale: displayHeightScale, transform, project, scale }
+  return { ...camera, heightScale: displayHeightScale, transform, project, scale, screenOrigin }
+}
+
+// Zoom about the same anchor used to draw the terrain and rack polygons.
+export function fitTerrainLayoutZoom(frame, rackCorners, viewport) {
+  const { project, screenOrigin: [centerX, centerY] } = createTerrainProjection({ ...frame, zoom: 1 })
+  const left = viewport.x + 8, right = viewport.x + viewport.width - 8
+  const top = viewport.y + 8, bottom = viewport.y + viewport.height - 8
+  if (!rackCorners.length || centerX <= left || centerX >= right || centerY <= top || centerY >= bottom) {
+    return normalizeTerrainView(frame).zoom
+  }
+  let zoom = Number.MAX_VALUE
+  for (const corner of rackCorners) {
+    const [x, y] = project(corner)
+    const dx = x - centerX, dy = y - centerY
+    if (dx !== 0) zoom = Math.min(zoom, (dx < 0 ? centerX - left : right - centerX) / Math.abs(dx))
+    if (dy !== 0) zoom = Math.min(zoom, (dy < 0 ? centerY - top : bottom - centerY) / Math.abs(dy))
+  }
+  return normalizeTerrainView({ zoom }).zoom
 }

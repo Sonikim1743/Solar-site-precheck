@@ -210,6 +210,7 @@
 .terrain-area-panel .terrain-area-empty { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:8px 12px; max-width:920px; margin:0 auto; padding:8px 0; border-radius:0; background:none; }
 .terrain-area-panel .terrain-area-empty p { min-width:0; margin:0; color:var(--ink,#193e35); font-size:15px; font-weight:500; line-height:1.5; overflow-wrap:anywhere; }
 .terrain-area-panel .terrain-area-empty button { white-space:nowrap; }
+.terrain-area-panel .terrain-area-feedback { box-sizing:border-box; max-width:920px; margin:6px auto; padding:8px 10px; border-radius:6px; background:#f3f8f3; font-size:14px; line-height:1.5; }
 .terrain-area-panel .terrain-area-progress { gap:10px; max-width:920px; margin:6px auto; padding:8px 10px; border-radius:6px; }
 .terrain-area-panel .terrain-area-progress>div { gap:2px; }
 .terrain-area-panel .terrain-area-progress strong { font-size:14px; }

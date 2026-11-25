@@ -6,7 +6,9 @@ import react from '@vitejs/plugin-react'
 import {terrainReviewSynthetic} from '../fixtures/terrainReviewSynthetic.mjs'
 import {normalizeTerrainArea} from '../../src/utils/terrainArea.js'
 import {buildTerrainLayout} from '../../src/utils/terrainLayout.js'
-import {simpleReviewDefaults} from '../../src/services/simpleReview.js'
+import {runSimpleReview,simpleReviewDefaults} from '../../src/services/simpleReview.js'
+import {selectedParcelUnionReview} from '../../src/utils/selectedParcelReview.js'
+import {MAP_PARCEL_SOURCE} from '../../src/utils/mapParcelSelection.js'
 import {setReviewParcel,createEmptyParcelReview,measureParcelReview} from '../../src/utils/parcelReview.js'
 import {featureInteriorPoint} from '../../src/services/parcelGeometry.js'
 let dom,server,React,createRoot,Panel,root,state,changeReview,runner,exporter,snapshot,fixture
@@ -22,7 +24,7 @@ async function setup(){
  fixture=terrainReviewSynthetic();const area=normalizeTerrainArea({...fixture.terrainArea,grid:{...fixture.terrainArea.grid,elevations:fixture.terrainArea.grid.elevations.map(()=>100)}}),defaults=simpleReviewDefaults()
  snapshot={position:featureInteriorPoint({geometry:area.geometry}),defaults,results:{area,layout:buildTerrainLayout(area,defaults.layout),elevation:{value:100,dataSource:'合成'},section:null,horizon:null,snow:null},steps:[],status:'complete',review:fixture.parcelReview,areaM2:area.summary.polygonAreaM2,acquiredAt:'2026-10-13T00:00:00.000Z'}
  runner=async()=>snapshot;exporter=async({drawingOnly})=>({blob:new Blob(['test']),fileName:drawingOnly?'drawing.pdf':'report.pdf',pageCount:drawingOnly?1:4})
- function Harness(){const [value,setValue]=React.useState({status:'idle',pending:null,result:null,error:'',progress:null});const [review,setReview]=React.useState(fixture.parcelReview);state=value;changeReview=setReview;return React.createElement(Panel,{review,siteName:'合成',appVersion:'test',state:value,onChange:setValue,run:runBridge,exporter:exportBridge})}
+ function Harness(){const [value,setValue]=React.useState({status:'idle',pending:null,result:null,error:'',progress:null});const [review,setReview]=React.useState(fixture.parcelReview);state=value;changeReview=setReview;return React.createElement(Panel,{review,siteName:'合成',appVersion:'test',drawingScale:2000,state:value,onChange:setValue,run:runBridge,exporter:exportBridge})}
  root=createRoot(document.getElementById('root'));await React.act(async()=>root.render(React.createElement(Harness)))
 }
 async function click(text){const b=[...document.querySelectorAll('button')].find(b=>b.textContent===text);assert.ok(b,text);await React.act(async()=>b.click())}
@@ -41,11 +43,28 @@ test('unconfirmed 2024 reference selections cannot enable the batch action witho
  await setup();await React.act(async()=>changeReview({version:1,parcels:[],boundary:null,exclusions:[]}));const b=[...document.querySelectorAll('button')].find(b=>b.textContent==='配置図PDFを作成');assert.equal(b.disabled,true);assert.match(document.querySelector('.simple-batch').textContent,/範囲を確定/);assert.equal(state.result,null);await clean()
 })
 
-test('verified selected parcels send the exact multipolygon union with holes to DEM, without drawn clipping or convex hull',async()=>{
- const module=await server.ssrLoadModule('/src/components/SelectedParcel3D.jsx'),s=terrainReviewSynthetic(),stamp={fileName:'synthetic-full',importedAt:'2026-10-13T00:00:00.000Z'}
- let review=setReviewParcel(createEmptyParcelReview(),{type:'Feature',id:'A',properties:{地番:'合成A'},geometry:s.parcelReview.boundary},'target',stamp)
- const geometry={type:'Polygon',coordinates:[[[135.003,35],[135.005,35],[135.005,35.001],[135.004,35.001],[135.004,35.002],[135.003,35.002],[135.003,35]]]}
- review=setReviewParcel(review,{type:'Feature',id:'B',properties:{地番:'合成B'},geometry},'target',stamp);review={...review,boundary:geometry,exclusions:[s.parcelReview.boundary]}
- const expected=measureParcelReview(module.selectedParcelUnionReview(review)).geometry;assert.equal(expected.type,'MultiPolygon');assert.equal(expected.coordinates.length,2);assert.ok(expected.coordinates.some(p=>p.length===2))
- let seen;root=createRoot(document.getElementById('root'));await React.act(async()=>root.render(React.createElement(module.default,{review,analyze:async g=>{seen=g;return new Promise(()=>{})}})));await click('確認済み2筆を3Dで見る');assert.deepEqual(seen,expected);await clean()
+test('simple mode analyzes the selected union with holes and without drawn clipping', async () => {
+ const fixture = terrainReviewSynthetic()
+ const stamp = {fileName:MAP_PARCEL_SOURCE,importedAt:'2026-10-13T00:00:00.000Z'}
+ let review = setReviewParcel(createEmptyParcelReview(), {
+  type:'Feature',id:'A',properties:{地番:'合成A'},geometry:fixture.parcelReview.boundary,
+ }, 'target', stamp)
+ const geometry = {type:'Polygon',coordinates:[[[135.003,35],[135.005,35],[135.005,35.001],[135.004,35.001],[135.004,35.002],[135.003,35.002],[135.003,35]]]}
+ review = setReviewParcel(review, {type:'Feature',id:'B',properties:{地番:'合成B'},geometry}, 'target', stamp)
+ review = {...review,boundary:geometry,exclusions:[fixture.parcelReview.boundary]}
+ const unionReview = selectedParcelUnionReview(review)
+ const expected = measureParcelReview(unionReview).geometry
+ assert.equal(expected.type,'MultiPolygon')
+ assert.equal(expected.coordinates.length,2)
+ assert.ok(expected.coordinates.some(polygon => polygon.length === 2))
+ let seen
+ const controller = new AbortController()
+ await assert.rejects(runSimpleReview(unionReview, {signal:controller.signal,dependencies:{
+  fetchElevation: async () => ({value:100}),
+  section: async () => ({lines:[]}),
+  horizon: async () => ({samples:[]}),
+  snow: async () => null,
+  area: async geometry => { seen = geometry; controller.abort() },
+ }}), {name:'AbortError'})
+ assert.deepEqual(seen,expected)
 })

@@ -4,13 +4,12 @@ import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createServer } from 'vite'
 import react from '@vitejs/plugin-react'
-import { createEmptyParcelReview, measureParcelReview, setReviewParcel } from '../src/utils/parcelReview.js'
-import { MAP_PARCEL_SOURCE } from '../src/utils/mapParcelSelection.js'
+import { createEmptyParcelReview, measureParcelReview } from '../src/utils/parcelReview.js'
 import { createTerrainPlan, normalizeTerrainArea, terrainTilePoint } from '../src/utils/terrainArea.js'
 
 // Every coordinate, elevation and source entry below is synthetic. No site
 // records or downloaded DEM/parcel data are used by these rendering tests.
-let viteServer, TerrainArea3D, TerrainAreaReport, TerrainDrawingPair, SelectedParcel3D
+let viteServer, TerrainArea3D, TerrainAreaReport, TerrainDrawingPair, TerrainAreaPanel
 before(async () => {
   viteServer = await createServer({
     configFile: false, root: process.cwd(), plugins: [react()],
@@ -18,7 +17,7 @@ before(async () => {
     appType: 'custom', logLevel: 'error', optimizeDeps: { disabled: true },
   })
   TerrainArea3D = (await viteServer.ssrLoadModule('/src/components/TerrainAreaFigures.jsx')).TerrainArea3D
-  SelectedParcel3D = (await viteServer.ssrLoadModule('/src/components/SelectedParcel3D.jsx')).default
+  TerrainAreaPanel = (await viteServer.ssrLoadModule('/src/components/TerrainAreaPanel.jsx')).default
   TerrainAreaReport = (await viteServer.ssrLoadModule('/src/components/TerrainAreaReport.jsx')).default
   TerrainDrawingPair = (await viteServer.ssrLoadModule('/src/components/TerrainDrawingPair.jsx')).default
 }, { timeout: 30_000 })
@@ -261,18 +260,20 @@ function reportFixture() {
   return {terrainArea,parcelReview,position:{lat:35.0002,lon:135.0002},siteName:'合成地形・描画回帰用',appVersion:'test'}
 }
 
-test('returning to a selected-parcel view reuses only the matching acquired terrain and keeps stale results executable',()=>{
-  const {terrainArea,parcelReview}=reportFixture()
-  const review=setReviewParcel(createEmptyParcelReview(),{type:'Feature',id:'synthetic-map',properties:{},geometry:parcelReview.boundary},'target',{fileName:MAP_PARCEL_SOURCE,importedAt:'2026-10-01T00:00:00.000Z'})
-  const render=initialAnalysis=>renderToStaticMarkup(React.createElement(SelectedParcel3D,{review,initialAnalysis}))
-  const current=render(terrainArea)
-  assert.match(current,/<canvas/)
-  assert.doesNotMatch(current,/>参考領域1区域を3Dで見る<\/button>/)
-  assert.match(current,/<dialog[^>]+>[\s\S]*適用済みの参考領域 1区域/)
-  assert.match(current,/>標高を再取得<\/button>/)
-  const stale=render({...terrainArea,geometryKey:'different-selection'})
-  assert.doesNotMatch(stale,/<canvas|data-selected-parcel-geometry-key=/)
-  assert.match(stale,/>参考領域1区域を3Dで見る<\/button>/)
+test('the range terrain panel displays restored geometry and retains manual acquisition', () => {
+  const { terrainArea, parcelReview, position } = reportFixture()
+  const metrics = measureParcelReview(parcelReview)
+  const render = analysis => renderToStaticMarkup(React.createElement(TerrainAreaPanel, {
+    geometry: metrics.geometry, metrics, analysis, position, onAnalyze() {}, preferredView: '3d',
+  }))
+  const restored = render(terrainArea)
+  assert.match(restored, /範囲の地形/)
+  assert.match(restored, /<canvas/)
+  assert.match(restored, />再取得<\/button>/)
+  assert.doesNotMatch(restored, /data-layout-modules="[1-9]/)
+  const pending = render(null)
+  assert.doesNotMatch(pending, /<canvas/)
+  assert.match(pending, />地形を確認<\/button>/)
 })
 
 test('the Japanese report keeps two terrain sheets plus consolidated annotations with fixed views, source limits and unchanged real statistics',()=>{

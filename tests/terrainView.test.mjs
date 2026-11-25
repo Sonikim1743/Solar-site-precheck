@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createTerrainProjection, dragTerrainView, elevateTerrainView, orbitTerrainView, normalizeTerrainView, terrainFaceVisible, zoomTerrainView, stepTerrainView, panTerrainOffset, stepTerrainOffset } from '../src/utils/terrainView.js'
+import { createTerrainProjection, dragTerrainView, fitTerrainLayoutZoom, elevateTerrainView, orbitTerrainView, normalizeTerrainView, terrainFaceVisible, zoomTerrainView, stepTerrainView, panTerrainOffset, stepTerrainOffset } from '../src/utils/terrainView.js'
 import { buildTerrainSolid } from '../src/utils/terrainSolid.js'
 
 const settings = { bounds: { west: -50, south: -40, east: 50, north: 40 }, base: 300, maxElevation: 360 }
@@ -355,4 +355,19 @@ test('scaled-normal culling agrees with a cross product of displayed surface tan
       assert.equal(terrainFaceVisible([0,0,-1], view, heightScale), false)
     }
   }
+})
+
+test('first layout fit uses the projected rack footprint and retains the camera zoom limits', () => {
+  const viewport = { x: 25, y: 35, width: 750, height: 395 }
+  const camera = { ...settings, azimuth: 35, pitch: 32, zoom: 1 }
+  const boundaryRacks = [[-49, -39, 303], [49, -39, 303], [49, 39, 307], [-49, 39, 307]]
+  const zoom = fitTerrainLayoutZoom(camera, boundaryRacks, viewport)
+  assert.ok(zoom > 1 && zoom < 2.5)
+  const projection = createTerrainProjection({ ...camera, zoom })
+  for (const corner of boundaryRacks) {
+    const [x, y] = projection.project(corner)
+    assert.ok(x >= 33 - 1e-8 && x <= 767 + 1e-8 && y >= 43 - 1e-8 && y <= 422 + 1e-8, 'each module corner is inside the viewport with a margin')
+  }
+  assert.equal(fitTerrainLayoutZoom(camera, [[0, 0, 330]], viewport), 2.5)
+  assert.equal(fitTerrainLayoutZoom(camera, [], viewport), 1)
 })

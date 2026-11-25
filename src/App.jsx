@@ -35,6 +35,7 @@ import { REGIONAL_PARCEL_SOURCE } from './services/regionalParcels.js'
 import { MAP_PARCEL_SOURCE } from './utils/mapParcelSelection.js'
 import SimpleReviewPanel, { initialSimpleReview } from './components/SimpleReviewPanel.jsx'
 import { normalizeTerrainLayoutOptions } from './utils/terrainLayout.js'
+import { terrainLayoutAnalysisKey } from './utils/terrainLayoutComparison.js'
 import { layoutOutputState, terrainLayoutMode, latestLayoutAnalysis } from './utils/layoutOutputState.js'
 import { analyzeTerrainArea } from './services/terrainArea.js'
 import { normalizeTerrainArea, terrainAreaSnapshot, terrainGeometryKey } from './utils/terrainArea.js'
@@ -688,6 +689,7 @@ function AppWorkspace({ coordinateLink }) {
   const [terrainAreaStatus, setTerrainAreaStatus] = useState(terrainArea ? 'success' : 'idle')
   const [terrainAreaProgress, setTerrainAreaProgress] = useState(null)
   const [terrainAreaError, setTerrainAreaError] = useState('')
+  const [autoLayoutKey, setAutoLayoutKey] = useState(null)
   const [terrainAreaOpen, setTerrainAreaOpen] = useState(false)
   const [terrainDrawingRequested, setTerrainDrawingRequested] = useState(false)
   const [terrainPreview, setTerrainPreview] = useState({ options: {}, layout: null, enabled: false, labels: false })
@@ -716,6 +718,7 @@ function AppWorkspace({ coordinateLink }) {
   const [terrainDrawingScale, setTerrainDrawingScale] = useState(1000)
   const terrainAreaJob = useRef({ id: 0, controller: null, key: '' })
   const terrainAreaAttemptedKeys = useRef(new Set())
+  const autoLayoutOfferedKeys = useRef(new Set())
   const terrainAreaKeyRef = useRef(terrainAreaKey)
   terrainAreaKeyRef.current = terrainAreaKey
   const [siteName, setSiteName] = useState(typeof draftSeed.siteName === 'string' ? draftSeed.siteName : '')
@@ -1408,6 +1411,7 @@ function AppWorkspace({ coordinateLink }) {
     job.controller = null
     job.key = ''
     setConfirmedTerrainKey('')
+    setAutoLayoutKey(null)
     setTerrainAreaProgress(null)
   }
 
@@ -1433,6 +1437,10 @@ function AppWorkspace({ coordinateLink }) {
       const result = await analyzeTerrainArea(parcelMetrics.geometry, { signal: controller.signal, onProgress: value => { if (isCurrent()) setTerrainAreaProgress(value) } })
       if (!isCurrent()) return
       setTerrainArea(result)
+      if (!currentTerrainArea && !autoLayoutOfferedKeys.current.has(key)) {
+        autoLayoutOfferedKeys.current.add(key)
+        setAutoLayoutKey(terrainLayoutAnalysisKey(result))
+      }
       setTerrainAreaStatus('success')
       setTerrainAreaProgress(null)
       terrainAreaJob.current.controller = null
@@ -3755,7 +3763,7 @@ function AppWorkspace({ coordinateLink }) {
 
             <details id="terrain-area" className="terrain-area-disclosure" open={terrainAreaOpen} onToggle={event => setTerrainAreaOpen(event.currentTarget.open)}>
               <summary><strong>範囲を3Dで見る</strong><span>{terrainAreaOpen ? '閉じる' : '開く'}</span></summary>
-              <TerrainAreaPanel preferredView="3d" geometry={parcelMetrics.geometry} metrics={parcelMetrics} analysis={currentTerrainArea} status={terrainAreaStatus} progress={terrainAreaProgress} error={terrainAreaError} position={position} onAnalyze={handleTerrainAreaAnalysis} onCancel={cancelTerrainAreaAnalysis} onClear={() => { cancelTerrainAreaWork(); setTerrainArea(null); setTerrainAreaStatus('idle'); setTerrainAreaError(''); setReportView('summary') }} onDrawBoundary={() => openReviewSection('site-select', 'boundary')} onOpenReport={openTerrainAreaReport} onOpenDrawing={() => { openTerrainAreaReport(); setTerrainDrawingRequested(true) }} parcels={parcelReview.parcels} publicParcels={publicParcelSnapshot.features} publicParcelsLimited={publicParcelSnapshot.truncated || publicParcelSnapshot.status === 'partial'} preview={terrainPreview} onPreviewChange={setTerrainPreview} outputBlocked={terrainOutputBlocked} dxfReport={terrainPdfReport} />
+              <TerrainAreaPanel preferredView="3d" autoLayoutKey={autoLayoutKey} geometry={parcelMetrics.geometry} metrics={parcelMetrics} analysis={currentTerrainArea} status={terrainAreaStatus} progress={terrainAreaProgress} error={terrainAreaError} position={position} onAnalyze={handleTerrainAreaAnalysis} onCancel={cancelTerrainAreaAnalysis} onClear={() => { cancelTerrainAreaWork(); setTerrainArea(null); setTerrainAreaStatus('idle'); setTerrainAreaError(''); setReportView('summary') }} onDrawBoundary={() => openReviewSection('site-select', 'boundary')} onOpenReport={openTerrainAreaReport} onOpenDrawing={() => { openTerrainAreaReport(); setTerrainDrawingRequested(true) }} parcels={parcelReview.parcels} publicParcels={publicParcelSnapshot.features} publicParcelsLimited={publicParcelSnapshot.truncated || publicParcelSnapshot.status === 'partial'} preview={terrainPreview} onPreviewChange={setTerrainPreview} outputBlocked={terrainOutputBlocked} dxfReport={terrainPdfReport} />
             </details>
             <section className="terrain-section-tools" aria-label="地点の地形断面">
               <div className="terrain-section-quick">
