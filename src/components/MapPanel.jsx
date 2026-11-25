@@ -75,9 +75,10 @@ function ClickHandler({ onSelect, mode, locked, onAddVertex, onFinish, onPublicP
 
 // The public parcel layer paints every parcel in the viewport, so a wide
 // view renders far more parcels than anyone can inspect and stalls the map.
-// Below this zoom the toggle is switched off automatically instead; parcel
-// picking already requires zoom 16, so no usable range is lost.
-const PUBLIC_PARCEL_AUTO_OFF_ZOOM = 15
+// Below this zoom the toggle is switched off automatically instead. Parcel
+// picking itself requires zoom 16, but with the threshold at 17 the layer
+// is already off there, so in practice picking starts at zoom 17.
+const PUBLIC_PARCEL_AUTO_OFF_ZOOM = 17
 
 function PublicParcelAutoOff({ enabled, onAutoOff }) {
   const map = useMap()
