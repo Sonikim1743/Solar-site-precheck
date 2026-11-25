@@ -350,13 +350,10 @@
 .terrain-navigation-controls .terrain-area-camera-zoom span { min-width:30px; }
 .terrain-navigation-controls .terrain-navigation-height button { flex:1; }
 .terrain-navigation-height>span { min-width:38px; text-align:center; color:#61726c; font-size:12px; font-variant-numeric:tabular-nums; }
-.selected-parcel-3d-heading { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
-.selected-parcel-3d .selected-parcel-3d-heading h3 { margin:0; font-size:17px; line-height:1.5; font-weight:650; letter-spacing:.015em; }
 .terrain-area-panel .terrain-info-button { display:inline-flex; align-items:center; justify-content:center; box-sizing:border-box; width:32px; min-width:32px; height:32px; min-height:32px; padding:0; border:1px solid #c8d8ce; border-radius:50%; background:#fff; color:#466a57; font:600 16px/1 Georgia,serif; letter-spacing:0; vertical-align:middle; }
 .terrain-info-button:focus-visible,.terrain-help-dialog button:focus-visible { outline:3px solid #17664f; outline-offset:3px; }
 .terrain-area-slope-distribution caption .terrain-area-distribution-info { display:inline-flex; gap:5px; align-items:center; margin-left:6px; font-size:13px; }
 .terrain-area-missing-status { display:inline-block; margin-left:6px; padding:2px 6px; border-radius:5px; background:#fff5df; color:#785922; font-size:12px; font-weight:500; line-height:1.5; }
-.terrain-area-panel .terrain-area-reacquire { min-height:44px; padding:7px 12px; border:1px solid #c8d8ce; border-radius:8px; background:#f3f8f4; color:#235741; font:inherit; font-size:14px; }
 .terrain-navigation-controls button:hover:not(:disabled),.terrain-navigation-menu button:hover,.terrain-info-button:hover { background:#edf5ef; border-color:#8dab99; }
 @media(max-width:640px),(pointer:coarse) { .terrain-area-panel .terrain-info-button { width:44px; min-width:44px; height:44px; min-height:44px; } }
 @media(max-width:640px),(pointer:coarse) {
