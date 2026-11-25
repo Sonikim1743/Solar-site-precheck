@@ -23,7 +23,6 @@ import { parcelReviewCsvRows } from './utils/parcelPresentation.js'
 import './workspace.css'
 import './review-records.css'
 import ReviewRecordsPanel from './components/ReviewRecordsPanel.jsx'
-import UseCasesGuide from './components/UseCasesGuide.jsx'
 import { createReviewRecord, parseReviewRecord, reviewRecordFilename, exampleReviewRecord, MAX_REVIEW_BYTES } from './utils/reviewRecord.js'
 import HorizonGraphPreview from './components/HorizonGraphPreview.jsx'
 import TerrainSectionPreview from './components/TerrainSectionPreview.jsx'
@@ -3452,7 +3451,6 @@ function AppWorkspace({ coordinateLink }) {
                 <button type="button" onClick={() => openReviewSection('site-details')}>検討メモ</button>
                 <button type="button" onClick={() => openReviewSection('report-section')}>レポート</button>
                 <hr />
-                <button type="button" onClick={() => openReviewSection('use-cases')}>使い方・活用例</button>
                 <button type="button" onClick={openSolarManual}>Solar Pro入力ガイド</button>
                 <button type="button" onClick={() => switchPage('pdf')}>PDFツール</button>
                 <button type="button" onClick={() => switchPage('inheritance')}>登記チェック</button>
@@ -4254,7 +4252,6 @@ function AppWorkspace({ coordinateLink }) {
             <div className="action-row no-print">
               <button type="button" className="secondary-button" onClick={downloadCsv}>チェックCSV出力</button>
               <button type="button" className="secondary-button" disabled={!position} onClick={saveReviewRecord}>検討記録を保存</button>
-              <button type="button" className="secondary-button" onClick={() => openReviewSection('use-cases')}>資料の使い方を見る</button>
               {reportView === 'terrain' && terrainPreview.layout?.analysisReference === currentTerrainArea && <><button type="button" className="secondary-button" disabled={terrainPdfStatus.loading || terrainPreview.calculating || terrainOutputBlocked} onClick={() => saveTerrainPdf({ drawingOnly: true })}>配置図PDF · 1枚</button><TerrainDxfButton report={terrainPdfReport} blocked={terrainOutputBlocked || terrainPdfStatus.loading} /></>}
               {reportView === 'terrain' && currentTerrainArea ? <button type="button" className="primary-button" disabled={terrainPdfStatus.loading || terrainOutputBlocked} onClick={saveTerrainPdf}>{terrainPdfStatus.loading ? 'PDFを作成中…' : '地形PDFを保存'}</button> : <button type="button" className="primary-button" onClick={() => window.print()}>PDF印刷</button>}
             </div>
@@ -4540,7 +4537,6 @@ function AppWorkspace({ coordinateLink }) {
           </details>
         </section>
         </div>
-        <UseCasesGuide onExample={previewExampleRecord} onReport={() => openReviewSection('report-section')} />
         </div>
 
         {activePage === 'pdf' && (
