@@ -19,7 +19,7 @@ export function TerrainLayoutErrorNotice({ error, onRetry, onRefresh, onReacquir
   return <div className="terrain-area-warning terrain-layout-error" role="alert"><strong>{error.message}</strong><p>{error.hint}</p><div><button type="button" onClick={action} disabled={!action}>{label}</button><button type="button" onClick={onRetry} disabled={!onRetry}>再試行</button></div></div>
 }
 
-export default function TerrainLayoutPreview({ analysis, preview, onChange, parcelCount, onShow3D, onReacquire, onBoundary, autoCalculateKey, onNoticeChange }) {
+export default function TerrainLayoutPreview({ analysis, preview, onChange, parcelCount, onShow3D, onReacquire, onBoundary, autoCalculateKey, onNoticeChange, moduleVisibility }) {
   const [localBusy, setBusy] = useState(false)
   const busy = localBusy || Boolean(preview?.calculating)
   const [error, setError] = useState('')
@@ -45,7 +45,9 @@ export default function TerrainLayoutPreview({ analysis, preview, onChange, parc
   const comparisonDraftChanged = Boolean(preview?.comparison && !terrainLayoutResultMatchesOptions({options:preview.comparison.options},{...normalizeTerrainLayoutOptions(options),slopeLimitDeg:preview.comparison.options.slopeLimitDeg}))
   const pool = appliedTerrainPreview(analysis, preview)
   const layout = selectedTerrainLayout(pool, preview)
-  const enabled = Boolean(layout && preview?.enabled)
+  const enabled = moduleVisibility?.shown ?? Boolean(layout && preview?.enabled)
+  const moduleDisplayLabel = enabled ? 'モジュールを隠す' : 'モジュール配置を3Dで表示'
+  const displayLabel = moduleVisibility ? moduleDisplayLabel : `参考配置の表示 ${enabled ? 'ON' : 'OFF'}`
   useEffect(() => {
     retryRef.current = null
     setBusy(false); setError('')
@@ -133,6 +135,10 @@ export default function TerrainLayoutPreview({ analysis, preview, onChange, parc
 
   const toggle = () => {
     if (!layout) { calculate(); return }
+    if (moduleVisibility) {
+      moduleVisibility.onToggle()
+      return
+    }
     onChangeRef.current(previous => ({ ...previous, enabled: !enabled }))
     if (!enabled) onShow3D?.()
   }
@@ -153,7 +159,7 @@ export default function TerrainLayoutPreview({ analysis, preview, onChange, parc
 
   return <div className="terrain-layout-preview">
     <div className="terrain-layout-bar">
-      <button type="button" className="terrain-layout-toggle" aria-pressed={pool ? enabled : undefined} disabled={busy} onClick={toggle}>{pool ? `参考配置の表示 ${enabled ? 'ON' : 'OFF'}` : '参考配置を計算'}</button>
+      <button type="button" className="terrain-layout-toggle" aria-pressed={pool ? enabled : undefined} disabled={busy || Boolean(moduleVisibility && pool && !pool.rackCount)} onClick={toggle}>{pool ? displayLabel : '参考配置を計算'}</button>
       <button type="button" disabled={busy} onClick={() => calculate({}, false, true)}>地形勾配15° / 20°を比較</button>
       {pool && <button type="button" className="terrain-layout-optimize" disabled={busy} onClick={() => calculate({}, true)}>方位も最適化して適用（±30°）</button>}
       <button type="button" className="terrain-layout-optimize" disabled={busy} onClick={()=>calculate({},false,false,true)}>真南固定・最大配置を比較</button>

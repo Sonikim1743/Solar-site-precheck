@@ -263,7 +263,7 @@ function segmentCrossesCell(a, b, west, south, east, north) {
   return true
 }
 
-export function TerrainArea3D({ analysis, position, reportMode = false, compactReport = false, noteRef = '注1', reportTitle, reportLayout = false, azimuth = 35, interactive = false, heightScale = 1, layout, layoutCandidates, onToggleRack, fence, parcelOverlay, rackControls }) {
+export function TerrainArea3D({ analysis, position, reportMode = false, compactReport = false, noteRef = '注1', reportTitle, reportLayout = false, azimuth = 35, interactive = false, heightScale = 1, layout, layoutCandidates, onToggleRack, fence, parcelOverlay, rackControls, fitOnLayoutReveal = false }) {
   const id = `terrain-3d-${useId().replace(/:/g, '')}`
   const canRotate = interactive && !reportMode
   const initialView = normalizeTerrainView({ azimuth, pitch: 32 })
@@ -506,7 +506,8 @@ export function TerrainArea3D({ analysis, position, reportMode = false, compactR
   const changeViewMode = mode => { releaseDrag(); discardFrame(); setViewMode(mode) }
   const changeHeightScale = scale => { releaseDrag(); discardFrame(); setDisplayHeightScale(scale) }
   const zoomView = factor => {
-    fitPending.current = false
+    // The integrated preview reserves its fit for the first reveal of the layout.
+    if (!fitOnLayoutReveal) fitPending.current = false
     releaseDrag(); discardFrame()
     const next = zoomTerrainView(latestView.current, factor)
     latestView.current = next; setView(next)
@@ -522,7 +523,7 @@ export function TerrainArea3D({ analysis, position, reportMode = false, compactR
     }
     target.addEventListener('wheel', wheel, { passive: false })
     return () => target.removeEventListener('wheel', wheel)
-  }, [canRotate, Boolean(drawing)])
+  }, [canRotate, Boolean(drawing), fitOnLayoutReveal])
   if (!drawing) return <p className="terrain-area-empty">3D表示に必要な標高がありません。</p>
   const { grid, bounds, base, project, faces, outlinePaths } = drawing
   const localPoint = figurePoint(position, grid), pointZ = localPoint && interpolateElevation(grid, localPoint[0], localPoint[1])

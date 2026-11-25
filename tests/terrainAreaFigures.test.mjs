@@ -6,6 +6,8 @@ import { createServer } from 'vite'
 import react from '@vitejs/plugin-react'
 import { createEmptyParcelReview, measureParcelReview } from '../src/utils/parcelReview.js'
 import { createTerrainPlan, normalizeTerrainArea, terrainTilePoint } from '../src/utils/terrainArea.js'
+import { buildTerrainLayout } from '../src/utils/terrainLayout.js'
+import { terrainLayoutAnalysisKey } from '../src/utils/terrainLayoutComparison.js'
 
 // Every coordinate, elevation and source entry below is synthetic. No site
 // records or downloaded DEM/parcel data are used by these rendering tests.
@@ -274,6 +276,28 @@ test('the range terrain panel displays restored geometry and retains manual acqu
   const pending = render(null)
   assert.doesNotMatch(pending, /<canvas/)
   assert.match(pending, />地形を確認<\/button>/)
+})
+
+test('the range terrain panel keeps calculated quantities while initially showing only terrain in 3D', () => {
+  const { terrainArea: analysis, parcelReview, position } = reportFixture()
+  const metrics = measureParcelReview(parcelReview)
+  const layout = {
+    ...buildTerrainLayout(analysis), analysisReference: analysis, analysisKey: terrainLayoutAnalysisKey(analysis),
+  }
+  assert.ok(layout.moduleCount > 0)
+  const render = preferredView => renderToStaticMarkup(React.createElement(TerrainAreaPanel, {
+    geometry: metrics.geometry, metrics, analysis, position, preferredView,
+    preview: { layout, enabled: true }, onPreviewChange() {}, onOpenDrawing() {},
+  }))
+  const model = render('3d')
+  const count = layout.moduleCount.toLocaleString('ja-JP')
+  const capacity = layout.dcKw.toLocaleString('ja-JP', { maximumFractionDigits: 1 })
+  assert.ok(model.includes('モジュール ' + count + '枚・DC 約' + capacity + ' kW（参考）。'))
+  assert.match(model, /3Dは地形のみ表示中です。/)
+  assert.match(model, /<button[^>]*aria-pressed="false"[^>]*>モジュール配置を3Dで表示<\/button>/)
+  assert.match(model, /data-layout-modules="0"/)
+  assert.doesNotMatch(model, /data-terrain-face="module"/)
+  assert.ok(render('plan').includes('data-layout-racks="' + layout.rackCount + '"'))
 })
 
 test('the Japanese report keeps two terrain sheets plus consolidated annotations with fixed views, source limits and unchanged real statistics',()=>{
