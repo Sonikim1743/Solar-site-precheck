@@ -672,7 +672,8 @@ function AppWorkspace({ coordinateLink }) {
   const [parcelReview, setParcelReview] = useState(() => { try { return normalizeParcelReview(draftSeed.parcelReview) } catch { return createEmptyParcelReview() } })
   const [parcelMode, setParcelMode] = useState('point')
   const [regional3DRequest,setRegional3DRequest] = useState(0)
-  const [selectedParcelTerrain, setSelectedParcelTerrain] = useState(null)
+  // Terrain cached for simple mode, including the parcel union when it differs from the review area.
+  const [simpleModeTerrain, setSimpleModeTerrain] = useState(null)
   const [parcelReviewStatus, setParcelReviewStatus] = useState('')
   const parcelMetrics = useMemo(() => measureParcelReview(parcelReview), [parcelReview])
   const simpleReviewInput = useMemo(() => parcelReview.parcels.some(p => p.role === 'target' && [REGIONAL_PARCEL_SOURCE, MAP_PARCEL_SOURCE].includes(p.source.fileName)) ? selectedParcelUnionReview(parcelReview) : parcelReview, [parcelReview])
@@ -682,7 +683,7 @@ function AppWorkspace({ coordinateLink }) {
     try { return draftSeed.terrainArea && parcelMetrics.geometry ? normalizeTerrainArea(draftSeed.terrainArea, parcelMetrics.geometry) : null } catch { return null }
   })
   const currentTerrainArea = terrainArea?.geometryKey === terrainAreaKey ? terrainArea : null
-  const simpleTerrainArea = latestLayoutAnalysis(simpleGeometryKey, currentTerrainArea, selectedParcelTerrain)
+  const simpleTerrainArea = latestLayoutAnalysis(simpleGeometryKey, currentTerrainArea, simpleModeTerrain)
   const currentTerrainAreaSnapshot = useMemo(() => currentTerrainArea ? terrainAreaSnapshot(currentTerrainArea) : null, [currentTerrainArea])
   const [terrainAreaStatus, setTerrainAreaStatus] = useState(terrainArea ? 'success' : 'idle')
   const [terrainAreaProgress, setTerrainAreaProgress] = useState(null)
@@ -697,7 +698,7 @@ function AppWorkspace({ coordinateLink }) {
   const setSharedLayoutBusy = useCallback(calculating => setTerrainPreview(previous => previous.calculating === calculating ? previous : { ...previous, calculating }), [])
   const applySimpleLayout = useCallback(report => {
     const area = report.terrainArea
-    setSelectedParcelTerrain(area)
+    setSimpleModeTerrain(area)
     // Different effective geometries cannot share a rack pool. Keep the other
     // scope intact and block its output instead of relabelling or copying racks.
     if (area.geometryKey !== terrainAreaKey) return
@@ -1041,7 +1042,7 @@ function AppWorkspace({ coordinateLink }) {
     cancelCandidateWork()
     setSelectionResetRequest(current => current + 1)
     setPublicParcelReferences([])
-    setSelectedParcelTerrain(null)
+    setSimpleModeTerrain(null)
     setRegional3DRequest(0)
     setLocationStatus({ status: 'idle', message: '' })
     setGenerationNotice('')
@@ -3786,7 +3787,7 @@ function AppWorkspace({ coordinateLink }) {
               )}
               {terrainSectionOpen && <TerrainSectionPreview analysis={terrainSection} />}
             </section>
-            <SelectedParcel3D review={parcelReview} referenceCount={publicParcelReferences.length} request={regional3DRequest} onAcquired={setSelectedParcelTerrain} initialAnalysis={selectedParcelTerrain} />
+            <SelectedParcel3D review={parcelReview} referenceCount={publicParcelReferences.length} request={regional3DRequest} onAcquired={setSimpleModeTerrain} initialAnalysis={simpleModeTerrain} />
             <SimpleReviewPanel visible={simpleDesign} review={simpleReviewInput} referenceCount={publicParcelReferences.length} siteName={siteName} appVersion={APP_VERSION} terrainArea={simpleTerrainArea} layoutOptions={terrainPreview.options} layoutSettings={sharedLayoutSettings} onLayoutSettingsChange={changeSharedLayoutSettings} layoutPreview={terrainPreview} onApplied={applySimpleLayout} onBusyChange={setSharedLayoutBusy} outputBlocked={['loading', 'fetching', 'calculating'].includes(terrainAreaStatus)} drawingScale={terrainDrawingScale} onDrawingScaleChange={setTerrainDrawingScale} state={simpleWorkflow} onChange={setSimpleWorkflow} onRepresentativeChange={setSimpleRepresentative} onDraw={() => openReviewSection('site-select', 'boundary')} />
 
             <CandidateWorkflow position={position} terrainArea={currentTerrainArea} terrain={terrain} terrainStatus={terrainStatus} obstructionHeight={obstructionHeight} snowStation={confirmedSnowStation} snowStatus={snowData.status} inspection={inspectionState} onOpen={target => {
