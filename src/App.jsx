@@ -27,6 +27,8 @@ import { createReviewRecord, parseReviewRecord, reviewRecordFilename, exampleRev
 import HorizonGraphPreview from './components/HorizonGraphPreview.jsx'
 import TerrainSectionPreview from './components/TerrainSectionPreview.jsx'
 import TerrainAreaPanel from './components/TerrainAreaPanel.jsx'
+import TerrainGuideTour from './components/TerrainGuideTour.jsx'
+import { TERRAIN_GUIDE_STEPS, advanceTerrainGuide, terrainGuideStartingStep } from './utils/terrainGuideTour.js'
 import TerrainAreaReport from './components/TerrainAreaReport.jsx'
 import TerrainDrawingScaleControl from './components/TerrainDrawingScaleControl.jsx'
 import TerrainDxfButton from './components/TerrainDxfButton.jsx'
@@ -101,6 +103,7 @@ const initialPlaceApiStatus = {
   cooldownUntil: null,
 }
 const DRAFT_KEY = 'solar-site-precheck-draft-v1'
+const TERRAIN_TOUR_STATUS_KEY = 'solar-site-precheck-ui-terrain-tour-v1'
 const PLACE_CACHE_KEY = 'solar-site-precheck-place-cache-v1'
 const PLACE_CACHE_LIMIT = 300
 const PLACE_CACHE_MAX_AGE = 30 * 24 * 60 * 60 * 1000
@@ -691,6 +694,32 @@ function AppWorkspace({ coordinateLink }) {
   const [terrainAreaError, setTerrainAreaError] = useState('')
   const [autoLayoutKey, setAutoLayoutKey] = useState(null)
   const [terrainAreaOpen, setTerrainAreaOpen] = useState(false)
+  const [terrainGuideStep, setTerrainGuideStep] = useState(null)
+  const [terrainGuideDraft, setTerrainGuideDraft] = useState(false)
+  const terrainGuideAction = useCallback(action => {
+    setTerrainGuideStep(step => advanceTerrainGuide(step, action))
+  }, [])
+  const reportTerrainGuideDraft = useCallback(selected => {
+    setTerrainGuideDraft(selected)
+    if (selected) terrainGuideAction('parcel-selected')
+  }, [terrainGuideAction])
+  const endTerrainGuide = useCallback(status => {
+    try {
+      window.localStorage.setItem(TERRAIN_TOUR_STATUS_KEY, status)
+    } catch {
+      // Keep the guide usable when browser storage is unavailable.
+    }
+    setTerrainGuideStep(null)
+  }, [])
+  useEffect(() => {
+    if (terrainGuideStep === TERRAIN_GUIDE_STEPS.length) endTerrainGuide('completed')
+  }, [terrainGuideStep, endTerrainGuide])
+  useEffect(() => {
+    if (currentTerrainArea) terrainGuideAction('terrain-ready')
+  }, [currentTerrainArea, terrainGuideAction])
+  useEffect(() => {
+    if (terrainAreaKey && terrainGuideStep >= 2 && terrainGuideStep < TERRAIN_GUIDE_STEPS.length) setTerrainAreaOpen(true)
+  }, [terrainAreaKey, terrainGuideStep])
   const [terrainDrawingRequested, setTerrainDrawingRequested] = useState(false)
   const [terrainPreview, setTerrainPreview] = useState({ options: {}, layout: null, enabled: false, labels: false })
   const sharedLayoutSettings = { tiltDeg: normalizeTerrainLayoutOptions(terrainPreview.options).tiltDeg, slopeLimitDeg: normalizeTerrainLayoutOptions(terrainPreview.options).slopeLimitDeg, direction: terrainLayoutMode(terrainPreview) }
@@ -771,6 +800,7 @@ function AppWorkspace({ coordinateLink }) {
   const [inheritanceSort, setInheritanceSort] = useState('receipt')
   const [inheritanceCopyStatus, setInheritanceCopyStatus] = useState('')
   const [activePage, setActivePage] = useState(() => pageFromHash(typeof window === 'undefined' ? '' : window.location.hash))
+  const suppressSlopeCoachmark = !terrainAreaOpen || activePage !== 'solar' || TERRAIN_GUIDE_STEPS[terrainGuideStep]?.anchor === 'layout-slope'
   const [navigationHash, setNavigationHash] = useState(() => typeof window === 'undefined' ? '' : window.location.hash)
   const [solarManualActive, setSolarManualActive] = useState(
     () => typeof window !== 'undefined' && window.location.hash === '#solar-manual',
@@ -1293,6 +1323,8 @@ function AppWorkspace({ coordinateLink }) {
       const applied = updateParcelReview(next)
       if (!applied) return false
       if (features.length) {
+        terrainGuideAction('parcel-confirmed')
+        if (currentTerrainArea?.geometryKey === applied.terrainKey) terrainGuideAction('terrain-ready')
         setTerrainAreaOpen(true)
         openReviewSection('terrain-area')
         // Wait for the committed review to supply the accepted geometry to the analysis.
@@ -3408,7 +3440,21 @@ function AppWorkspace({ coordinateLink }) {
     }
   }
 
+  function startTerrainGuide() {
+    if (activePage !== 'solar' || solarManualActive) switchPage('solar')
+    const reveal = document.querySelector('[data-terrain-tour-anchor="layout-reveal"]')
+    setTerrainGuideStep(terrainGuideStartingStep({
+      draftSelected: terrainGuideDraft,
+      confirmedSelection: parcelReview.parcels.some(parcel => parcel.role === 'target' && parcel.source.fileName === MAP_PARCEL_SOURCE),
+      analyzing: terrainAreaStatus === 'loading',
+      hasTerrain: Boolean(currentTerrainArea),
+      hasLayout: Boolean(currentTerrainArea && terrainPreview.layout?.analysisReference === currentTerrainArea),
+      modulesVisible: reveal?.getAttribute('aria-pressed') === 'true',
+    }))
+  }
+
   function openReviewSection(target, drawingMode = null) {
+    if (target === 'report-section') terrainGuideAction('results-opened')
     switchPage(pageFromHash('#' + target))
     if (drawingMode) setParcelMode(drawingMode)
     window.history.replaceState(null, '', '#' + target)
@@ -3441,6 +3487,10 @@ function AppWorkspace({ coordinateLink }) {
 
   return (
     <div className={`app${simpleDesign ? ' app--simple' : ''}`}>
+      <TerrainGuideTour step={terrainGuideStep} steps={TERRAIN_GUIDE_STEPS}
+        onNext={() => setTerrainGuideStep(step => step === null ? null : Math.min(step + 1, TERRAIN_GUIDE_STEPS.length))}
+        onBack={() => setTerrainGuideStep(step => step === null ? null : Math.max(0, step - 1))}
+        onEnd={() => endTerrainGuide('ended')} />
       <header className="topbar">
         <div className="brand">
           <button type="button" className="brand-mark" onClick={scrollToPageTop} aria-label="ページの先頭へ戻る">
@@ -3461,7 +3511,8 @@ function AppWorkspace({ coordinateLink }) {
               button?.focus(); button?.click()
             }}><button type="button" aria-pressed={simpleDesign} onClick={() => { if (!simpleDesign) toggleSimpleDesign() }}>シンプル</button><button type="button" aria-pressed={!simpleDesign} onClick={() => { if (simpleDesign) toggleSimpleDesign() }}>詳細</button></div>
             <button type="button" aria-current={activePage === 'solar' && !solarManualActive ? 'page' : undefined} onClick={() => switchPage('solar')}>地図・3D地形</button>
-            <button type="button" onClick={() => openReviewSection('report-section')}>レポート</button>
+            <button type="button" data-terrain-tour-anchor="report-nav" onClick={() => openReviewSection('report-section')}>レポート</button>
+            <button type="button" onClick={startTerrainGuide}>チュートリアル</button>
             <details className="workspace-tools"><summary>ツール</summary>
               <div className="workspace-tools-menu" onClick={event => { if (event.target.closest('button, a')) { event.currentTarget.parentElement.open = false; event.currentTarget.parentElement.querySelector('summary')?.focus() } }}>
                 <button type="button" onClick={() => openReviewSection('solar-generation')}>発電量計算</button>
@@ -3577,7 +3628,7 @@ function AppWorkspace({ coordinateLink }) {
         </section>}
 
         <div className="workflow">
-          <section className="panel map-panel" id="site-select">
+          <section className="panel map-panel" id="site-select" data-terrain-tour-anchor="site-map">
             <div className="section-heading site-map-header">
 
               <div>
@@ -3653,6 +3704,7 @@ function AppWorkspace({ coordinateLink }) {
               }}
               parcelReview={parcelReview}
               onPublicParcelsChange={setPublicParcelSnapshot}
+              onTutorialDraftChange={reportTerrainGuideDraft}
               reviewAreaM2={parcelMetrics.geometry ? parcelMetrics.usableAreaM2 : null}
               parcelMode={parcelMode}
               onParcelModeChange={setParcelMode}
@@ -3762,8 +3814,8 @@ function AppWorkspace({ coordinateLink }) {
               </details>
 
             <details id="terrain-area" className="terrain-area-disclosure" open={terrainAreaOpen} onToggle={event => setTerrainAreaOpen(event.currentTarget.open)}>
-              <summary><strong>範囲を3Dで見る</strong><span>{terrainAreaOpen ? '閉じる' : '開く'}</span></summary>
-              <TerrainAreaPanel preferredView="3d" autoLayoutKey={autoLayoutKey} geometryKey={terrainAreaKey} geometry={parcelMetrics.geometry} metrics={parcelMetrics} analysis={currentTerrainArea} status={terrainAreaStatus} progress={terrainAreaProgress} error={terrainAreaError} position={position} onAnalyze={handleTerrainAreaAnalysis} onCancel={cancelTerrainAreaAnalysis} onClear={() => { cancelTerrainAreaWork(); setTerrainArea(null); setTerrainAreaStatus('idle'); setTerrainAreaError(''); setReportView('summary') }} onDrawBoundary={() => openReviewSection('site-select', 'boundary')} onOpenReport={openTerrainAreaReport} onOpenDrawing={() => { openTerrainAreaReport(); setTerrainDrawingRequested(true) }} parcels={parcelReview.parcels} publicParcels={publicParcelSnapshot.features} publicParcelsLimited={publicParcelSnapshot.truncated || publicParcelSnapshot.status === 'partial'} preview={terrainPreview} onPreviewChange={setTerrainPreview} outputBlocked={terrainOutputBlocked} dxfReport={terrainPdfReport} />
+              <summary data-terrain-tour-anchor="terrain-section"><strong>範囲を3Dで見る</strong><span>{terrainAreaOpen ? '閉じる' : '開く'}</span></summary>
+              <TerrainAreaPanel preferredView="3d" onTutorialAction={terrainGuideAction} suppressSlopeCoachmark={suppressSlopeCoachmark} autoLayoutKey={autoLayoutKey} geometryKey={terrainAreaKey} geometry={parcelMetrics.geometry} metrics={parcelMetrics} analysis={currentTerrainArea} status={terrainAreaStatus} progress={terrainAreaProgress} error={terrainAreaError} position={position} onAnalyze={handleTerrainAreaAnalysis} onCancel={cancelTerrainAreaAnalysis} onClear={() => { cancelTerrainAreaWork(); setTerrainArea(null); setTerrainAreaStatus('idle'); setTerrainAreaError(''); setReportView('summary') }} onDrawBoundary={() => openReviewSection('site-select', 'boundary')} onOpenReport={openTerrainAreaReport} onOpenDrawing={() => { openTerrainAreaReport(); setTerrainDrawingRequested(true) }} parcels={parcelReview.parcels} publicParcels={publicParcelSnapshot.features} publicParcelsLimited={publicParcelSnapshot.truncated || publicParcelSnapshot.status === 'partial'} preview={terrainPreview} onPreviewChange={setTerrainPreview} outputBlocked={terrainOutputBlocked} dxfReport={terrainPdfReport} />
             </details>
             <section className="terrain-section-tools" aria-label="地点の地形断面">
               <div className="terrain-section-quick">

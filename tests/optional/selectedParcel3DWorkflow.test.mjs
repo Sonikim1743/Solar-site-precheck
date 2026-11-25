@@ -15,13 +15,24 @@ const acquisitions = [], workers = [], scrolled = []
 const fixture = terrainReviewSynthetic()
 const target = { type: 'Feature', id: 'synthetic-map-target', properties: { 地番: '合成' }, geometry: fixture.parcelReview.boundary }
 const exclusion = { type: 'Polygon', coordinates: [[[135.0001,35.0001],[135.0002,35.0001],[135.0002,35.0002],[135.0001,35.0002],[135.0001,35.0001]]] }
+const slopeGuideKey = 'solar-site-precheck-ui-slope-coachmark-v1'
+
+function nextSelection() {
+  return {
+    ...target, id: 'synthetic-map-target-other',
+    geometry: {
+      type: 'Polygon',
+      coordinates: target.geometry.coordinates.map(ring => ring.map(([lon, lat]) => [lon + .002, lat])),
+    },
+  }
+}
 
 class WorkerStub {
   constructor() { workers.push(this) }
   postMessage(message) { this.message = message }
   terminate() { this.terminated = true }
-  complete() {
-    const result = buildTerrainLayout(this.message.analysis, this.message.options)
+  complete(analysis = this.message.analysis) {
+    const result = buildTerrainLayout(analysis, this.message.options)
     this.onmessage({ data: { result } })
     return result
   }
@@ -54,10 +65,13 @@ const testDependencies = {
     if (id !== '\0test-map-panel') return
     return `
       import React from 'react'
-      export default function TestMap({ onConfirmRegionalParcels, onReviewGeometry }) {
+      export default function TestMap({ onConfirmRegionalParcels, onReviewGeometry, onTutorialDraftChange }) {
         const { boundary, exclusion } = globalThis.__terrainWorkflowFixture()
         return React.createElement(React.Fragment, null,
-          React.createElement('button', { onClick: () => onConfirmRegionalParcels(globalThis.__terrainWorkflowFixture().targets) }, '選択完了 → 3D'),
+          React.createElement('button', { onClick: () => onTutorialDraftChange?.(true) }, '合成地番を選ぶ'),
+          React.createElement('button', { onClick: () => {
+            if (onConfirmRegionalParcels(globalThis.__terrainWorkflowFixture().targets)) onTutorialDraftChange?.(false)
+          } }, '選択完了 → 3D'),
           React.createElement('button', { onClick: () => onReviewGeometry(boundary, 'boundary') }, '合成範囲を描く'),
           React.createElement('button', { onClick: () => onReviewGeometry(exclusion, 'exclusion') }, '合成除外を描く'))
       }`
@@ -71,7 +85,7 @@ const testDependencies = {
 }
 
 before(async () => {
-  dom = new JSDOM('<div id="root"></div>', { url: 'http://localhost/' })
+  dom = new JSDOM('<div id="root"></div>', { url: 'http://localhost/', pretendToBeVisual: true })
   const { window } = dom
   window.scrollTo = () => {}
   // jsdom does not make the descendants of a closed native dialog unfocusable.
@@ -109,8 +123,9 @@ after(async () => {
   for (const key of ['window', 'document', 'MutationObserver', 'Worker', 'IS_REACT_ACT_ENVIRONMENT', '__terrainWorkflowFixture', '__runTerrainWorkflowAnalysis']) delete globalThis[key]
 })
 
-async function mount() {
-  window.localStorage.clear()
+async function mount({ preserveStorage = false } = {}) {
+  if (preserveStorage) window.localStorage.removeItem('solar-site-precheck-draft-v1')
+  else window.localStorage.clear()
   window.history.replaceState(null, '', '/')
   selections = [target]
   acquisitions.length = 0
@@ -125,6 +140,8 @@ const panel = () => document.getElementById('terrain-area')
 const model = () => panel().querySelector('svg[data-view-zoom]')
 const moduleCount = () => Number(model()?.dataset.layoutModules)
 const modelZoom = () => Number(model()?.dataset.viewZoom)
+const slopeGuide = () => panel().querySelector('.terrain-layout-slope-guide')
+const slopeControl = () => panel().querySelector('select[aria-label="参考配置の勾配条件"]')
 
 async function click(label, scope = document) {
   const button = [...scope.querySelectorAll('button')].find(node => node.textContent.trim() === label)
@@ -139,7 +156,7 @@ async function shrinkModel() {
 }
 
 async function changeSlope(value) {
-  const control = panel().querySelector('select[aria-label="参考配置の勾配条件"]')
+  const control = slopeControl()
   assert.ok(control && !control.disabled)
   await React.act(async () => {
     control.value = String(value)
@@ -199,6 +216,11 @@ test('recalculation preserves module visibility while a new selected area hides 
   await React.act(async () => workers[0].complete())
   assert.equal(moduleCount(), 0)
 
+  assert.ok(slopeGuide())
+  await React.act(async () => slopeControl().dispatchEvent(new window.Event('pointerdown', { bubbles: true })))
+  assert.equal(slopeGuide(), null)
+  assert.equal(workers.length, 1)
+
   await changeSlope(15)
   assert.equal(workers.length, 2)
   assert.equal(moduleCount(), 0)
@@ -216,13 +238,7 @@ test('recalculation preserves module visibility while a new selected area hides 
   assert.ok(moduleCount() > 0)
   assert.equal(modelZoom(), customZoom)
 
-  selections = [{
-    ...target, id: 'synthetic-map-target-other',
-    geometry: {
-      type: 'Polygon',
-      coordinates: target.geometry.coordinates.map(ring => ring.map(([lon, lat]) => [lon + .002, lat])),
-    },
-  }]
+  selections = [nextSelection()]
   await click('選択完了 → 3D')
   assert.equal(acquisitions.length, 2)
   assert.equal(workers.length, 4)
@@ -245,6 +261,89 @@ test('cancelling area analysis ignores its late result and does not rearm the sa
   assert.match(panel().textContent, /取得を中止しました/)
   assert.equal(acquisitions.length, 1)
   assert.equal(workers.length, 0)
+})
+
+test('first automatic layout shows a non-modal slope guide once and retains dismissal', async () => {
+  await mount()
+  await click('選択完了 → 3D')
+  await React.act(async () => new Promise(resolve => setTimeout(resolve, 0)))
+  assert.equal(slopeGuide(), null)
+  assert.equal(window.localStorage.getItem(slopeGuideKey), null)
+
+  const zoomButton = panel().querySelector('button[aria-label="3Dを縮小"]')
+  zoomButton.focus()
+  let layout
+  await React.act(async () => { layout = workers[0].complete() })
+  assert.ok(layout.moduleCount > 0)
+  const guide = slopeGuide()
+  assert.ok(guide)
+  assert.ok(guide.textContent.includes('ここで勾配条件を変更できます。15°・20°も選べます。'))
+  const control = slopeControl()
+  assert.ok(control.closest('.terrain-layout-slope-highlight'))
+  assert.ok(guide.contains(document.getElementById(control.getAttribute('aria-describedby'))))
+  assert.ok(document.activeElement === zoomButton, 'showing the guide keeps focus on the active control')
+  assert.equal(window.localStorage.getItem(slopeGuideKey), 'seen')
+  await shrinkModel()
+  assert.ok(modelZoom() < 1)
+  assert.ok(slopeGuide())
+
+  const close = guide.querySelector('button[aria-label="勾配条件の案内を閉じる"]')
+  assert.ok(close && !close.disabled)
+  await React.act(async () => close.click())
+  assert.equal(slopeGuide(), null)
+  assert.equal(control.hasAttribute('aria-describedby'), false)
+  selections = [nextSelection()]
+  await click('選択完了 → 3D')
+  await React.act(async () => workers[1].complete())
+  assert.equal(slopeGuide(), null)
+
+  await React.act(async () => root.unmount())
+  root = null
+  await mount({ preserveStorage: true })
+  await click('選択完了 → 3D')
+  await React.act(async () => workers[0].complete())
+  assert.equal(slopeGuide(), null)
+})
+
+test('an automatic layout with zero modules still explains and accepts slope changes', async () => {
+  await mount()
+  await click('選択完了 → 3D')
+  const { analysis } = workers[0].message
+  const steepArea = { ...analysis, grid: { ...analysis.grid, slopes: analysis.grid.slopes.map(() => 17) } }
+  let layout
+  await React.act(async () => { layout = workers[0].complete(steepArea) })
+  assert.equal(layout.moduleCount, 0)
+  assert.ok(slopeGuide())
+  const control = slopeControl()
+  control.focus()
+  assert.ok(slopeGuide(), 'moving keyboard focus to the control still allows reading the guide')
+  await changeSlope(20)
+  assert.equal(slopeGuide(), null)
+  assert.equal(workers[1].message.options.slopeLimitDeg, 20)
+  assert.equal(window.localStorage.getItem(slopeGuideKey), 'seen')
+  await React.act(async () => workers[1].complete())
+  assert.equal(slopeGuide(), null)
+})
+
+test('an unsuccessful automatic layout and a successful manual retry leave the slope guide unused', async () => {
+  await mount()
+  await click('選択完了 → 3D')
+  await React.act(async () => workers[0].onmessage({ data: { error: '合成計算エラー' } }))
+  assert.equal(slopeGuide(), null)
+  assert.equal(window.localStorage.getItem(slopeGuideKey), null)
+
+  await click('参考配置を計算', panel())
+  await React.act(async () => workers[1].complete())
+  assert.equal(slopeGuide(), null)
+  assert.equal(window.localStorage.getItem(slopeGuideKey), null)
+
+  selections = [nextSelection()]
+  await click('選択完了 → 3D')
+  await React.act(async () => workers[2].complete())
+  assert.ok(slopeGuide(), 'the first successful automatic layout is still eligible')
+  await React.act(async () => slopeControl().dispatchEvent(new window.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true })))
+  assert.equal(slopeGuide(), null)
+  assert.equal(workers.length, 3)
 })
 
 test('drawing and exclusions retain manual terrain acquisition, then apply automatic layout', async () => {
@@ -293,4 +392,57 @@ test('reopening a review JSON restores terrain and waits for manual layout', asy
   assert.equal(workers.length, 1)
   await click('参考配置を計算', panel())
   assert.equal(workers.length, 2)
+})
+
+
+test('the app tour follows real layout actions and keeps the slope hint separate', async () => {
+  await mount()
+  const tourKey = 'solar-site-precheck-ui-terrain-tour-v1'
+  const guide = () => document.querySelector('.terrain-guide-tour-callout')
+  const step = expected => assert.match(guide()?.textContent ?? '', new RegExp(expected + ' *[/] *6'))
+
+  await click('チュートリアル')
+  step(1)
+  await click('合成地番を選ぶ')
+  step(2)
+
+  let completeTerrain
+  analyze = geometry => new Promise(resolve => {
+    completeTerrain = () => resolve(flatTerrain(geometry))
+  })
+  await click('選択完了 → 3D')
+  step(3)
+  assert.equal(acquisitions.length, 1)
+  assert.equal(workers.length, 0)
+  await React.act(async () => completeTerrain())
+  step(4)
+  assert.equal(workers.length, 1)
+  await React.act(async () => { workers[0].complete() })
+  assert.ok(slopeGuide(), 'The one-time prompt can appear independently of the tour')
+
+  await click('モジュール配置を3Dで表示', panel())
+  step(5)
+  assert.equal(slopeGuide(), null)
+  await click('次へ', guide())
+  step(6)
+  assert.ok(slopeGuide(), 'The prompt returns outside step five if it was never dismissed')
+  await click('戻る', guide())
+  step(5)
+  assert.equal(slopeGuide(), null)
+  await changeSlope(15)
+  step(6)
+  assert.equal(slopeGuide(), null, 'Direct slope interaction dismisses the prompt')
+  assert.equal(workers.length, 2)
+  await React.act(async () => { workers[1].complete() })
+
+  await click('レポート', panel())
+  assert.equal(guide(), null)
+  assert.equal(window.localStorage.getItem(tourKey), 'completed')
+  assert.equal(window.localStorage.getItem(slopeGuideKey), 'seen')
+
+  await click('チュートリアル')
+  step(5)
+  await click('終了', guide())
+  assert.equal(guide(), null)
+  assert.equal(window.localStorage.getItem(tourKey), 'ended')
 })

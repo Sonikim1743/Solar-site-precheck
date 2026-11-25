@@ -18,13 +18,16 @@ function dateText(value) {
   return value && Number.isFinite(date.getTime()) ? date.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '未記録'
 }
 
-export default function TerrainAreaPanel({ geometry, metrics, analysis, status = 'idle', progress, error, onAnalyze, onCancel, onClear, position, onDrawBoundary, onOpenReport, onOpenDrawing, parcels = [], publicParcels = [], publicParcelsLimited = false, preview, onPreviewChange, outputBlocked = false, dxfReport, preferredView = 'plan', autoLayoutKey, geometryKey = analysis?.geometryKey ?? '' }) {
+export default function TerrainAreaPanel({ geometry, metrics, analysis, status = 'idle', progress, error, onAnalyze, onCancel, onClear, position, onDrawBoundary, onOpenReport, onOpenDrawing, parcels = [], publicParcels = [], publicParcelsLimited = false, preview, onPreviewChange, outputBlocked = false, dxfReport, preferredView = 'plan', autoLayoutKey, geometryKey = analysis?.geometryKey ?? '', onTutorialAction, suppressSlopeCoachmark }) {
   const [layoutNotice, setLayoutNotice] = useState(null)
   const [view, setView] = useState(preferredView === '3d' ? '3d' : 'plan')
   const [shownGeometryKey, setShownGeometryKey] = useState(null)
   const showModules = shownGeometryKey === geometryKey
   useEffect(() => setShownGeometryKey(null), [geometryKey])
-  const toggleModules = () => setShownGeometryKey(shown => shown === geometryKey ? null : geometryKey)
+  const toggleModules = () => {
+    setShownGeometryKey(showModules ? null : geometryKey)
+    if (!showModules) onTutorialAction?.('modules-shown')
+  }
   const id = `terrain-area-${useId().replace(/:/g, '')}`
   const state = typeof status === 'string' ? status : status?.status || 'idle'
   const loading = ['loading', 'fetching', 'calculating'].includes(state)
@@ -69,20 +72,20 @@ export default function TerrainAreaPanel({ geometry, metrics, analysis, status =
   return <section className="terrain-area-panel" aria-labelledby={`${id}-heading`}>
     <h3 id={`${id}-heading`} className="terrain-area-panel-heading">範囲の地形</h3>
     {analysis ? <div className="terrain-area-toolbar">
-      <div className="terrain-area-view-switch" role="group" aria-label="地形の見方"><button type="button" aria-pressed={view === 'plan'} className={view === 'plan' ? 'is-active' : ''} onClick={() => setView('plan')}>等高線</button><button type="button" aria-pressed={view === '3d'} className={`terrain-area-3d-button${view === '3d' ? ' is-active' : ''}`} onClick={() => setView('3d')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 22 7.5v9L12 22 2 16.5v-9Z M2 7.5 12 13l10-5.5 M12 13v9" /></svg>3Dで見る</button></div>
-      <div className="terrain-area-result-actions">{preview?.layout?.analysisReference === analysis && <><button type="button" className="secondary-button" onClick={onOpenDrawing} disabled={!onOpenDrawing || outputBlocked || loading || !layoutOutputState(analysis, preview).current}>配置図PDF · 1枚</button><TerrainDxfButton report={dxfReport} blocked={outputBlocked || loading} /></>}<button type="button" className="secondary-button" onClick={onOpenReport} disabled={!onOpenReport}>レポート</button><button type="button" className="terrain-area-quiet-button" onClick={onAnalyze} disabled={!onAnalyze || loading}>再取得</button></div>
-    </div> : geometry && !loading ? <div className="terrain-area-toolbar"><p className="terrain-area-scope terrain-area-preview"><span>参考範囲</span><strong>約{number(metrics?.usableAreaM2, 0)} <small>m²</small></strong></p><button type="button" className="secondary-button terrain-area-primary-action" onClick={onAnalyze} disabled={!onAnalyze}>{message ? '再試行' : '地形を確認'}</button></div> : null}
+      <div className="terrain-area-view-switch" role="group" aria-label="地形の見方"><button type="button" aria-pressed={view === 'plan'} className={view === 'plan' ? 'is-active' : ''} onClick={() => setView('plan')}>等高線</button><button type="button" data-terrain-tour-anchor="terrain-3d-view" aria-pressed={view === '3d'} className={`terrain-area-3d-button${view === '3d' ? ' is-active' : ''}`} onClick={() => setView('3d')}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 22 7.5v9L12 22 2 16.5v-9Z M2 7.5 12 13l10-5.5 M12 13v9" /></svg>3Dで見る</button></div>
+      <div className="terrain-area-result-actions">{preview?.layout?.analysisReference === analysis && <><button type="button" className="secondary-button" onClick={onOpenDrawing} disabled={!onOpenDrawing || outputBlocked || loading || !layoutOutputState(analysis, preview).current}>配置図PDF · 1枚</button><TerrainDxfButton report={dxfReport} blocked={outputBlocked || loading} /></>}<button type="button" className="secondary-button" data-terrain-tour-anchor="terrain-output" onClick={onOpenReport} disabled={!onOpenReport}>レポート</button><button type="button" className="terrain-area-quiet-button" onClick={onAnalyze} disabled={!onAnalyze || loading}>再取得</button></div>
+    </div> : geometry && !loading ? <div className="terrain-area-toolbar"><p className="terrain-area-scope terrain-area-preview"><span>参考範囲</span><strong>約{number(metrics?.usableAreaM2, 0)} <small>m²</small></strong></p><button type="button" className="secondary-button terrain-area-primary-action" data-terrain-tour-anchor="terrain-acquire" onClick={onAnalyze} disabled={!onAnalyze}>{message ? '再試行' : '地形を確認'}</button></div> : null}
     {!geometry && <div className="terrain-area-empty"><p>地図で範囲を描き、「地形を確認」を押してください。</p><button type="button" className="secondary-button" onClick={onDrawBoundary} disabled={!onDrawBoundary}>範囲を描く</button></div>}
-    {loading && <div className="terrain-area-progress" role="status"><div><strong>{progress?.phase === 'calculating' ? '等高線・勾配を計算中…' : '標高を取得中…'}</strong>{Number.isFinite(progress?.completedTiles) && <span>取得 {progress.completedTiles}タイル{Number.isFinite(progress.totalTiles) ? ` / 現在の対象 ${progress.totalTiles}タイル` : ''}</span>}</div><button type="button" className="secondary-button" onClick={onCancel} disabled={!onCancel}>中止</button></div>}
+    {loading && <div className="terrain-area-progress" data-terrain-tour-anchor="terrain-progress" role="status"><div><strong>{progress?.phase === 'calculating' ? '等高線・勾配を計算中…' : '標高を取得中…'}</strong>{Number.isFinite(progress?.completedTiles) && <span>取得 {progress.completedTiles}タイル{Number.isFinite(progress.totalTiles) ? ` / 現在の対象 ${progress.totalTiles}タイル` : ''}</span>}</div><button type="button" className="secondary-button" onClick={onCancel} disabled={!onCancel}>中止</button></div>}
     {!loading && message && <div className="terrain-area-warning" role="alert"><p>{message}</p></div>}
     {!loading && ['cancelled', 'canceled'].includes(state) && !message && <p className="terrain-area-scope" role="status">取得を中止しました。範囲は保持されています。</p>}
     {analysis && <>
-      {!loading && <p className="terrain-area-feedback" role="status">{feedback}
+      {!loading && <p className="terrain-area-feedback" data-terrain-tour-anchor="terrain-results" role="status">{feedback}
         {view === '3d' && appliedLayout && <><br />{showModules && appliedLayout.moduleCount > 0 ? '3Dはモジュール配置を表示中です。' : '3Dは地形のみ表示中です。'}</>}
       </p>}
       <dl className="terrain-area-summary"><div><dt>図形面積</dt><dd>約{number(summary?.polygonAreaM2, 0)} <small>m²</small></dd></div><div><dt>高低差</dt><dd>約{number(summary?.heightRange)} <small>m</small></dd></div><div><dt title="10m幅で見た局所勾配の中央値">勾配の中央値</dt><dd>{Number.isFinite(summary?.medianSlope) ? `${number(summary.medianSlope)}°` : '未取得'}</dd></div></dl>
       {partial && <p className="terrain-area-warning" role="status">標高・勾配に未確認部分があります。集計は取得部分の参考値です。</p>}
-      {onPreviewChange && <TerrainLayoutPreview analysis={analysis} preview={preview} onChange={onPreviewChange} moduleVisibility={view === '3d' ? { shown: showModules, onToggle: toggleModules } : null} autoCalculateKey={autoLayoutKey} onNoticeChange={setLayoutNotice} parcelCount={parcelOverlay.labels.length} onShow3D={() => setView('3d')} onReacquire={onAnalyze} onBoundary={onDrawBoundary} />}
+      {onPreviewChange && <TerrainLayoutPreview analysis={analysis} preview={preview} onChange={onPreviewChange} moduleVisibility={view === '3d' ? { shown: showModules, onToggle: toggleModules } : null} autoCalculateKey={autoLayoutKey} suppressSlopeCoachmark={suppressSlopeCoachmark} onSlopeChanged={() => onTutorialAction?.('slope-changed')} onNoticeChange={setLayoutNotice} parcelCount={parcelOverlay.labels.length} onShow3D={() => setView('3d')} onReacquire={onAnalyze} onBoundary={onDrawBoundary} />}
       {view === 'plan' ? <TerrainAreaPlan analysis={analysis} position={position} layout={layout} layoutCandidates={layoutPool} onToggleRack={toggleRack} fence={fence} parcelOverlay={shownParcels} rackControls={rackControls} /> : <TerrainArea3D analysis={analysis} position={position} layout={layout} layoutCandidates={layoutPool} onToggleRack={toggleRack} fence={fence} parcelOverlay={shownParcels} rackControls={rackControls} fitOnLayoutReveal interactive />}
       {fence?.truncated && <p className="terrain-layout-footnote" role="status">フェンスは表示上限のため一部だけを描いています。</p>}
       {shownParcels?.truncated && <p className="terrain-layout-footnote" role="status">地番の表示数を制限しています。</p>}

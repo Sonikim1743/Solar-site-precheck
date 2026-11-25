@@ -17,9 +17,27 @@
 .terrain-layout-bar button:focus-visible,.terrain-layout-conditions summary:focus-visible { outline:3px solid #4f9676; outline-offset:3px; }
 .terrain-layout-instruction { flex:1 1 250px; color:#476653; font-size:14px; line-height:1.55; }
 .terrain-layout-slope-select { display:inline-flex; align-items:center; gap:5px; color:#476653; font-size:13px; white-space:nowrap; }
-.terrain-layout-slope-select { margin-left:auto; }
+.terrain-layout-slope-control { display:grid; justify-items:end; max-width:100%; margin-left:auto; }
 .terrain-layout-slope-select select { box-sizing:border-box; width:85px; min-height:36px; padding:5px 6px; border:1px solid #b9d2c3; border-radius:6px; background:#fff; color:#235741; font:inherit; }
 .terrain-layout-slope-select select:focus-visible { outline:3px solid #4f9676; outline-offset:3px; }
+/* Inline guidance keeps the map and the rest of the toolbar interactive. */
+.terrain-layout-slope-select .terrain-layout-slope-highlight {
+  border-color:#966417; border-radius:999px; box-shadow:0 0 0 3px #ffe2a0, 0 0 0 4px #966417;
+}
+.terrain-layout-slope-guide {
+  position:relative; display:flex; align-items:center; gap:6px; box-sizing:border-box;
+  max-width:100%; width:14rem; margin-top:11px; padding:7px 8px 7px 10px;
+  border:1px solid #b68b43; border-radius:9px; background:#fff7e4; color:#4e3819; pointer-events:none;
+}
+.terrain-layout-slope-guide::before {
+  content:""; position:absolute; inset:-6px 35px auto auto; width:10px; height:10px;
+  border-top:1px solid #b68b43; border-left:1px solid #b68b43; background:inherit; transform:rotate(45deg);
+}
+.terrain-layout-slope-guide p { flex:1; margin:0; font-size:13px; line-height:1.5; }
+.terrain-layout-bar .terrain-layout-slope-guide button {
+  display:grid; place-items:center; flex:0 0 36px; width:36px; min-height:36px; padding:0;
+  border:0; background:transparent; color:inherit; font-size:21px; pointer-events:auto;
+}
 .terrain-layout-setback-field { color:#476653; font-size:13px; }
 .terrain-layout-setback-field>div { display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; margin-top:5px; }
 .terrain-layout-fields .terrain-layout-setback-field label { flex-wrap:nowrap; }
@@ -77,7 +95,7 @@
   .terrain-layout-bar { gap:6px; }
   .terrain-layout-bar button,.terrain-layout-utility button,.terrain-layout-slope-select select { min-height:44px; }
   .terrain-layout-bar { display:grid; grid-template-columns:1fr auto; }
-  .terrain-layout-slope-select { margin-left:0; }
+  .terrain-layout-slope-control { margin-left:0; }
   .terrain-layout-utility { gap:6px; }
   .terrain-layout-utility .terrain-help-button { width:40px; min-height:40px; }
   .terrain-layout-count-controls { gap:7px; }

@@ -714,6 +714,7 @@ export default function MapPanel({
   referenceSelections = [],
   onReferenceSelectionsChange,
   onConfirmRegionalParcels,
+  onTutorialDraftChange,
   regionalConfirmError = '',
   terrainSection,
   terrainArea,
@@ -739,6 +740,8 @@ export default function MapPanel({
   const [regionalCandidates,setRegionalCandidates] = useState([])
   const [regionalMessage,setRegionalMessage] = useState('')
   const [regionalDirty,setRegionalDirty] = useState(false)
+  const hasTutorialDraft = Boolean(showPublicParcels && regionalDirty && regionalDraft.length)
+  useEffect(() => { onTutorialDraftChange?.(hasTutorialDraft) }, [hasTutorialDraft, onTutorialDraftChange])
   const [mapPickBusy,setMapPickBusy] = useState(false)
   const mapPickJob=useRef(0)
   const [publicParcelAutoOff, setPublicParcelAutoOff] = useState(false)
@@ -931,13 +934,13 @@ export default function MapPanel({
       <div className="map-draw-controls" role="group" aria-label="地番表示・範囲の作図">
         <button type="button" className={parcelMode === 'boundary' ? 'is-active' : ''} aria-pressed={parcelMode === 'boundary'} onClick={() => onParcelModeChange?.(parcelMode === 'boundary' ? 'point' : 'boundary')} disabled={!onParcelModeChange}>範囲を描く</button>
         <button type="button" className={parcelMode === 'exclusion' ? 'is-active' : ''} aria-pressed={parcelMode === 'exclusion'} onClick={() => onParcelModeChange?.(parcelMode === 'exclusion' ? 'point' : 'exclusion')} disabled={!onParcelModeChange}>除外</button>
-        <button type="button" className={`map-public-parcel-toggle${showPublicParcels ? ' is-active' : ''}`} aria-pressed={showPublicParcels} aria-label="地番選択" title="表示境界を参考領域として選択。原本全筆は未確認。出典情報を参照。" onClick={() => { setPublicParcelAutoOff(false); if(showPublicParcels){mapPickJob.current++;setMapPickBusy(false)}else if(isCompactMap) setMapInteractionEnabled(true);setShowPublicParcels(value => !value) }}>地番選択 {showPublicParcels ? 'ON' : 'OFF'}</button>
+        <button type="button" className={`map-public-parcel-toggle${showPublicParcels ? ' is-active' : ''}`} aria-pressed={showPublicParcels} aria-label="地番選択" data-terrain-tour-anchor="parcel-select" title="表示境界を参考領域として選択。原本全筆は未確認。出典情報を参照。" onClick={() => { setPublicParcelAutoOff(false); if(showPublicParcels){mapPickJob.current++;setMapPickBusy(false)}else if(isCompactMap) setMapInteractionEnabled(true);setShowPublicParcels(value => !value) }}>地番選択 {showPublicParcels ? 'ON' : 'OFF'}</button>
       </div>
 
       <button type="button" className="map-interaction-toggle" disabled={isDrawing} aria-pressed={mapInteractionEnabled} onClick={() => setMapInteractionEnabled(value => !value)} title={isCompactMap ? "ページスクロールと地図操作を切り替えます" : "通常はページをスクロール。ONでホイール拡大。＋と−はいつでも使えます。"}>{isCompactMap ? (mapInteractionEnabled ? "地図操作 ON" : "地図操作を有効化") : ("ホイール拡大 " + (mapInteractionEnabled ? "ON" : "OFF"))}</button>
     </div>
     <p className={"map-load-status" + (tileStatus.status === "error" ? " is-error" : "")} role="status">{tileStatus.status === "loading" ? "地図画像を読み込み中…" : tileStatus.status === "error" ? "地図画像の一部を取得できません。移動・再読み込みして確認してください。" : ""}</p>
-    <div ref={mapShellRef} tabIndex={-1} data-basemap={baseMap} className={`map-shell${isDrawing ? ' map-shell--parcel-drawing' : ''}`} onKeyDown={(event) => {
+    <div ref={mapShellRef} tabIndex={-1} data-basemap={baseMap} data-terrain-tour-anchor={showPublicParcels ? 'parcel-map' : undefined} className={`map-shell${isDrawing ? ' map-shell--parcel-drawing' : ''}`} onKeyDown={(event) => {
       if (!isDrawing || event.target.closest?.('input, textarea, select, button, a, summary')) return
       if (event.key === 'Escape') { event.preventDefault(); cancelDrawing() }
       if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); finishDrawing() }
@@ -1017,7 +1020,7 @@ export default function MapPanel({
     {showPublicParcels && <div className="public-parcel-selected regional-parcel-selection" aria-label="地図境界の選択">
       <strong>選択中 {regionalDraft.length}区域 / 適用済み {confirmedRegional.length}区域</strong>
       {regionalDraft.map(f=><button key={f.id} type="button" disabled={mapPickBusy} onClick={()=>toggleRegional(f)}>{f.properties['地番']} ×</button>)}
-      <button type="button" className="regional-parcel-complete" disabled={mapPickBusy||isDrawing||(!regionalDraft.length&&!confirmedRegional.length)} onClick={()=>{if(onConfirmRegionalParcels?.(regionalDraft)){setRegionalDirty(false);setRegionalMessage(regionalDraft.length ? '表示境界を参考領域として適用しました。3D地形と参考配置は「範囲の地形」で確認できます。' : '適用済みの地図境界を解除しました。');setRegionalCandidates([])}}}>選択完了 → 3D</button>
+      <button type="button" className="regional-parcel-complete" data-terrain-tour-anchor="confirm-parcels" disabled={mapPickBusy||isDrawing||(!regionalDraft.length&&!confirmedRegional.length)} onClick={()=>{if(onConfirmRegionalParcels?.(regionalDraft)){setRegionalDirty(false);setRegionalMessage(regionalDraft.length ? '表示境界を参考領域として適用しました。3D地形と参考配置は「範囲の地形」で確認できます。' : '適用済みの地図境界を解除しました。');setRegionalCandidates([])}}}>選択完了 → 3D</button>
       <button type="button" onClick={()=>{mapPickJob.current++;setMapPickBusy(false);setRegionalDirty(false);setRegionalDraft(confirmedDraft());setRegionalCandidates([]);setRegionalMessage('未適用の選択変更を中止しました。適用済み領域と結果は保持しています。')}}>選択を中止</button>
       <MapParcelNotice message={regionalMessage} drawing={isDrawing} />
       {mapPickBusy&&<p role="status">選択境界を取得中…</p>}{regionalMessage&&!isMapParcelJoinNotice(regionalMessage)&&<p role="status">{regionalMessage}</p>}{regionalConfirmError&&<p role="alert">{regionalConfirmError}</p>}

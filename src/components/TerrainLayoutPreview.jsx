@@ -11,6 +11,21 @@ export { selectedTerrainLayout } from '../utils/terrainLayoutSelection.js'
 const number = (value, digits = 1) => Number.isFinite(value) ? value.toLocaleString('ja-JP', { maximumFractionDigits: digits }) : '—'
 export { terrainLayoutAnalysisKey } from '../utils/terrainLayoutComparison.js'
 
+const SLOPE_COACHMARK_KEY = 'solar-site-precheck-ui-slope-coachmark-v1'
+const SLOPE_SELECT_KEYS = ['Enter', ' ', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown']
+let slopeCoachmarkOfferedInPage = false
+
+function claimSlopeCoachmark() {
+  try {
+    if (window.localStorage.getItem(SLOPE_COACHMARK_KEY) === 'seen') return false
+    window.localStorage.setItem(SLOPE_COACHMARK_KEY, 'seen')
+  } catch {
+    if (slopeCoachmarkOfferedInPage) return false
+  }
+  slopeCoachmarkOfferedInPage = true
+  return true
+}
+
 // Preview settings live in App. View toggles and navigation never edit the
 // selected range, the acquired DEM or the saved record schema.
 export function TerrainLayoutErrorNotice({ error, onRetry, onRefresh, onReacquire, onBoundary, onConditions }) {
@@ -19,7 +34,7 @@ export function TerrainLayoutErrorNotice({ error, onRetry, onRefresh, onReacquir
   return <div className="terrain-area-warning terrain-layout-error" role="alert"><strong>{error.message}</strong><p>{error.hint}</p><div><button type="button" onClick={action} disabled={!action}>{label}</button><button type="button" onClick={onRetry} disabled={!onRetry}>再試行</button></div></div>
 }
 
-export default function TerrainLayoutPreview({ analysis, preview, onChange, parcelCount, onShow3D, onReacquire, onBoundary, autoCalculateKey, onNoticeChange, moduleVisibility }) {
+export default function TerrainLayoutPreview({ analysis, preview, onChange, parcelCount, onShow3D, onReacquire, onBoundary, autoCalculateKey, onNoticeChange, moduleVisibility, suppressSlopeCoachmark = false, onSlopeChanged }) {
   const [localBusy, setBusy] = useState(false)
   const busy = localBusy || Boolean(preview?.calculating)
   const [error, setError] = useState('')
@@ -34,6 +49,19 @@ export default function TerrainLayoutPreview({ analysis, preview, onChange, parc
   onChangeRef.current = onChange
   latestAnalysisRef.current = analysis
   const key = terrainLayoutAnalysisKey(analysis)
+  const [slopeCoachmark, setSlopeCoachmark] = useState(null)
+  const slopeCoachmarkId = `slope-coachmark-${useId().replace(/:/g, '')}`
+  const showSlopeCoachmark = slopeCoachmark?.key === key && slopeCoachmark.shown && !suppressSlopeCoachmark
+  useEffect(() => {
+    if (slopeCoachmark?.key !== key || slopeCoachmark.shown || suppressSlopeCoachmark) return
+    setSlopeCoachmark(claimSlopeCoachmark() ? { key, shown: true } : null)
+  }, [key, slopeCoachmark, suppressSlopeCoachmark])
+
+  const dismissSlopeCoachmark = () => {
+    if (slopeCoachmark?.key !== key) return
+    if (!slopeCoachmark.shown) claimSlopeCoachmark()
+    setSlopeCoachmark(null)
+  }
   const autoRequested = Boolean(autoCalculateKey && autoCalculateKey === key)
   const autoHandled = preview?.autoCalculatedKey === key
   const autoCalculated = autoRequested ? { autoCalculatedKey: key } : {}
@@ -78,7 +106,7 @@ export default function TerrainLayoutPreview({ analysis, preview, onChange, parc
     setBusy(false); clearNotice()
     onChangeRef.current(previous => ({ ...previous, ...autoCalculated, options: { ...options, ...patch }, ...(Object.hasOwn(patch, 'azimuthDeg') ? { layoutMode: 'manual' } : {}), calculating: false }))
   }
-  const calculate = (patch = {}, optimized = false, compareSlopes = false, fixedSouth = false) => {
+  const calculate = (patch = {}, optimized = false, compareSlopes = false, fixedSouth = false, automatic = false) => {
     claimAutomaticRequest()
     const runOptions = normalizeTerrainLayoutOptions({ ...options, ...patch })
     const mode = compareSlopes || fixedSouth ? terrainLayoutMode(preview) : optimized ? 'optimized' : 'manual'
@@ -106,6 +134,7 @@ export default function TerrainLayoutPreview({ analysis, preview, onChange, parc
         }
         const appliedOptions={ ...runOptions, azimuthDeg:data.result.options.azimuthDeg, scanOffsetUM:data.result.options.scanOffsetUM, scanOffsetVM:data.result.options.scanOffsetVM }
         onChangeRef.current(previous => ({ ...previous, options: appliedOptions, appliedOptions, layoutMode: mode, appliedMode: mode, layout: { ...data.result, analysisKey: key, analysisReference: analysis }, activeRackCount: null, disabledRackIds: [], enabled: true, calculating: false }))
+        if (automatic && data.result.options.slopeLimitDeg === 10) setSlopeCoachmark({ key, shown: false })
         onShow3D?.()
       }
       worker.onerror = event => {
@@ -123,7 +152,7 @@ export default function TerrainLayoutPreview({ analysis, preview, onChange, parc
   }
   const startAutomaticLayout = useEffectEvent(() => {
     if (!autoRequested || autoHandled || busy || pool || autoCalculatedKeys.current.has(key)) return
-    calculate(normalizeTerrainLayoutOptions())
+    calculate(normalizeTerrainLayoutOptions(), false, false, false, true)
   })
   useEffect(() => {
     if (!autoRequested || autoHandled || busy || pool || autoCalculatedKeys.current.has(key)) return
@@ -149,8 +178,10 @@ export default function TerrainLayoutPreview({ analysis, preview, onChange, parc
     onNoticeChange?.({ key, message: '参考配置の計算を中止しました。' })
   }
   const changeSlope = value => {
+    dismissSlopeCoachmark()
     changeOptions({ slopeLimitDeg: value })
     if (pool) calculate({ slopeLimitDeg: value })
+    onSlopeChanged?.()
   }
   const columns = options.minColumns === options.maxColumns ? `${options.maxColumns}列` : `${options.minColumns}〜${options.maxColumns}列`
   const widthFor = columns => columns * options.moduleWidthM + (columns - 1) * options.moduleGapM
@@ -159,11 +190,28 @@ export default function TerrainLayoutPreview({ analysis, preview, onChange, parc
 
   return <div className="terrain-layout-preview">
     <div className="terrain-layout-bar">
-      <button type="button" className="terrain-layout-toggle" aria-pressed={pool ? enabled : undefined} disabled={busy || Boolean(moduleVisibility && pool && !pool.rackCount)} onClick={toggle}>{pool ? displayLabel : '参考配置を計算'}</button>
+      <button type="button" className="terrain-layout-toggle" data-terrain-tour-anchor={moduleVisibility && pool?.rackCount ? 'layout-reveal' : !pool && !busy ? 'layout-calculate' : undefined} aria-pressed={pool ? enabled : undefined} disabled={busy || Boolean(moduleVisibility && pool && !pool.rackCount)} onClick={toggle}>{pool ? displayLabel : '参考配置を計算'}</button>
       <button type="button" disabled={busy} onClick={() => calculate({}, false, true)}>地形勾配15° / 20°を比較</button>
       {pool && <button type="button" className="terrain-layout-optimize" disabled={busy} onClick={() => calculate({}, true)}>方位も最適化して適用（±30°）</button>}
       <button type="button" className="terrain-layout-optimize" disabled={busy} onClick={()=>calculate({},false,false,true)}>真南固定・最大配置を比較</button>
-      <label className="terrain-layout-slope-select">配置可能な地形勾配<select aria-label="参考配置の勾配条件" title="選んだ局所勾配未満で参考配置を比較。施工可否の判定ではありません。" value={options.slopeLimitDeg} disabled={busy} onChange={event => changeSlope(Number(event.target.value))}>{[10,15,20].map(degrees => <option key={degrees} value={degrees}>{degrees}°未満</option>)}</select></label>
+      <div className="terrain-layout-slope-control">
+        <label className="terrain-layout-slope-select">
+          配置可能な地形勾配
+          <select aria-label="参考配置の勾配条件" aria-describedby={showSlopeCoachmark ? slopeCoachmarkId : undefined}
+            className={showSlopeCoachmark ? 'terrain-layout-slope-highlight' : undefined} data-terrain-tour-anchor="layout-slope"
+            title="選んだ局所勾配未満で参考配置を比較。施工可否の判定ではありません。"
+            value={options.slopeLimitDeg} disabled={busy}
+            onPointerDown={dismissSlopeCoachmark}
+            onKeyDown={event => { if (SLOPE_SELECT_KEYS.includes(event.key)) dismissSlopeCoachmark() }}
+            onChange={event => changeSlope(Number(event.target.value))}>
+            {[10, 15, 20].map(degrees => <option key={degrees} value={degrees}>{degrees}°未満</option>)}
+          </select>
+        </label>
+        {showSlopeCoachmark && <div className="terrain-layout-slope-guide">
+          <p id={slopeCoachmarkId} role="status">ここで勾配条件を変更できます。15°・20°も選べます。</p>
+          <button type="button" aria-label="勾配条件の案内を閉じる" onClick={dismissSlopeCoachmark}>×</button>
+        </div>}
+      </div>
     </div>
     <div className="terrain-layout-utility">
       <button type="button" aria-expanded={conditionsOpen} aria-controls={conditionsId} onClick={() => setConditionsOpen(value => !value)}><span aria-hidden="true">{conditionsOpen ? '▾' : '▸'}</span> 配置条件</button>
