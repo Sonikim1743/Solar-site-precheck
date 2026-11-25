@@ -17,7 +17,7 @@ after(async () => { await server?.close() })
 test('map selection notice keeps the full boundary warning in a closed accessible dialog after its instruction', () => {
   const html = renderToStaticMarkup(React.createElement(MapParcelNotice))
   const [outside, dialog] = html.split('<dialog')
-  assert.match(outside, /地図を拡大し、表示された地番の内側を押して選択してください（ズーム16以上）。/)
+  assert.match(outside, /地図を拡大し、表示された地番の内側を押して選択してください（ズーム17以上）。/)
   assert.match(outside, /aria-label="地図境界の注意を開く"/)
   assert.match(outside, /aria-haspopup="dialog"/); assert.match(outside, /aria-expanded="false"/)
   assert.ok(!outside.includes(MAP_PARCEL_NOTICE)); assert.ok(dialog.includes(MAP_PARCEL_NOTICE))
@@ -39,6 +39,6 @@ test('only the existing successful fragment-join message enters the conditional 
 test('drawing mode retains its instruction and the same warning entry point', () => {
   const html = renderToStaticMarkup(React.createElement(MapParcelNotice, { drawing: true }))
   assert.match(html, /作図中です。範囲を「確定」または「取消」した後、地番を選択してください。/)
-  assert.doesNotMatch(html, /ズーム16以上/)
+  assert.doesNotMatch(html, /ズーム17以上/)
   assert.match(html, /地図境界の注意を開く/)
 })

@@ -34,7 +34,7 @@ function createPublicParcelLayer(props, context) {
       { dataSource: 'parcels', dataLayer: 'fude', filter: (_, feature) => isPublicParcelFeature(feature), symbolizer: new PolygonSymbolizer({ fill: 'rgba(0,0,0,0)', stroke: 'rgba(22,58,56,.65)', width: 2.3 }) },
       { dataSource: 'parcels', dataLayer: 'fude', filter: (_, feature) => isPublicParcelFeature(feature), symbolizer: new PolygonSymbolizer({ fill: 'rgba(0,0,0,0)', stroke: '#d6ffff', width: 1.15 }) },
     ],
-    labelRules: [{ dataSource: 'parcels', dataLayer: 'fude', minzoom: 15, filter: (_, feature) => Boolean(publicParcelNumber(feature)), symbolizer: new ParcelNumberSymbolizer() }],
+    labelRules: [{ dataSource: 'parcels', dataLayer: 'fude', minzoom: PUBLIC_PARCEL_SOURCE.minZoom, filter: (_, feature) => Boolean(publicParcelNumber(feature)), symbolizer: new ParcelNumberSymbolizer() }],
   })
   let callback = props.onStatus
   let parcelsCallback = props.onPublicParcelsChange
@@ -143,7 +143,7 @@ function createPublicParcelLayer(props, context) {
     report(context.map.getZoom() < PUBLIC_PARCEL_SOURCE.minZoom ? 'zoom' : 'loading')
     scheduleSnapshot()
     props.onPickerChange?.(latlng => {
-      if (!active || context.map.getZoom() < 16) return null
+      if (!active || context.map.getZoom() < PUBLIC_PARCEL_SOURCE.minZoom) return null
       const picked = view.queryFeatures(latlng.lng, latlng.lat, context.map.getZoom(), 0).filter(p => p.layerName === 'fude' && isPublicParcelFeature(p.feature)).map(p=>p.feature)
       if(!picked.length)return null
       const z=Math.min(Math.round(context.map.getZoom())-view.levelDiff,view.maxDataLevel)

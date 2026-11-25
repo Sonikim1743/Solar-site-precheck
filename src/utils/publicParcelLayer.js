@@ -5,7 +5,7 @@ export const PUBLIC_PARCEL_SOURCE = Object.freeze({
   pageUrl: 'https://source.coop/smartmaps/amx-2024-04',
   year: 2024,
   dataLayer: 'fude',
-  minZoom: 14,
+  minZoom: 17,
   maxDataZoom: 16,
 })
 
@@ -63,7 +63,7 @@ export function publicParcelLabelAnchor(rings) {
 export function publicParcelStatus(state) {
   const messages = {
     off: '',
-    zoom: '地番を見るには地図を拡大してください。',
+    zoom: `地番を見るにはズーム${PUBLIC_PARCEL_SOURCE.minZoom}以上に拡大してください。`,
     loading: '公開地番を読み込み中…',
     ready: '公開地番／参考境界',
     empty: 'この表示範囲には公開地番がありません。地番ファイルも利用できます。',

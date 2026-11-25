@@ -7,6 +7,7 @@ import MapPlaceNamesOverlay from './MapPlaceNamesOverlay.jsx'
 import PublicParcelOverlay, { PublicParcelOverlayStatus } from './PublicParcelOverlay.jsx'
 import MapParcelNotice, { isMapParcelJoinNotice } from './MapParcelNotice.jsx'
 import { MAP_PARCEL_SOURCE } from '../utils/mapParcelSelection.js'
+import { PUBLIC_PARCEL_SOURCE } from '../utils/publicParcelLayer.js'
 import L from 'leaflet'
 import { Circle, CircleMarker, GeoJSON, MapContainer, Marker, Polygon, Polyline, Popup, Rectangle, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet'
 import MapDistanceScale from './MapDistanceScale.jsx'
@@ -73,22 +74,16 @@ function ClickHandler({ onSelect, mode, locked, onAddVertex, onFinish, onPublicP
   return null
 }
 
-// The public parcel layer paints every parcel in the viewport, so a wide
-// view renders far more parcels than anyone can inspect and stalls the map.
-// Below this zoom the toggle is switched off automatically instead. Parcel
-// picking itself requires zoom 16, but with the threshold at 17 the layer
-// is already off there, so in practice picking starts at zoom 17.
-const PUBLIC_PARCEL_AUTO_OFF_ZOOM = 17
-
+// Automatically turn off the public parcel layer when the viewport becomes too wide.
 function PublicParcelAutoOff({ enabled, onAutoOff }) {
   const map = useMap()
   useMapEvents({
     zoomend() {
-      if (enabled && map.getZoom() < PUBLIC_PARCEL_AUTO_OFF_ZOOM) onAutoOff()
+      if (enabled && map.getZoom() < PUBLIC_PARCEL_SOURCE.minZoom) onAutoOff()
     },
   })
   useEffect(() => {
-    if (enabled && map.getZoom() < PUBLIC_PARCEL_AUTO_OFF_ZOOM) onAutoOff()
+    if (enabled && map.getZoom() < PUBLIC_PARCEL_SOURCE.minZoom) onAutoOff()
   }, [map, enabled, onAutoOff])
   return null
 }
@@ -783,7 +778,7 @@ export default function MapPanel({
     if (!showPublicParcels || ['boundary','exclusion'].includes(parcelMode)) return false
     if(mapPickBusy)return true
     const picked = publicPickerRef.current?.(latlng)
-    if (!picked) { setRegionalMessage('地番の表示境界の内側を押してください（ズーム16以上）。現在の地点・選択・結果は保持しています。'); return true }
+    if (!picked) { setRegionalMessage(`地番の表示境界の内側を押してください（ズーム${PUBLIC_PARCEL_SOURCE.minZoom}以上）。現在の地点・選択・結果は保持しています。`); return true }
     onSelectionChange?.()
     if(picked.candidates.length>1){setRegionalCandidates(picked.candidates);setRegionalMessage('重なる表示境界があります。下の地番候補から選択してください。')}
     else beginMapPick(picked.candidates[0])
@@ -1018,7 +1013,7 @@ export default function MapPanel({
         )}
       </div>}
     <PublicParcelOverlayStatus status={publicParcelStatus} />
-    {publicParcelAutoOff && !showPublicParcels && <p className="public-parcel-overlay-status" role="status">表示範囲が広いため、地番表示を自動でOFFにしました。地図を拡大してからONにしてください。</p>}
+    {publicParcelAutoOff && !showPublicParcels && <p className="public-parcel-overlay-status" role="status">表示範囲が広いため、地番表示を自動でOFFにしました。ズーム{PUBLIC_PARCEL_SOURCE.minZoom}以上に拡大してからONにしてください。</p>}
     {showPublicParcels && <div className="public-parcel-selected regional-parcel-selection" aria-label="地図境界の選択">
       <strong>選択中 {regionalDraft.length}区域 / 適用済み {confirmedRegional.length}区域</strong>
       {regionalDraft.map(f=><button key={f.id} type="button" disabled={mapPickBusy} onClick={()=>toggleRegional(f)}>{f.properties['地番']} ×</button>)}
