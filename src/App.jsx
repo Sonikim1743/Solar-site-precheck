@@ -37,7 +37,7 @@ import { REGIONAL_PARCEL_SOURCE } from './services/regionalParcels.js'
 import { MAP_PARCEL_SOURCE } from './utils/mapParcelSelection.js'
 import SimpleReviewPanel, { initialSimpleReview } from './components/SimpleReviewPanel.jsx'
 import { normalizeTerrainLayoutOptions } from './utils/terrainLayout.js'
-import { terrainLayoutAnalysisKey } from './utils/terrainLayoutComparison.js'
+import { appliedTerrainPreview, terrainLayoutAnalysisKey } from './utils/terrainLayoutComparison.js'
 import { layoutOutputState, terrainLayoutMode, latestLayoutAnalysis } from './utils/layoutOutputState.js'
 import { analyzeTerrainArea } from './services/terrainArea.js'
 import { normalizeTerrainArea, terrainAreaSnapshot, terrainGeometryKey } from './utils/terrainArea.js'
@@ -3444,6 +3444,7 @@ function AppWorkspace({ coordinateLink }) {
     analyzing: guideAnalyzing,
     hasTerrain: guideHasTerrain,
     modulesVisible: Boolean(terrainAreaKey && visibleModulesKey === terrainAreaKey),
+    layoutEmpty: Boolean(guideHasTerrain && !terrainPreview.calculating && appliedTerrainPreview(currentTerrainArea, terrainPreview)?.moduleCount === 0),
     slopeChanged: guideSlopeChange?.geometryKey === terrainAreaKey
       && guideSlopeChange.from !== sharedLayoutSettings.slopeLimitDeg
       && guideSlopeChange.to === sharedLayoutSettings.slopeLimitDeg,

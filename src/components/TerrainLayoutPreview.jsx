@@ -190,7 +190,7 @@ export default function TerrainLayoutPreview({ analysis, preview, onChange, parc
 
   return <div className="terrain-layout-preview">
     <div className="terrain-layout-bar">
-      <button type="button" className="terrain-layout-toggle" data-terrain-tour-anchor={moduleVisibility && pool?.rackCount ? 'layout-reveal' : !pool && !busy ? 'layout-calculate' : undefined} aria-pressed={pool ? enabled : undefined} disabled={busy || Boolean(moduleVisibility && pool && !pool.rackCount)} onClick={toggle}>{pool ? displayLabel : '参考配置を計算'}</button>
+      <button type="button" className="terrain-layout-toggle" data-terrain-tour-anchor={moduleVisibility && pool ? 'layout-reveal' : !pool && !busy ? 'layout-calculate' : undefined} aria-pressed={pool ? enabled : undefined} disabled={busy || Boolean(moduleVisibility && pool && !pool.rackCount)} onClick={toggle}>{pool ? displayLabel : '参考配置を計算'}</button>
       <button type="button" disabled={busy} onClick={() => calculate({}, false, true)}>地形勾配15° / 20°を比較</button>
       {pool && <button type="button" className="terrain-layout-optimize" disabled={busy} onClick={() => calculate({}, true)}>方位も最適化して適用（±30°）</button>}
       <button type="button" className="terrain-layout-optimize" disabled={busy} onClick={()=>calculate({},false,false,true)}>真南固定・最大配置を比較</button>

@@ -21,7 +21,7 @@ export const TERRAIN_GUIDE_STEPS = Object.freeze([
     title: '3Dでモジュールを確認する',
     anchor: 'layout-reveal',
     fallbackAnchor: ['layout-calculate', 'terrain-3d-view', 'terrain-section'],
-    message: '未計算なら「参考配置を計算」を押します。計算後、「モジュール配置を3Dで表示」で地形にモジュールを重ねます。0枚の場合は勾配条件や範囲を見直してください。',
+    message: '未計算なら「参考配置を計算」を押します。計算後、「モジュール配置を3Dで表示」で地形にモジュールを重ねます。0枚の場合はそのまま次へ進み、次の段階で勾配条件の変更を試せます。',
   },
   {
     title: '地形の勾配条件を変更する',
@@ -37,12 +37,12 @@ export const TERRAIN_GUIDE_STEPS = Object.freeze([
   },
 ])
 
-export function terrainGuideConditions({ parcelSelected, pendingSelection, panelOpen, analyzing, hasTerrain, modulesVisible, slopeChanged, reportOpen }) {
+export function terrainGuideConditions({ parcelSelected, pendingSelection, panelOpen, analyzing, hasTerrain, modulesVisible, slopeChanged, reportOpen, layoutEmpty }) {
   return [
     Boolean(parcelSelected),
     Boolean(parcelSelected && !pendingSelection && panelOpen && (analyzing || hasTerrain)),
     Boolean(!pendingSelection && hasTerrain),
-    Boolean(!pendingSelection && hasTerrain && modulesVisible),
+    Boolean(!pendingSelection && hasTerrain && (modulesVisible || layoutEmpty)),
     Boolean(!pendingSelection && hasTerrain && slopeChanged),
     Boolean(reportOpen),
   ]

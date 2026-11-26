@@ -42,17 +42,36 @@ function visibleOutline(rect, screen) {
 
 const clampPosition = (position, limit, size) => Math.max(SCREEN_GAP, Math.min(position, limit - size - SCREEN_GAP))
 
-function placeCallout(outline, screen, width, height) {
+function rectsOverlap(a, b, margin = 4) {
+  return a.left < b.right + margin && a.right > b.left - margin && a.top < b.bottom + margin && a.bottom > b.top - margin
+}
+
+function placeCallout(outline, screen, width, height, protectedRects = []) {
   if (!outline) return null
   const right = outline.left + outline.width
   const bottom = outline.top + outline.height
   const x = clampPosition(outline.left + (outline.width - width) / 2, screen.width, width)
   const y = clampPosition(outline.top + (outline.height - height) / 2, screen.height, height)
-  if (bottom + height + 2 * SCREEN_GAP <= screen.height) return { left: x, top: bottom + SCREEN_GAP }
-  if (outline.top >= height + 2 * SCREEN_GAP) return { left: x, top: outline.top - height - SCREEN_GAP }
-  if (right + width + 2 * SCREEN_GAP <= screen.width) return { left: right + SCREEN_GAP, top: y }
-  if (outline.left >= width + 2 * SCREEN_GAP) return { left: outline.left - width - SCREEN_GAP, top: y }
-  return { left: x, top: clampPosition(screen.height - height - SCREEN_GAP, screen.height, height) }
+  const candidates = []
+  if (bottom + height + 2 * SCREEN_GAP <= screen.height) candidates.push({ left: x, top: bottom + SCREEN_GAP })
+  if (outline.top >= height + 2 * SCREEN_GAP) candidates.push({ left: x, top: outline.top - height - SCREEN_GAP })
+  if (right + width + 2 * SCREEN_GAP <= screen.width) candidates.push({ left: right + SCREEN_GAP, top: y })
+  if (outline.left >= width + 2 * SCREEN_GAP) candidates.push({ left: outline.left - width - SCREEN_GAP, top: y })
+  const dock = {
+    left: clampPosition(screen.width - width - SCREEN_GAP, screen.width, width),
+    top: clampPosition(screen.height - height - SCREEN_GAP, screen.height, height),
+  }
+  const isClear = candidate => {
+    const rect = { left: candidate.left, top: candidate.top, right: candidate.left + width, bottom: candidate.top + height }
+    return !protectedRects.some(protectedRect => rectsOverlap(rect, protectedRect))
+  }
+  // Never cover another tour target: a covered control cannot be clicked,
+  // which deadlocks the gated steps that require the real operation.
+  for (const candidate of candidates) {
+    if (isClear(candidate)) return candidate
+  }
+  if (isClear(dock)) return dock
+  return candidates[0] ?? dock
 }
 
 function sameRect(a, b) {
@@ -100,7 +119,17 @@ export default function TerrainGuideTour({ step, steps, satisfied = false, onNex
       const bubbleRect = bubble.current?.getBoundingClientRect()
       const width = bubbleRect?.width || Math.min(340, screen.width - 2 * SCREEN_GAP)
       const height = bubbleRect?.height || 140
-      const callout = placeCallout(outline, screen, width, height)
+      const protectedRects = []
+      if (element) {
+        for (const other of document.querySelectorAll('[data-terrain-tour-anchor]')) {
+          if (other === element || other.closest('[hidden]')) continue
+          const otherRect = other.getBoundingClientRect()
+          if (otherRect.width && otherRect.height && other.getClientRects().length) {
+            protectedRects.push({ left: otherRect.left, top: otherRect.top, right: otherRect.right, bottom: otherRect.bottom })
+          }
+        }
+      }
+      const callout = placeCallout(outline, screen, width, height, protectedRects)
       setPosition(previous => previous?.step === step && sameRect(previous.outline, outline) && sameRect(previous.callout, callout)
         ? previous : { step, outline, callout })
     }
