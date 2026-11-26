@@ -1314,7 +1314,8 @@ function AppWorkspace({ coordinateLink }) {
     try {
       let next={...parcelReview,parcels:parcelReview.parcels.filter(p=>!(p.role==='target'&&p.source.fileName===MAP_PARCEL_SOURCE))}
       for(const feature of features)next=setReviewParcel(next,feature,'target',{fileName:MAP_PARCEL_SOURCE,importedAt:new Date().toISOString()})
-      if(features.length){const geometry=measureParcelReview(selectedParcelUnionReview(next)).geometry;if(!geometry)throw Error('選択区域の合併形状を確認できません。');validatePolygonGeometry(geometry)}
+      let unionGeometry=null
+      if(features.length){unionGeometry=measureParcelReview(selectedParcelUnionReview(next)).geometry;if(!unionGeometry)throw Error('選択区域の合併形状を確認できません。');validatePolygonGeometry(unionGeometry)}
       const applied = updateParcelReview(next)
       if (!applied) return false
       if (features.length) {
@@ -1322,6 +1323,10 @@ function AppWorkspace({ coordinateLink }) {
         openReviewSection('terrain-area')
         // Wait for the committed review to supply the accepted geometry to the analysis.
         setConfirmedTerrainKey(applied.terrainKey)
+        // Applying a map selection also sets the calculation point inside the
+        // selection's largest part, as if that spot had been clicked.
+        const center = featureInteriorPoint({ type: 'Feature', geometry: unionGeometry })
+        if (center) selectPosition(center, { resetCandidate: false, preserveParcelReview: true })
       }
       return true
     }catch(error){setParcelReviewStatus(`選択は未確定です。${error.message} 前回の筆・結果は保持しています。`);return false}
