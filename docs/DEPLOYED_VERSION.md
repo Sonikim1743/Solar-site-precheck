@@ -1,3 +1,17 @@
+# 公開更新 — 地図画面に「進め方ヘルプ」フローティングボタンを追加 / 2026-11-26
+
+地図画面に「進め方ヘルプ」フローティングボタンを追加（現在の進行状況からガイドを開始・再開）。
+
+- 運用URL：https://solar-site-precheck.pages.dev/
+- Production ID：`11d1279d-22e8-4085-9ebe-cf7f009f7d44` / branch main / 配布完了
+- 固定URL：https://11d1279d.solar-site-precheck.pages.dev/
+- 配布ソース：`13b62dd771835b928a9e6e16462c6c0ad894bd45`
+- JS：`index-BnO7dDnO.js`
+- 公開preflightは全項目OK（メインHTML、操作マニュアルPDF 6,095,628 bytes、power-grid 400 JSON、nedo-monsola 200・異常mesh 400、inheritance-pdf GET 405）。個人PDFのPOST送信は実施していない。
+- 旧production：`e71d43df-5351-4d30-8bc8-6418935d9880` を復旧用に保持
+
+---
+
 # 公開更新 — 選択地点の座標リンクをコピーする「リンクをコピー」ボタン追加 / 2026-11-26
 
 選択地点の座標リンク(?lat=&lon=)をコピーする「リンクをコピー」ボタンを追加した。地点を選択するとMapLocationBarに「リンクをコピー」ボタンが表示され、コピーしたリンクを開くと同じ地点が開く。
