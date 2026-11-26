@@ -73,7 +73,7 @@ import { generationAtPosition } from '../shared/generation.js'
 import { capacityValueLabel, capacityValueStatusLabel, findCapacityCandidatesByPlaceName, loadBundledChugokuGridCapacity, matchPowerGridCapacity, parseGridCapacityFile, summarizeGridFlowDirection } from './services/gridCapacity.js'
 import { findChugokuGridAreaByAddress } from './services/chugokuGridSources.js'
 import { parseCoordinateInput, toDegreeMinutes } from './utils/coordinates.js'
-import { parseCoordinateLink, savedWorkspaceUrl, loadCoordinateWorkspaceDraft, saveCoordinateWorkspaceDraft, copyCoordinateLink } from './utils/coordinateLink.js'
+import { parseCoordinateLink, loadCoordinateWorkspaceDraft, saveCoordinateWorkspaceDraft, copyCoordinateLink } from './utils/coordinateLink.js'
 import { copyDecimalCoordinates, googleMapsLinks } from './utils/locationLinks.js'
 import './coordinate-link.css'
 import { escapeCsv } from './utils/csv.js'
@@ -3614,15 +3614,6 @@ function AppWorkspace({ coordinateLink }) {
       </header>
 
       <main>
-        {coordinateLink.status !== 'none' && <aside className="coordinate-link-notice no-print" aria-label="座標リンクの一時検討">
-          <div role={coordinateLink.status === 'invalid' ? 'alert' : 'status'}>
-            <strong>{coordinateLink.status === 'valid' ? 'リンクの地点を一時検討（自動保存なし）' : '座標リンクを開けません'}</strong>
-            <p>{coordinateLink.status === 'valid'
-              ? '地図で範囲を選び、地形を確認してください。既存の作業は保持しています。再読み込みはリンクの地点からやり直します。必要な内容は検討記録JSONで保存してください。'
-              : 'lat・lonを1つずつ、緯度20〜50・経度120〜155の数値で指定してください。既存の作業は変更していません。'}</p>
-          </div>
-          <a href={savedWorkspaceUrl(window.location.href)} target="_blank" rel="noreferrer">保存中の作業を別タブで開く ↗</a>
-        </aside>}
         {activePage === 'generation' && <section className="panel solar-generation solar-generation--page no-print" id="solar-generation" aria-label="候補地の参考発電量">
           <div className="solar-generation__heading"><div><h1>参考発電量を計算</h1><p>{siteName || selectedPlaceLabel || (position ? selectedCoordinateText : '先に候補地を選択してください')}</p></div><button type="button" className="secondary-button" onClick={() => switchPage('solar')}>← 候補地へ戻る</button></div>
           <GenerationPanel key={candidateRevision + ":" + selectedCoordinateText} onNotice={setGenerationNotice} position={position} result={generation} onChange={setGeneration} annualYield={solarProMemo.annualYield} draftInputs={generationInputs} onInputsChange={setGenerationInputs} terrain={terrain} snowStation={confirmedSnowStation} onScenarioSources={openReviewSection}
