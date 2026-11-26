@@ -3,6 +3,8 @@ import assert from 'node:assert/strict'
 import { createTerrainDxf, dxfText, downloadTerrainDxf, TERRAIN_DXF_LAYERS } from '../src/utils/terrainDxf.js'
 import { terrainDxfSynthetic } from './fixtures/terrainDxfSynthetic.mjs'
 import { terrainReportLayouts } from '../src/utils/terrainLayoutReport.js'
+import { terrainDrawingAnnotations } from '../src/utils/terrainDrawingAnnotations.js'
+import { terrainDrawingPrintViewports } from '../src/utils/terrainDrawingViewport.js'
 import { terrainPointToLocal } from '../src/utils/terrainArea.js'
 
 const near=(a,b,eps=1e-8)=>assert.ok(Math.abs(a-b)<eps,`${a} != ${b}`)
@@ -107,4 +109,38 @@ test('download is one local DXF Blob and cleans its temporary link and URL',()=>
     URL.createObjectURL=b=>{blob=b;return 'blob:synthetic'};URL.revokeObjectURL=url=>{assert.equal(url,'blob:synthetic');revoked++};globalThis.setTimeout=fn=>fn()
     const result=downloadTerrainDxf(terrainDxfSynthetic());assert.equal(blob.type,'application/dxf');assert.equal(link.download,result.fileName);assert.deepEqual([clicked,removed,revoked],[1,1,1])
   }finally{globalThis.document=previous.document;globalThis.setTimeout=previous.setTimeout;URL.createObjectURL=previous.create;URL.revokeObjectURL=previous.revoke}
+})
+
+
+test('DXF filled arrows use the PDF endpoints in model metres, with rounded DEM slope at each tip',()=>{
+  const report={...terrainDxfSynthetic({fence:false,gradeX:.34,gradeY:-.15}),drawingScale:2000}
+  const {terrainArea:analysis,parcelReview:{parcels}}=report
+  const [,v]=terrainDrawingPrintViewports(analysis.grid,2000), expected=terrainDrawingAnnotations(analysis,v,{parcels}).drainage
+  const dxf=readDxf(createTerrainDxf(report).bytes), shapes=dxf.entities.filter(e=>e.layer==='DRAINAGE_ARROW')
+  const labels=dxf.entities.filter(e=>e.layer==='DRAINAGE_TEXT')
+  assert.ok(expected.length>3)
+  assert.equal(shapes.length,2*expected.length);assert.equal(labels.length,expected.length)
+  expected.forEach(({icon,slopeDeg},i)=>{
+    const [shaft,head]=shapes.slice(2*i,2*i+2)
+    shaft.points[1].forEach((v,j)=>near(v,head.points[0][j]))
+    assert.ok(shaft.groups.some(([c,v])=>c===43&&Number(v)>0))
+    assert.ok(head.groups.some(([c,v])=>c===40&&Number(v)>0))
+    assert.ok(head.groups.some(([c,v])=>c===41&&Number(v)===0))
+    const [a,b]=[shaft.points[0],head.points[1]]
+    assert.ok(b[0]<a[0]&&b[1]>a[1]) // lower elevations lie west and north
+    ;[a,b].map(v.project).forEach((p,j)=>p.forEach((value,k)=>near(value,icon.segments[0][j][k])))
+    near(slopeDeg,Math.atan(Math.hypot(.34,.15))*180/Math.PI)
+    assert.equal(labels[i].text,'20°')
+    const [x,y]=labels[i].points[0]
+    assert.ok(Math.hypot(x-b[0],y-b[1])*v.scale<65)
+  })
+  assert.ok(dxf.entities.some(e=>e.layer==='NOTES'&&e.text.includes('局所勾配（整数丸め）')))
+})
+
+test('flat and sub-1° DEM do not invent drainage arrows or angle text',()=>{
+  for(const gradeX of [0,.01]){
+    const r=createTerrainDxf(terrainDxfSynthetic({gradeX,gradeY:0}))
+    assert.equal(r.counts.DRAINAGE_ARROW,0);assert.equal(r.counts.DRAINAGE_TEXT,0)
+    assert.ok(r.warnings.some(w=>w.includes('表示できる地点なし')))
+  }
 })

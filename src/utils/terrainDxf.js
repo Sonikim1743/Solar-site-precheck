@@ -1,6 +1,7 @@
 import { terrainGeometryKey, terrainPointToLocal } from './terrainArea.js'
 import { measureParcelReview } from './parcelReview.js'
 import { terrainReportLayouts } from './terrainLayoutReport.js'
+import { terrainDxfDrainage } from './terrainDxfDrainage.js'
 import { terrainReportTitle } from './terrainReportTitle.js'
 import { geometryPolygons, featureInteriorPoint } from '../services/parcelGeometry.js'
 
@@ -8,6 +9,7 @@ export const TERRAIN_DXF_LAYERS = Object.freeze({
   BOUNDARY: 2, BOUNDARY_HOLES: 1, MODULES: 5, FENCE: 3,
   CONTOUR: 8, CONTOUR_MAJOR: 32, ELEVATION_TEXT: 7,
   PARCEL_BOUNDARY: 6, PARCEL_TEXT: 7, REFERENCE: 4, NOTES: 7,
+  DRAINAGE_ARROW: 4, DRAINAGE_TEXT: 4, DRAINAGE_ANCHOR: 8,
 })
 const fail = message => { throw new Error(`DXF：${message}`) }
 const number = value => {
@@ -35,13 +37,13 @@ export function createTerrainDxf(report) {
     if (entities.length >= 150000) fail('図形数が上限を超えています。範囲を小さくしてください。')
     counts[entity.layer]++; entities.push(entity)
   }
-  const poly = (layer, points, closed = false) => {
+  const poly = (layer, points, closed = false, widths = {}) => {
     let vertices = points.map(xy)
     if (closed && vertices.length > 1 && vertices[0].every((v, i) => Math.abs(v - vertices.at(-1)[i]) < 1e-8)) vertices.pop()
     if (vertices.length < (closed ? 3 : 2)) fail('線の頂点が不足しています。')
     vertexCount += vertices.length
     if (vertexCount > 500000) fail('頂点数が上限を超えています。')
-    add({ type: 'LWPOLYLINE', layer, points: vertices, closed })
+    add({ type: 'LWPOLYLINE', layer, points: vertices, closed, ...widths })
   }
   const text = (layer, point, value, height = 2) => add({ type: 'TEXT', layer, point: xy(point), text: dxfText(value), height })
   for (const polygon of grid.boundary) polygon.forEach((ring, i) => poly(i ? 'BOUNDARY_HOLES' : 'BOUNDARY', ring, true))
@@ -87,10 +89,19 @@ export function createTerrainDxf(report) {
   poly('REFERENCE', [[west - 6, north - 10], [west - 6, north]])
   poly('REFERENCE', [[west - 8, north - 3], [west - 6, north], [west - 4, north - 3]])
   text('REFERENCE', [west - 7, north + 2], 'N')
+  const drainage = terrainDxfDrainage(analysis, report, fence, entities.filter(e => e.type === 'TEXT'))
+  for (const a of drainage.arrows) {
+    poly('DRAINAGE_ARROW', [a.tail,a.base], false, { width: drainage.shaftWidth })
+    // A width-tapered editable polyline forms the filled triangular head.
+    poly('DRAINAGE_ARROW', [a.base,a.tip], false, { taper: a.headWidth })
+    if (a.leader) poly('DRAINAGE_ANCHOR', a.leader)
+    text('DRAINAGE_TEXT', a.labelPoint, a.label, drainage.height)
+  }
   const origin = grid.origin
   const warnings = [
     ...(fence?.truncated ? ['仮フェンスは表示上限により一部です。'] : []),
     ...(!counts.CONTOUR && !counts.CONTOUR_MAJOR ? ['出力できる等高線はありません（平坦・欠測・未生成を含む）。'] : []),
+    ...(!drainage.arrows.length ? ['想定排水方向：表示できる地点なし（平坦・欠測・表示条件を含む）。'] : []),
     ...(missingNumbers ? [`地番未記載：${missingNumbers}筆（番号は推定していません）。`] : []),
   ]
   const notes = [terrainReportTitle(report),
@@ -100,7 +111,11 @@ export function createTerrainDxf(report) {
     `パネル傾斜 ${layout.options.tiltDeg}度 / 方位 ${layout.options.azimuthDeg}度（北0・時計回り、真南180）/ 仮フェンス ${report.terrainPreview?.fence ? 'ON' : 'OFF'}`,
     `資料 ${analysis.source?.name || '参考DEM'} / 取得 ${analysis.fetchedAt || '未記録'} / 格子 ${grid.step}m（測量精度ではありません）`,
     '紙mm / モデルm：1:1000は1mm=1m、50m=50mm。1:500は2mm=1m。',
-    '地図・航空写真は含みません。標高文字は参考DEM値。境界・地番は原資料の範囲のみ。', ...warnings]
+    '地図・航空写真は含みません。標高文字は参考DEM値。境界・地番は原資料の範囲のみ。',
+    '想定排水方向：参考配置図と同じDEM判定で高→低へ表示。矢印そばの°は局所勾配（整数丸め）。',
+    `注記：矢印長は5°区分の記号長（${drainage.drawingScale === 'auto' ? '自動縮尺' : `1:${drainage.drawingScale}`}ベース）。流路・流量・流速・排水施設を示さない。`,
+    `判定：東西・南北${grid.step*2}m幅で標高を比較。1°未満・欠測は省略。8m区間で逆勾配なし・標高差0.05m以上を確認。`,
+    ...warnings]
   notes.forEach((note, i) => text('NOTES', [west, south - 14 - i * 3], note))
   const lines = [], pair = (code, value) => lines.push(String(code), String(value))
   let handle = 256
@@ -116,7 +131,7 @@ export function createTerrainDxf(report) {
   record('LTYPE', '10', 'AcDbSymbolTableRecord'); pair(100, 'AcDbLinetypeTableRecord'); pair(2, 'CONTINUOUS'); pair(70, 0); pair(3, 'Solid line'); pair(72, 65); pair(73, 0); pair(40, 0); pair(0, 'ENDTAB')
   table('LAYER', '11', Object.keys(TERRAIN_DXF_LAYERS).length + 1)
   for (const [name, color] of [['0', 7], ...Object.entries(TERRAIN_DXF_LAYERS)]) {
-    record('LAYER', '11', 'AcDbSymbolTableRecord'); pair(100, 'AcDbLayerTableRecord'); pair(2, name); pair(70, 0); pair(62, color); pair(6, 'CONTINUOUS')
+    record('LAYER', '11', 'AcDbSymbolTableRecord'); pair(100, 'AcDbLayerTableRecord'); pair(2, name); pair(70, 0); pair(62, color); if (name === 'DRAINAGE_ARROW' || name === 'DRAINAGE_TEXT') pair(420, 0x267aa3); pair(6, 'CONTINUOUS')
   }
   pair(0, 'ENDTAB'); table('STYLE', '12', 1)
   record('STYLE', '12', 'AcDbSymbolTableRecord'); pair(100, 'AcDbTextStyleTableRecord'); pair(2, 'STANDARD'); pair(70, 0); pair(40, 0); pair(41, 1); pair(50, 0); pair(71, 0); pair(42, 1); pair(3, 'msgothic.ttc'); pair(4, ''); pair(0, 'ENDTAB')
@@ -133,8 +148,11 @@ export function createTerrainDxf(report) {
   for (const entity of entities) {
     record(entity.type, '20', 'AcDbEntity'); pair(8, entity.layer)
     if (entity.type === 'LWPOLYLINE') {
-      pair(100, 'AcDbPolyline'); pair(90, entity.points.length); pair(70, entity.closed ? 1 : 0); pair(38, 0)
-      for (const p of entity.points) { pair(10, number(p[0])); pair(20, number(p[1])) }
+      pair(100, 'AcDbPolyline'); pair(90, entity.points.length); pair(70, entity.closed ? 1 : 0); if (entity.width) pair(43, number(entity.width)); pair(38, 0)
+      for (const [i,p] of entity.points.entries()) {
+        pair(10, number(p[0])); pair(20, number(p[1]))
+        if (entity.taper && i === 0) { pair(40, number(entity.taper)); pair(41, 0) }
+      }
     } else {
       pair(100, 'AcDbText'); pair(10, number(entity.point[0])); pair(20, number(entity.point[1])); pair(30, 0); pair(40, number(entity.height)); pair(1, entity.text); pair(50, 0); pair(7, 'STANDARD'); pair(100, 'AcDbText')
     }
