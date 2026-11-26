@@ -1,3 +1,17 @@
+# 公開更新 — 座標リンクを開いたときに地図セクションへ移動し、地番が見えるズームで表示 / 案内バナー削除 / 2026-11-27
+
+座標リンクを開いたときに地図セクションへ移動し、地番が見えるズームで地点を表示するよう改善。あわせて座標リンクの案内バナーを削除。
+
+- 運用URL：https://solar-site-precheck.pages.dev/
+- Production ID：`ec066311-2317-4b35-a8cd-1b0fd348d27d` / branch main / 配布完了
+- 固定URL：https://ec066311.solar-site-precheck.pages.dev/
+- 配布ソース：`2be0926dd3c8e27b4ca32d3d5f8454c269455522`
+- JS：`index-3AXNYcB2.js`
+- 公開preflightは全項目OK（メインHTML、操作マニュアルPDF 6,095,628 bytes、power-grid 400 JSON、nedo-monsola 200・異常mesh 400、inheritance-pdf GET 405）。個人PDFのPOST送信は実施していない。
+- 旧production：`11d1279d-22e8-4085-9ebe-cf7f009f7d44` を復旧用に保持
+
+---
+
 # 公開更新 — 地図画面に「進め方ヘルプ」フローティングボタンを追加 / 2026-11-26
 
 地図画面に「進め方ヘルプ」フローティングボタンを追加（現在の進行状況からガイドを開始・再開）。
