@@ -60,7 +60,7 @@ test('MAPCODE help uses an explicit keyboard button and a hidden controlled note
  assert.ok(note.includes(`id="${controls}"`))
  assert.match(note,/role="note"/);assert.match(note,/hidden=""/)
  assert.doesNotMatch(html,/<details\b|<summary\b/)
- assert.match(html,/role="group" aria-label="座標のコピー"/)
+ assert.match(html,/role="group" aria-label="座標とリンクのコピー"/)
  assert.match(html,/role="status"/)
 })
 
