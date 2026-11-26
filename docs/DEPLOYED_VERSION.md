@@ -1,3 +1,18 @@
+# 公開更新 — ツアー1段階の複数選択・計算地点の自動設定・3D初期視点の南西化 / 2026-11-26
+
+利用者の実使用に基づき3件を公開した。① ツアー1段階は自動で進まず、地番を複数選んで「次へ」で進むよう変更した。② 地図地番の「選択完了」で、合併形状の最も広い部分の内側に計算地点を自動設定するようにした。③ 画面の3D地形の初期視点を35°（北東）から215°（南西）へ変更し、レポート図面の固定視点35°/145°は維持した。
+
+- 運用URL：https://solar-site-precheck.pages.dev/
+- Production ID：`1299c8bc-a78e-4202-904e-f5dcee932998` / branch main / 配布完了
+- 固定URL：https://1299c8bc.solar-site-precheck.pages.dev/
+- 配布ソース：`71c0787c12179d9cc13e2503d7747a66851b94d7`（48ebb00 + 71c0787）
+- Version 1.28.6 / JS：`index-C9jOcBSi.js`
+- 検証済みCloudflare ZIP：`SolarSitePrecheck_release.zip` / 303,579,870 bytes / SHA-256 `4dd90f98ffe7d21b58ed7f69c13ecf7e5413849a240da0f7c5df5029d9b7f51d`
+- 公開preflightは全項目OK（メインHTML、操作マニュアルPDF 6,095,628 bytes、power-grid 400 JSON、nedo-monsola 200・異常mesh 400、inheritance-pdf GET 405）。個人PDFのPOST送信は実施していない。
+- 旧production：`8a10fe30-56fc-4219-be0a-c5b8642c47ef` を復旧用に保持
+
+---
+
 # 公開更新 — DXF排水矢印・勾配ラベルと地図ホイール拡大の初期ON / 2026-11-26
 
 ## 公開更新 — ツアー4段階の詰まり解消と1段階の文言改善 / 2026-11-26
