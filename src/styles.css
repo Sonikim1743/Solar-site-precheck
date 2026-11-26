@@ -7151,3 +7151,43 @@ footer > div:first-child {
   .report-generation-scenario .report-data-block p{margin:6px 0;font-size:10px;line-height:1.45}
   .report-generation-scenario th,.report-generation-scenario td{padding:4px 8px;font-size:10px;line-height:1.35}
 }
+
+
+/* Floating guide help button: starts/resumes the terrain guide from the current state. */
+.guide-fab {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 900;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px 10px 10px;
+  border: none;
+  border-radius: 999px;
+  background: var(--green);
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 10px 30px rgba(13, 80, 61, 0.35);
+}
+.guide-fab:hover { background: var(--green-dark); }
+.guide-fab:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+.guide-fab__mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #fff;
+  color: var(--green-dark);
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1;
+}
+@media (max-width: 640px) {
+  .guide-fab { right: 12px; bottom: 12px; }
+}

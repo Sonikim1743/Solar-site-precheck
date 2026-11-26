@@ -3556,6 +3556,12 @@ function AppWorkspace({ coordinateLink }) {
         onNext={nextTerrainGuide}
         onBack={() => setTerrainGuide(guide => guide?.step > 0 ? { ...guide, step: guide.step - 1 } : guide)}
         onEnd={() => endTerrainGuide('ended')} />
+      {!terrainGuide && activePage === 'solar' && !solarManualActive && (
+        <button type="button" className="guide-fab no-print" onClick={startTerrainGuide} aria-label="進め方ヘルプを開く">
+          <span className="guide-fab__mark" aria-hidden="true">?</span>
+          <span className="guide-fab__label">進め方ヘルプ</span>
+        </button>
+      )}
       <header className="topbar">
         <div className="brand">
           <button type="button" className="brand-mark" onClick={scrollToPageTop} aria-label="ページの先頭へ戻る">
