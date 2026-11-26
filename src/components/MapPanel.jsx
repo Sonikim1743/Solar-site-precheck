@@ -825,8 +825,11 @@ export default function MapPanel({
   const [placeNameStatus, setPlaceNameStatus] = useState(null)
   useEffect(() => setShowTerrainArea(true), [terrainArea?.geometryKey, terrainArea?.fetchedAt])
   const [tileStatus, setTileStatus] = useState({ status: 'loading', failures: 0 })
-  const [isCompactMap, setIsCompactMap] = useState(false)
-  const [mapInteractionEnabled, setMapInteractionEnabled] = useState(false)
+  const [isCompactMap, setIsCompactMap] = useState(() => globalThis.window?.matchMedia?.('(max-width: 640px)')?.matches ?? false)
+  const [mapInteractionOverride, setMapInteractionOverride] = useState(null)
+  // Desktop starts with wheel zoom; compact touch views keep page scrolling.
+  // An explicit choice survives layout changes and desktop drawing actions.
+  const mapInteractionEnabled = mapInteractionOverride ?? !isCompactMap
   const [draftVertices, setDraftVertices] = useState([])
   const draftRef = useRef([])
   const mapShellRef = useRef(null)
@@ -837,7 +840,7 @@ export default function MapPanel({
 
   useEffect(() => {
     if (!isDrawing) return
-    if (isCompactMap) setMapInteractionEnabled(true)
+    if (isCompactMap) setMapInteractionOverride(true)
     mapShellRef.current?.focus({ preventScroll: true })
     const reduceMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
     mapShellRef.current?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' })
@@ -934,10 +937,10 @@ export default function MapPanel({
       <div className="map-draw-controls" role="group" aria-label="地番表示・範囲の作図">
         <button type="button" className={parcelMode === 'boundary' ? 'is-active' : ''} aria-pressed={parcelMode === 'boundary'} onClick={() => onParcelModeChange?.(parcelMode === 'boundary' ? 'point' : 'boundary')} disabled={!onParcelModeChange}>範囲を描く</button>
         <button type="button" className={parcelMode === 'exclusion' ? 'is-active' : ''} aria-pressed={parcelMode === 'exclusion'} onClick={() => onParcelModeChange?.(parcelMode === 'exclusion' ? 'point' : 'exclusion')} disabled={!onParcelModeChange}>除外</button>
-        <button type="button" className={`map-public-parcel-toggle${showPublicParcels ? ' is-active' : ''}`} aria-pressed={showPublicParcels} aria-label="地番選択" data-terrain-tour-anchor="parcel-select" title="表示境界を参考領域として選択。原本全筆は未確認。出典情報を参照。" onClick={() => { setPublicParcelAutoOff(false); if(showPublicParcels){mapPickJob.current++;setMapPickBusy(false)}else if(isCompactMap) setMapInteractionEnabled(true);setShowPublicParcels(value => !value) }}>地番選択 {showPublicParcels ? 'ON' : 'OFF'}</button>
+        <button type="button" className={`map-public-parcel-toggle${showPublicParcels ? ' is-active' : ''}`} aria-pressed={showPublicParcels} aria-label="地番選択" data-terrain-tour-anchor="parcel-select" title="表示境界を参考領域として選択。原本全筆は未確認。出典情報を参照。" onClick={() => { setPublicParcelAutoOff(false); if(showPublicParcels){mapPickJob.current++;setMapPickBusy(false)}else if(isCompactMap) setMapInteractionOverride(true);setShowPublicParcels(value => !value) }}>地番選択 {showPublicParcels ? 'ON' : 'OFF'}</button>
       </div>
 
-      <button type="button" className="map-interaction-toggle" disabled={isDrawing} aria-pressed={mapInteractionEnabled} onClick={() => setMapInteractionEnabled(value => !value)} title={isCompactMap ? "ページスクロールと地図操作を切り替えます" : "通常はページをスクロール。ONでホイール拡大。＋と−はいつでも使えます。"}>{isCompactMap ? (mapInteractionEnabled ? "地図操作 ON" : "地図操作を有効化") : ("ホイール拡大 " + (mapInteractionEnabled ? "ON" : "OFF"))}</button>
+      <button type="button" className="map-interaction-toggle" disabled={isDrawing} aria-pressed={mapInteractionEnabled} onClick={() => setMapInteractionOverride(value => !(value ?? !isCompactMap))} title={isCompactMap ? "ページスクロールと地図操作を切り替えます" : "地図の上でホイール拡大。OFFにすると地図の上でもページをスクロールできます。＋と−はいつでも使えます。"}>{isCompactMap ? (mapInteractionEnabled ? "地図操作 ON" : "地図操作を有効化") : ("ホイール拡大 " + (mapInteractionEnabled ? "ON" : "OFF"))}</button>
     </div>
     <p className={"map-load-status" + (tileStatus.status === "error" ? " is-error" : "")} role="status">{tileStatus.status === "loading" ? "地図画像を読み込み中…" : tileStatus.status === "error" ? "地図画像の一部を取得できません。移動・再読み込みして確認してください。" : ""}</p>
     <div ref={mapShellRef} tabIndex={-1} data-basemap={baseMap} data-terrain-tour-anchor={showPublicParcels ? 'parcel-map' : undefined} className={`map-shell${isDrawing ? ' map-shell--parcel-drawing' : ''}`} onKeyDown={(event) => {
