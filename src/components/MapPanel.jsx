@@ -88,7 +88,7 @@ function PublicParcelAutoOff({ enabled, onAutoOff }) {
   return null
 }
 
-function MapController({ position, viewport, onViewportChange, resetRequest }) {
+function MapController({ position, viewport, onViewportChange, resetRequest, focusParcelZoom = false }) {
   const map = useMap()
   const lastPosition = useRef(viewport ? position : undefined)
   const lastReset = useRef(viewport?.resetRequest || 0)
@@ -100,11 +100,18 @@ function MapController({ position, viewport, onViewportChange, resetRequest }) {
   }
   useMapEvents({ move: remember, moveend: remember, zoomend: remember })
 
+  const parcelFocusUsed = useRef(false)
   useEffect(() => {
     if (lastPosition.current === position) return
     lastPosition.current = position
     map.stop()
-    if (position) map.flyTo([position.lat, position.lon], Math.max(map.getZoom(), 14))
+    if (position) {
+      // A coordinate link opens an isolated review: land at parcel zoom once so
+      // the parcels are visible immediately, then keep the usual floor.
+      const minZoom = focusParcelZoom && !parcelFocusUsed.current ? PUBLIC_PARCEL_SOURCE.minZoom : 14
+      if (focusParcelZoom) parcelFocusUsed.current = true
+      map.flyTo([position.lat, position.lon], Math.max(map.getZoom(), minZoom))
+    }
     // Clearing a candidate stops navigation, but never changes the viewport.
     remember()
   }, [map, position])
@@ -692,6 +699,7 @@ function ReviewGeometryLayers({ review, vertices, onClose, locked = false, dimme
 
 export default function MapPanel({
   position,
+  focusParcelZoom = false,
   regulatoryRequest = 0,
   onInspectionState,
   onSelect,
@@ -975,7 +983,7 @@ export default function MapPanel({
         {showPublicParcels && <PublicParcelOverlay referenceSelections={regionalDraft} onStatus={setPublicParcelStatus} onPickerChange={picker => { publicPickerRef.current = picker }} onPublicParcelsChange={onPublicParcelsChange} />}
         <MapDistanceScale position="bottomleft" />
         <ClickHandler onPublicParcelPick={pickPublicReference} onSelect={onSelect} mode={parcelMode} locked={mapLocked} onAddVertex={addDraftVertex} onFinish={finishDrawing} />
-        <MapController position={position} viewport={viewport} onViewportChange={onViewportChange} resetRequest={mapViewResetRequest} />
+        <MapController position={position} viewport={viewport} onViewportChange={onViewportChange} resetRequest={mapViewResetRequest} focusParcelZoom={focusParcelZoom} />
         <PublicParcelAutoOff enabled={showPublicParcels} onAutoOff={handlePublicParcelAutoOff} />
         <MapInteractionController wheelEnabled={mapInteractionEnabled} locked={mapLocked} drawing={isDrawing} preserveViewport={preserveViewport} resetRequest={mapViewResetRequest} />
         <ParcelLayer

@@ -809,7 +809,7 @@ function AppWorkspace({ coordinateLink }) {
   useEffect(() => {
     if (coordinateLink.status === 'valid') {
       selectPosition(coordinateLink.position)
-      openReviewSection('terrain-area')
+      openReviewSection('site-select')
     }
   }, [])
 
@@ -3760,6 +3760,7 @@ function AppWorkspace({ coordinateLink }) {
 
             <MapPanel
               position={position}
+              focusParcelZoom={coordinateLink.status === 'valid'}
               regulatoryRequest={regulatoryRequest}
               onInspectionState={setInspectionState}
               viewport={mapViewport.current}
