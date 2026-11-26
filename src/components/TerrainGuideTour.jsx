@@ -185,7 +185,7 @@ export default function TerrainGuideTour({ step, steps, satisfied = false, onNex
           <span>{step + 1} / {steps.length}</span>
         </div>
         <p>{current.message}</p>
-        <p>{satisfied ? '✓ できました' : step === 2 ? '分析の完了を待っています。' : '実際に操作すると進めます。'}</p>
+        <p>{satisfied ? (current.satisfiedMessage || '✓ できました') : step === 2 ? '分析の完了を待っています。' : '実際に操作すると進めます。'}</p>
       </div>
       <div className="terrain-guide-tour-actions" role="group" aria-label="チュートリアルの操作">
         <button type="button" className="terrain-guide-tour-end" onClick={onEnd}>終了</button>

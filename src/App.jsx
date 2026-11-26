@@ -3489,7 +3489,9 @@ function AppWorkspace({ coordinateLink }) {
     if (scheduledGuide === terrainGuide && scheduledKey === terrainAreaKey && !guideReviewing) nextTerrainGuide()
   })
   useEffect(() => {
-    if (!guideSatisfied || guideReviewing || terrainGuideStep >= TERRAIN_GUIDE_STEPS.length - 1) return
+    // Step 0 (parcel picking) never auto-advances: the user may select several
+    // parcels and moves on with the Next button when done.
+    if (!guideSatisfied || guideReviewing || terrainGuideStep === 0 || terrainGuideStep >= TERRAIN_GUIDE_STEPS.length - 1) return
     const timer = window.setTimeout(() => advanceAfterFeedback(terrainGuide, terrainAreaKey), 450)
     return () => window.clearTimeout(timer)
   }, [terrainGuide, terrainAreaKey, guideSatisfied, guideReviewing, terrainGuideStep])
