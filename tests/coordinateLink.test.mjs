@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { parseCoordinateLink, savedWorkspaceUrl, loadCoordinateWorkspaceDraft, saveCoordinateWorkspaceDraft } from '../src/utils/coordinateLink.js'
+import { parseCoordinateLink, savedWorkspaceUrl, loadCoordinateWorkspaceDraft, saveCoordinateWorkspaceDraft, coordinateLinkUrl, copyCoordinateLink } from '../src/utils/coordinateLink.js'
 
 test('no coordinates leaves the saved workspace route available', () => {
   for (const query of ['', '?design=simple', '?address=example', '?latitudex=34']) {
@@ -61,6 +61,35 @@ test('direct links, reloads, different points and history never read or replace 
   assert.equal(saveCoordinateWorkspaceDraft(normal, storage, 'test-draft', updated), true)
   assert.deepEqual(JSON.parse(saved), updated)
   assert.equal(writes, 1)
+})
+
+test('share link for a selected point round-trips through the coordinate parser', () => {
+  const url = coordinateLinkUrl({ lat: 35.2712742, lon: 137.2185194 }, 'https://solar-site-precheck.pages.dev/?design=simple#generation')
+  assert.equal(url, 'https://solar-site-precheck.pages.dev/?lat=35.271274&lon=137.218519')
+  const parsed = parseCoordinateLink(new URL(url).search)
+  assert.equal(parsed.status, 'valid')
+  assert.deepEqual(parsed.position, { lat: 35.271274, lon: 137.218519 })
+})
+
+test('share link is empty without a point or outside Japan coverage', () => {
+  const href = 'https://solar-site-precheck.pages.dev/'
+  assert.equal(coordinateLinkUrl(null, href), '')
+  assert.equal(coordinateLinkUrl({ lat: Number.NaN, lon: 133 }, href), '')
+  assert.equal(coordinateLinkUrl({ lat: 10, lon: 133 }, href), '')
+  assert.equal(coordinateLinkUrl({ lat: 35, lon: 100 }, href), '')
+})
+
+test('copying the share link reports success and failure like the coordinate copies', async () => {
+  let copied = ''
+  const clipboard = { writeText: async (text) => { copied = text } }
+  const ok = await copyCoordinateLink({ lat: 35.2713, lon: 137.2185 }, 'https://solar-site-precheck.pages.dev/', clipboard)
+  assert.equal(ok.status, 'success')
+  assert.equal(copied, 'https://solar-site-precheck.pages.dev/?lat=35.2713&lon=137.2185')
+  const missing = await copyCoordinateLink(null, 'https://solar-site-precheck.pages.dev/', clipboard)
+  assert.equal(missing.status, 'error')
+  const failed = await copyCoordinateLink({ lat: 35.2713, lon: 137.2185 }, 'https://solar-site-precheck.pages.dev/', null)
+  assert.equal(failed.status, 'error')
+  assert.match(failed.message, /lat=35\.2713/)
 })
 
 test('coordinate workspaces remain usable even when persistent storage cannot be accessed', () => {

@@ -3,7 +3,7 @@ import { toDegreeMinutes } from '../utils/coordinates.js'
 import { decimalCoordinateText, googleMapsLinks, mapionMapcodeUrl } from '../utils/locationLinks.js'
 import './map-location-bar.css'
 
-export default function MapLocationBar({ position, placeLabel, placeStatus, elevation, onCopy, onCopyDecimal, copyStatus, onFetchElevation, onUseCurrentLocation, onResetWorkspace, locationStatus, resetMapNext = false }) {
+export default function MapLocationBar({ position, placeLabel, placeStatus, elevation, onCopy, onCopyDecimal, onCopyLink, copyStatus, onFetchElevation, onUseCurrentLocation, onResetWorkspace, locationStatus, resetMapNext = false }) {
   const [mapcodeHelpOpen, setMapcodeHelpOpen] = useState(false)
   const mapcodeHelpId = useId()
   const { mapUrl, streetViewUrl } = googleMapsLinks(position)
@@ -18,9 +18,10 @@ export default function MapLocationBar({ position, placeLabel, placeStatus, elev
       <div className="map-point-meta">
         <div className="map-point-coordinates" aria-label="選択地点の緯度・経度">{position ? <><span>{toDegreeMinutes(position.lat, 'lat')}</span><span>{toDegreeMinutes(position.lon, 'lon')}</span></> : <span>緯度・経度 —</span>}</div>
         <button type="button" className="map-point-elevation" aria-label={canFetch ? 'この地点の標高を取得' : `標高 ${height}`} disabled={!canFetch || !onFetchElevation} onClick={onFetchElevation}><span>標高</span><strong>{height}</strong></button>
-        <div className="map-point-copy-actions" role="group" aria-label="座標のコピー">
+        <div className="map-point-copy-actions" role="group" aria-label="座標とリンクのコピー">
           <button type="button" className="map-point-copy" aria-label="緯度・経度（度・分）をコピー" disabled={!position || !onCopy} onClick={onCopy}>度・分コピー</button>
           <button type="button" className="map-point-copy" aria-label="緯度・経度（十進度）をコピー" title="Googleマップに貼り付ける緯度, 経度をコピー" disabled={!decimalText || !onCopyDecimal} onClick={onCopyDecimal}>緯度経度コピー</button>
+          <button type="button" className="map-point-copy" aria-label="この地点を開くリンクをコピー" title="この地点をこのアプリで開くURLをコピー" disabled={!position || !onCopyLink} onClick={onCopyLink}>リンクをコピー</button>
         </div>
       </div>
     </div>

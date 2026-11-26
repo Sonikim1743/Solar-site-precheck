@@ -19,6 +19,31 @@ export function parseCoordinateLink(search = '') {
   return { status: 'valid', key: `point:${lat},${lon}`, position: { lat, lon } }
 }
 
+// Build the shareable link that reopens this app at a selected point, in the
+// same ?lat=&lon= form parseCoordinateLink accepts (Japan coverage only).
+export function coordinateLinkUrl(position, href) {
+  if (!position || !Number.isFinite(position.lat) || !Number.isFinite(position.lon)) return ''
+  if (position.lat < 20 || position.lat > 50 || position.lon < 120 || position.lon > 155) return ''
+  const url = new URL(href)
+  url.search = ''
+  url.searchParams.set('lat', String(Number(position.lat.toFixed(6))))
+  url.searchParams.set('lon', String(Number(position.lon.toFixed(6))))
+  url.hash = ''
+  return url.href
+}
+
+export async function copyCoordinateLink(position, href, clipboard) {
+  const url = coordinateLinkUrl(position, href)
+  if (!url) return { status: 'error', text: '', message: '先に有効な地点を選択してください。' }
+  try {
+    if (typeof clipboard?.writeText !== 'function') throw new Error('Clipboard unavailable')
+    await clipboard.writeText(url)
+    return { status: 'success', text: url, message: 'この地点を開くリンクをコピーしました。' }
+  } catch {
+    return { status: 'error', text: url, message: `コピーできませんでした。次のリンクをコピーしてください：${url}` }
+  }
+}
+
 export function savedWorkspaceUrl(href) {
   const url = new URL(href)
   url.searchParams.delete('lat')

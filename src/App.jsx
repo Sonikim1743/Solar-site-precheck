@@ -73,7 +73,7 @@ import { generationAtPosition } from '../shared/generation.js'
 import { capacityValueLabel, capacityValueStatusLabel, findCapacityCandidatesByPlaceName, loadBundledChugokuGridCapacity, matchPowerGridCapacity, parseGridCapacityFile, summarizeGridFlowDirection } from './services/gridCapacity.js'
 import { findChugokuGridAreaByAddress } from './services/chugokuGridSources.js'
 import { parseCoordinateInput, toDegreeMinutes } from './utils/coordinates.js'
-import { parseCoordinateLink, savedWorkspaceUrl, loadCoordinateWorkspaceDraft, saveCoordinateWorkspaceDraft } from './utils/coordinateLink.js'
+import { parseCoordinateLink, savedWorkspaceUrl, loadCoordinateWorkspaceDraft, saveCoordinateWorkspaceDraft, copyCoordinateLink } from './utils/coordinateLink.js'
 import { copyDecimalCoordinates, googleMapsLinks } from './utils/locationLinks.js'
 import './coordinate-link.css'
 import { escapeCsv } from './utils/csv.js'
@@ -1606,6 +1606,15 @@ function AppWorkspace({ coordinateLink }) {
     const isCurrent = candidateRequests.current.start('coordinate-copy')
     window.clearTimeout(pointActionTimer.current)
     const result = await copyDecimalCoordinates(position, navigator.clipboard)
+    if (!isCurrent()) return
+    setPointActionStatus(result.message)
+    if (result.status === 'success') pointActionTimer.current = window.setTimeout(() => setPointActionStatus(''), 2600)
+  }
+
+  async function handleCopyCoordinateLink() {
+    const isCurrent = candidateRequests.current.start('coordinate-copy')
+    window.clearTimeout(pointActionTimer.current)
+    const result = await copyCoordinateLink(position, window.location.href, navigator.clipboard)
     if (!isCurrent()) return
     setPointActionStatus(result.message)
     if (result.status === 'success') pointActionTimer.current = window.setTimeout(() => setPointActionStatus(''), 2600)
@@ -3785,7 +3794,7 @@ function AppWorkspace({ coordinateLink }) {
               powerGrid={powerGrid.data}
               capacityMatches={capacityMatches}
               googleMapsUrl={googleMapsUrl}
-              locationBar={<MapLocationBar position={position} placeLabel={selectedPlaceLabel} placeStatus={placeInfo.status} elevation={elevation} onCopy={copySelectedCoordinates} onCopyDecimal={handleCopyDecimalCoordinates} copyStatus={pointActionStatus} onFetchElevation={fetchMissingElevation} onUseCurrentLocation={handleUseCurrentLocation} onResetWorkspace={resetWorkTools} locationStatus={locationStatus} resetMapNext={mapResetStage === 'view'} />}
+              locationBar={<MapLocationBar position={position} placeLabel={selectedPlaceLabel} placeStatus={placeInfo.status} elevation={elevation} onCopy={copySelectedCoordinates} onCopyDecimal={handleCopyDecimalCoordinates} onCopyLink={handleCopyCoordinateLink} copyStatus={pointActionStatus} onFetchElevation={fetchMissingElevation} onUseCurrentLocation={handleUseCurrentLocation} onResetWorkspace={resetWorkTools} locationStatus={locationStatus} resetMapNext={mapResetStage === 'view'} />}
             />
 
 
