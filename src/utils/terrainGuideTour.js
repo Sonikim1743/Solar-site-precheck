@@ -3,7 +3,7 @@ export const TERRAIN_GUIDE_STEPS = Object.freeze([
     title: '地図で地番を選ぶ',
     anchor: ['parcel-map', 'parcel-select'],
     fallbackAnchor: 'site-map',
-    message: '地図をズーム17以上に拡大し、「地番選択」をONにします。地番の内側をクリックして、黄色い選択境界を確認します。',
+    message: '地図を拡大して、地番の境界と番号が見えるようにします。見えない間は、まだ拡大が足りません。「地番選択」をONにして、地番の内側をクリックし、黄色い選択境界を確認します。',
   },
   {
     title: '選択した範囲を確定する',
