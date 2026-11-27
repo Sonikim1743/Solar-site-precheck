@@ -1,3 +1,17 @@
+# 公開更新 — 座標リンクで開いた画面では地番選択レイヤーを初期表示ONにした / 2026-11-27
+
+座標リンクで開いた画面では地番選択レイヤーを初期表示ONにした。
+
+- 運用URL：https://solar-site-precheck.pages.dev/
+- Production ID：`755df081-7235-4856-b0ac-55a63c09e13a` / branch main / 配布完了
+- 固定URL：https://755df081.solar-site-precheck.pages.dev/
+- 配布ソース：`46ae809a05a8ee9da6d5c25e80be3a205701baae`
+- JS：`index-B4a71pL7.js`
+- 公開preflightは全項目OK（メインHTML、操作マニュアルPDF 6,095,628 bytes、power-grid 400 JSON、nedo-monsola 200・異常mesh 400、inheritance-pdf GET 405）。個人PDFのPOST送信は実施していない。
+- 旧production：`ec066311-2317-4b35-a8cd-1b0fd348d27d` を復旧用に保持
+
+---
+
 # 公開更新 — 座標リンクを開いたときに地図セクションへ移動し、地番が見えるズームで表示 / 案内バナー削除 / 2026-11-27
 
 座標リンクを開いたときに地図セクションへ移動し、地番が見えるズームで地点を表示するよう改善。あわせて座標リンクの案内バナーを削除。
