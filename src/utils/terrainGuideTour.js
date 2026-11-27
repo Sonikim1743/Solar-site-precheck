@@ -38,6 +38,37 @@ export const TERRAIN_GUIDE_STEPS = Object.freeze([
   },
 ])
 
+// Step 0 variant for areas the public parcel data does not cover: nothing can
+// be clicked, so the range must come from an imported cadastre file or from
+// drawing it on the map.
+const NO_PUBLIC_DATA_STEP = Object.freeze({
+  title: '地図で範囲を決める',
+  anchor: ['parcel-map', 'parcel-select'],
+  fallbackAnchor: 'site-map',
+  message: 'この付近は公開地番データに収録されていないため、地番をクリックでは選べません。範囲は次のどちらかで決めます。①地番ファイル（法務省XML・GeoJSON）がある場合は「範囲・地番の詳細」から読み込み、筆をクリックします。②地図で範囲を描く場合は「範囲・地番の詳細」の「範囲を描く」で、角を順にクリックします。範囲が決まったら「次へ」を押してください。',
+  satisfiedMessage: '✓ 範囲が決まりました。「次へ」を押してください。',
+})
+
+// Step 1 variant when the range was decided without the map-parcel draft:
+// there is no 「選択完了 → 3D」 button, so the terrain panel is opened directly.
+const DIRECT_TERRAIN_STEP = Object.freeze({
+  title: '範囲の地形を開く',
+  anchor: ['terrain-progress', 'terrain-acquire', 'terrain-results'],
+  fallbackAnchor: 'terrain-section',
+  message: '「範囲の地形」を開き、「地形を確認」を押します。標高の取得と地形分析が始まります。',
+})
+
+// Picks the step texts for the current situation: areas without public parcel
+// data get the import/draw guidance, and ranges decided outside the map-parcel
+// draft (file import or hand-drawn) skip the draft-confirm wording.
+export function terrainGuideStepsFor({ noPublicData = false, draftFlow = true } = {}) {
+  return TERRAIN_GUIDE_STEPS.map((step, index) => {
+    if (index === 0 && noPublicData) return NO_PUBLIC_DATA_STEP
+    if (index === 1 && !draftFlow) return DIRECT_TERRAIN_STEP
+    return step
+  })
+}
+
 export function terrainGuideConditions({ parcelSelected, pendingSelection, panelOpen, analyzing, hasTerrain, modulesVisible, slopeChanged, reportOpen, layoutEmpty }) {
   return [
     Boolean(parcelSelected),

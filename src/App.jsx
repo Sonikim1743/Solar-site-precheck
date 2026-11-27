@@ -28,7 +28,7 @@ import HorizonGraphPreview from './components/HorizonGraphPreview.jsx'
 import TerrainSectionPreview from './components/TerrainSectionPreview.jsx'
 import TerrainAreaPanel from './components/TerrainAreaPanel.jsx'
 import TerrainGuideTour from './components/TerrainGuideTour.jsx'
-import { TERRAIN_GUIDE_STEPS, terrainGuideConditions, terrainGuideStartingStep } from './utils/terrainGuideTour.js'
+import { TERRAIN_GUIDE_STEPS, terrainGuideConditions, terrainGuideStartingStep, terrainGuideStepsFor } from './utils/terrainGuideTour.js'
 import TerrainAreaReport from './components/TerrainAreaReport.jsx'
 import TerrainDrawingScaleControl from './components/TerrainDrawingScaleControl.jsx'
 import TerrainDxfButton from './components/TerrainDxfButton.jsx'
@@ -3449,7 +3449,7 @@ function AppWorkspace({ coordinateLink }) {
 
   const guideHasTerrain = Boolean(currentTerrainArea && terrainAreaStatus === 'success')
   const guideAnalyzing = terrainAreaStatus === 'loading' && terrainAreaJob.current.key === terrainAreaKey
-  const guideParcelSelected = terrainGuideDraft ?? parcelReview.parcels.some(parcel => parcel.role === 'target')
+  const guideParcelSelected = terrainGuideDraft ?? (parcelReview.parcels.some(parcel => parcel.role === 'target') || Boolean(parcelReview.boundary))
   const guideSlopeChange = terrainGuide?.slopeChange
   const guideConditions = terrainGuideConditions({
     parcelSelected: guideParcelSelected,
@@ -3463,6 +3463,10 @@ function AppWorkspace({ coordinateLink }) {
       && guideSlopeChange.from !== sharedLayoutSettings.slopeLimitDeg
       && guideSlopeChange.to === sharedLayoutSettings.slopeLimitDeg,
     reportOpen: activePage === 'solar' && reportOpen,
+  })
+  const guideSteps = terrainGuideStepsFor({
+    noPublicData: publicParcelSnapshot.status === 'empty',
+    draftFlow: terrainGuideDraft !== null,
   })
   const rangeChangedDuringGuide = terrainGuideStep >= 2 && (terrainGuide.geometryKey !== terrainAreaKey || terrainGuideDraft !== null)
   const guideSatisfied = Boolean(!rangeChangedDuringGuide && guideConditions[terrainGuideStep])
@@ -3552,7 +3556,7 @@ function AppWorkspace({ coordinateLink }) {
 
   return (
     <div className={`app${simpleDesign ? ' app--simple' : ''}`}>
-      <TerrainGuideTour step={terrainGuideStep} steps={TERRAIN_GUIDE_STEPS} satisfied={guideSatisfied}
+      <TerrainGuideTour step={terrainGuideStep} steps={guideSteps} satisfied={guideSatisfied}
         onNext={nextTerrainGuide}
         onBack={() => setTerrainGuide(guide => guide?.step > 0 ? { ...guide, step: guide.step - 1 } : guide)}
         onEnd={() => endTerrainGuide('ended')} />
