@@ -1,3 +1,17 @@
+# 公開更新 — 公開地番データのない地域でも進め方ヘルプ（ツアー）を進められるようにした / 2026-11-27
+
+公開地番データのない地域でも、地番ファイルの読み込みや手描き範囲で進め方ヘルプ（ツアー）を進められるようにした。
+
+- 運用URL：https://solar-site-precheck.pages.dev/
+- Production ID：`ee4b97b3-49bd-48b9-b37e-4c048116b4aa` / branch main / 配布完了
+- 固定URL：https://ee4b97b3.solar-site-precheck.pages.dev/
+- 配布ソース：`fa7d85e191eb5332b5c6628b441043ec71020d4a`
+- JS：`index-7OD94tJB.js`
+- 公開preflightは全項目OK（メインHTML、操作マニュアルPDF 6,095,628 bytes、power-grid 400 JSON、nedo-monsola 200・異常mesh 400、inheritance-pdf GET 405）。個人PDFのPOST送信は実施していない。
+- 旧production：`1f3dc6f7-9083-4ccb-a047-02baa3f35f8f` を復旧用に保持
+
+---
+
 # 公開更新 — 座標リンクの着地時に地番レイヤーを自動ONにするよう修正（初期ONでは自動OFFが先に働く不具合の是正） / 2026-11-27
 
 座標リンクで開いた画面で、地番レイヤーを初期ONにしても地図の初期ズームで自動OFFが先に働いてしまう不具合を是正した。初期値はOFFのままにし、リンクの地点への移動（フライ）が地番ズーム17に到達した時点で地番レイヤーを自動でONにする。
