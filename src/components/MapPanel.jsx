@@ -741,7 +741,7 @@ export default function MapPanel({
   const hasTerrainOverlay = !!terrainSection?.lines?.length
   const hasRegionLabel = Boolean(getMapRegionLabel(position, placeInfo))
   const [showTerrainArea, setShowTerrainArea] = useState(true)
-  const [showPublicParcels, setShowPublicParcels] = useState(false)
+  const [showPublicParcels, setShowPublicParcels] = useState(focusParcelZoom)
   const confirmedRegional = parcelReview.parcels.filter(p=>p.role==='target'&&p.source.fileName===MAP_PARCEL_SOURCE)
   const confirmedDraft = () => confirmedRegional.map(p=>({type:'Feature',id:p.info.id,geometry:p.geometry,properties:{地番:p.info.number,__parcelId:p.info.id,__parcelSourceName:MAP_PARCEL_SOURCE}}))
   const [regionalDraft,setRegionalDraft] = useState(confirmedDraft)
