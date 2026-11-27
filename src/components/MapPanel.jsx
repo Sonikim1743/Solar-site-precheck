@@ -88,6 +88,21 @@ function PublicParcelAutoOff({ enabled, onAutoOff }) {
   return null
 }
 
+// In a coordinate-link workspace, switch the parcel layer on once the opening
+// fly-to has landed at parcel zoom. Starting with the layer ON would trip the
+// auto-off above, because the map still sits at the initial wide zoom then.
+function PublicParcelLinkAutoEnable({ active, onEnable }) {
+  const map = useMap()
+  const done = useRef(false)
+  useMapEvents({
+    moveend() {
+      if (!active || done.current) return
+      if (map.getZoom() >= PUBLIC_PARCEL_SOURCE.minZoom) { done.current = true; onEnable() }
+    },
+  })
+  return null
+}
+
 function MapController({ position, viewport, onViewportChange, resetRequest, focusParcelZoom = false }) {
   const map = useMap()
   const lastPosition = useRef(viewport ? position : undefined)
@@ -741,7 +756,7 @@ export default function MapPanel({
   const hasTerrainOverlay = !!terrainSection?.lines?.length
   const hasRegionLabel = Boolean(getMapRegionLabel(position, placeInfo))
   const [showTerrainArea, setShowTerrainArea] = useState(true)
-  const [showPublicParcels, setShowPublicParcels] = useState(focusParcelZoom)
+  const [showPublicParcels, setShowPublicParcels] = useState(false)
   const confirmedRegional = parcelReview.parcels.filter(p=>p.role==='target'&&p.source.fileName===MAP_PARCEL_SOURCE)
   const confirmedDraft = () => confirmedRegional.map(p=>({type:'Feature',id:p.info.id,geometry:p.geometry,properties:{地番:p.info.number,__parcelId:p.info.id,__parcelSourceName:MAP_PARCEL_SOURCE}}))
   const [regionalDraft,setRegionalDraft] = useState(confirmedDraft)
@@ -985,6 +1000,7 @@ export default function MapPanel({
         <ClickHandler onPublicParcelPick={pickPublicReference} onSelect={onSelect} mode={parcelMode} locked={mapLocked} onAddVertex={addDraftVertex} onFinish={finishDrawing} />
         <MapController position={position} viewport={viewport} onViewportChange={onViewportChange} resetRequest={mapViewResetRequest} focusParcelZoom={focusParcelZoom} />
         <PublicParcelAutoOff enabled={showPublicParcels} onAutoOff={handlePublicParcelAutoOff} />
+        <PublicParcelLinkAutoEnable active={focusParcelZoom && !showPublicParcels} onEnable={() => { setPublicParcelAutoOff(false); setShowPublicParcels(true) }} />
         <MapInteractionController wheelEnabled={mapInteractionEnabled} locked={mapLocked} drawing={isDrawing} preserveViewport={preserveViewport} resetRequest={mapViewResetRequest} />
         <ParcelLayer
           data={parcelData}
